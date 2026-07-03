@@ -6,6 +6,32 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 4 — Scheduling & Timetable)
+- `class_session`, `enrollment`, `schedule_entry`, `schedule_change_request` tables (Alembic revision `0005_scheduling`, corrected from the roadmap's stale `0004_scheduling` filename), matching `Database_Design.md` §6.9-6.13 column-for-column, with `index=True`/`UniqueConstraint`/`Index` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `GET /schedule/me`: Student/Teacher own timetable, scoped via `enrollment`/`teacher_id` respectively
+- `POST/PUT/DELETE /schedule`: Admin schedule-entry management, with VR-007 (start before end) and BR-005 (no double-booking) enforced on both create and update — conflict detection is a genuine interval-overlap query (`existing.start < new.end AND new.start < existing.end`), not just the DB-level exact-duplicate `UniqueConstraint`, so two bookings with different `start_time` values that still overlap are correctly caught
+- `GET /schedule/conflicts`: computes all overlapping room/teacher pairs across the current schedule state
+- `POST /schedule/change-requests` / `POST /schedule/change-requests/{id}/resolve`: Teacher-submit/Admin-resolve schedule change workflow (BR-004 — a Teacher may only request a change to their own schedule entry; approving re-validates VR-007/BR-005 against the requested new time before applying it)
+- `POST /schedule/class-sessions`, `POST /schedule/enrollments` (Derived Engineering Additions, confirmed with the user): minimal Admin-only creation endpoints for two tables referenced as foreign keys throughout Scheduling/Exams/Attendance but with no creation endpoint anywhere in the source documents — without them, `POST /schedule` could not be exercised at all
+- Frontend: `features/schedule/index.ts` (React Query hooks for all schedule endpoints), `pages/Timetable/index.tsx` (role-branched: Student/Teacher read-only weekly grid with a Teacher-only "Request Change" action per cell; Admin schedule-management panel)
+- Backend test suite: `tests/unit/test_schedule_service.py`, `tests/integration/test_schedule_router.py` — 27 new tests, 99 total passing
+
+### Fixed (Milestone 4)
+- `make_department()`'s fixed default name/code in `tests/conftest.py` collided when a single test called two fixtures that each independently created a department (same class of test-isolation bug found once in Milestone 3) — fixed by making the fixture generate a unique department by default; no application code affected
+
+### Changed (Milestone 4 — Documentation)
+- `docs/Implementation_Roadmap.md`: fixed the systemic migration-filename off-by-one across every milestone entry — M1's entry was still wrong after two reactive fixes for M2/M3, and M4-M9 all had the same bug; migrations now read `0002` (M1) through `0010` (M9), matching the actual sequential numbering Alembic requires. Added the two schedule-change-request endpoints to M4's API list (already scoped to M4 by `API_Contract.md`'s own text, but omitted from the roadmap's bullet list). Added a Milestone 4 scope note for the two new Derived endpoints, confirmed with the user.
+- `docs/Requirement_Traceability_Matrix.md`: corrected a note that incorrectly grouped FR-050 (schedule-change-request) with the Milestone 9 notification gaps — the correct owner is Milestone 4, per `API_Contract.md`'s own endpoint-level text and `schedule_change_request.py` being an M4 file. FR-045-FR-050 and NFR-015 updated to Verified; FR-051 left honestly `Pending` (the `notification` module doesn't exist until Milestone 9).
+- `docs/API_Contract.md`: added Section 7.8 `POST /schedule/class-sessions` and 7.9 `POST /schedule/enrollments`.
+- `docs/Proposal_vs_Engineering_Additions.md`: classified both new endpoints as Derived, documenting why minimal Admin-only create was chosen over Milestone 3's seed-only precedent (these two are load-bearing for M4's own deliverables, not a deferrable feature).
+- `PROJECT_PROGRESS.md`: Milestone 3's Review Status updated to Approved (user sign-off, git tag `v0.4-milestone3`); Milestone 4 row and full Milestone Detail Log entry added; Summary section updated (42% overall progress, current/last/next milestone, HEAD commit).
+
+### Known Issues (Milestone 4)
+- The Admin panel's `class_session_id` fields are raw UUID text inputs, not dropdowns — no `GET /schedule/class-sessions` list endpoint exists, since the Derived endpoints approved for this milestone were deliberately scoped to create-only.
+- FR-051 (instant schedule-change notifications) is not implemented — depends on the Milestone 9 notification module.
+- Migration `0005_scheduling` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+
 ### Added (Milestone 3 — User Management & Profiles)
 - `student`, `teacher`, `parent`, `admin`, `parent_student_link` tables (Alembic revision `0004_role_profiles`, corrected from the roadmap's stale `0003_role_profiles` filename — `0003` was already consumed by Milestone 2), matching `Database_Design.md` §6.2-6.6 column-for-column, with `index=True`/`UniqueConstraint` declared on the models themselves so `alembic revision --autogenerate` stayed clean on the first attempt (applying the Milestone 2 review's finding proactively this time)
 - `GET /users/me` / `PUT /users/me`: self-service profile retrieval/update, merged with role-specific fields (Student/Teacher/Parent/Admin), VR-009 (role/`is_active`/`department_id` cannot be edited via this endpoint) enforced structurally by the request schema having no such field, not just a runtime check
