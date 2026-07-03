@@ -9,6 +9,8 @@ import { AppLayout } from "../components/AppLayout";
 import { RouteGuard } from "../auth/RouteGuard";
 import LoginPage from "../pages/Login";
 import DashboardPage from "../pages/Dashboard";
+import ProfilePage from "../pages/Profile";
+import UserManagementPage from "../pages/Admin/UserManagement";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -29,6 +31,14 @@ export const router = createBrowserRouter([
           {
             path: "/dashboard",
             element: <DashboardPage />,
+          },
+          {
+            path: "/profile",
+            element: <ProfilePage />,
+          },
+          {
+            path: "/admin/users",
+            element: <UserManagementPage />,
           },
         ],
       },

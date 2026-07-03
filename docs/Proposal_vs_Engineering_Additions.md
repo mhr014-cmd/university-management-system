@@ -167,6 +167,14 @@ Found during a Milestone 0 self-review against the full documentation set (per t
 
 ---
 
+## Milestone 3 Addition: `frontend/src/features/departments/index.ts`
+
+**Classification: Derived.** Not a proposal feature or a new API endpoint — the backend `GET /departments` endpoint it wraps already exists and is documented (Milestone 1, §10 of this document). Added because the Admin: User Management page's department selector and filter (`docs/UI_Wireframes.md` §10 — "Dept: All ▾" filter, and the Create/Edit Account form's Department field) genuinely need a typed React Query hook for it, per `CLAUDE.md` §7 ("components call these hooks, never `fetch`/`axios` directly"), and no frontend wrapper for any reference-data endpoint existed yet (Milestone 1 shipped backend-only; Milestone 0's scaffold never created a `features/departments/` or `features/reference-data/` placeholder).
+
+**Disposition:** Permanent — every future milestone whose UI needs a department picker (Scheduling, Fees, Reports) will reuse this hook rather than duplicating it.
+
+---
+
 ## Frontend / UI Engineering Decisions (Not API Endpoints)
 
 Found during the Milestone 0 proposal-traceability review: two frontend elements shipped in Milestone 0 with no corresponding proposal sentence and no wireframe in `docs/UI_Wireframes.md`. Both were explicitly requested in the Milestone 0 implementation prompt ("Theme support," "Health API connectivity test") — they are authorized, not silently invented — but per the same traceability rule applied to endpoints above, they still need to be logged rather than left undocumented.
