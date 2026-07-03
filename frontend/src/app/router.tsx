@@ -1,9 +1,12 @@
-// Application router — basic navigation shell (Milestone 0).
-// Role-aware route guards (frontend/src/auth/RouteGuard.tsx) are wired in
-// starting Milestone 2; every route below is currently public.
+// Application router.
+// Every route under AppLayout is wrapped in RouteGuard (Milestone 2):
+// unauthenticated users are redirected to /login. Server-side RBAC
+// (app/middleware/rbac.py) is the actual enforcement — this is UX only,
+// per CLAUDE.md Section 7.
 
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout";
+import { RouteGuard } from "../auth/RouteGuard";
 import LoginPage from "../pages/Login";
 import DashboardPage from "../pages/Dashboard";
 import NotFoundPage from "../pages/NotFound";
@@ -18,11 +21,16 @@ export const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
-    element: <AppLayout />,
+    element: <RouteGuard />,
     children: [
       {
-        path: "/dashboard",
-        element: <DashboardPage />,
+        element: <AppLayout />,
+        children: [
+          {
+            path: "/dashboard",
+            element: <DashboardPage />,
+          },
+        ],
       },
     ],
   },
