@@ -1,0 +1,4 @@
+/* Global styles — Tailwind entry point (placeholder). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
