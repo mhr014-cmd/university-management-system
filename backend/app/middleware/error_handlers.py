@@ -27,7 +27,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         logger.info("Validation error on %s %s: %s", request.method, request.url.path, exc.errors())
         return _error_response(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             "validation_error",
             "Request validation failed.",
             details=exc.errors(),
@@ -60,5 +60,5 @@ def _code_for_status(status_code: int) -> str:
         status.HTTP_403_FORBIDDEN: "forbidden",
         status.HTTP_404_NOT_FOUND: "not_found",
         status.HTTP_409_CONFLICT: "conflict",
-        status.HTTP_422_UNPROCESSABLE_ENTITY: "validation_error",
+        status.HTTP_422_UNPROCESSABLE_CONTENT: "validation_error",
     }.get(status_code, "error")
