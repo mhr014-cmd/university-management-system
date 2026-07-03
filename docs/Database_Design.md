@@ -320,8 +320,12 @@ Parent ──M:N── Student  (via ParentStudentLink, R5)
 | password_hash | string | not null |
 | role | enum(student, teacher, parent, admin) | not null |
 | is_active | boolean | not null, default true — supports BR-006 deactivation |
+| current_refresh_token_jti | string | nullable — see Milestone 2 design note below |
+| refresh_token_expires_at | timestamp | nullable — see Milestone 2 design note below |
 | created_at | timestamp | not null |
 | updated_at | timestamp | not null |
+
+**Milestone 2 design note (added 2026-07-04):** `current_refresh_token_jti` and `refresh_token_expires_at` resolve a gap the original design left open — `System_Architecture.md` §5.6 requires logout to invalidate the refresh token "server-side (denylist or rotation record)" and `Requirement_Analysis.md` NFR-004 requires refresh-token rotation, but no storage mechanism was specified. Resolved as: single active refresh token per user, tracked by its JWT ID (`jti`) claim and expiry directly on `user`, rather than a separate session-tracking table. Consequence, chosen deliberately: **one active session per user at a time** — logging in on a second device invalidates the first, since a new login overwrites `current_refresh_token_jti`. `POST /auth/refresh` compares the presented token's `jti` against this column and rejects if it doesn't match (already rotated/superseded) or has expired; `POST /auth/refresh` also rotates it to a new `jti` on success; `POST /auth/logout` clears both columns.
 
 ### 6.2 `student`
 | Column | Type | Notes |

@@ -157,6 +157,16 @@ Found during a Milestone 0 self-review against the full documentation set (per t
 
 ---
 
+## Milestone 2 Schema Addition: `user.current_refresh_token_jti` / `user.refresh_token_expires_at`
+
+**Classification: Derived.** Same category as the Milestone 0 middleware/utilities above — not a proposal feature, an unavoidable prerequisite for delivering ones that are. `Requirement_Analysis.md` NFR-004 (refresh-token rotation) and `System_Architecture.md` §5.6 (server-side logout invalidation) are both Required, but `Database_Design.md`'s original `user` table (§6.1) had no column to persist that state — the design was left open ("denylist or rotation record") rather than decided. Resolved by explicit user decision (2026-07-04, Milestone 2 kickoff): single active refresh token per user, tracked via two new nullable columns rather than a separate session table. Full rationale and the "one active session per user" consequence are documented in `Database_Design.md` §6.1's Milestone 2 design note.
+
+**Disposition:** Permanent, not optional — required for `POST /auth/refresh` and `POST /auth/logout` (both Required, FR-002/FR-003) to function per their documented rotation/invalidation behavior.
+
+**Also added, not originally enumerated in `Implementation_Roadmap.md`'s Milestone 2 file list:** `backend/app/repositories/user_repository.py`. Same precedent as Milestone 1 — `CLAUDE.md` §6's layering rule (services never touch the ORM session directly) is binding regardless of what a milestone's file list happens to spell out.
+
+---
+
 ## Frontend / UI Engineering Decisions (Not API Endpoints)
 
 Found during the Milestone 0 proposal-traceability review: two frontend elements shipped in Milestone 0 with no corresponding proposal sentence and no wireframe in `docs/UI_Wireframes.md`. Both were explicitly requested in the Milestone 0 implementation prompt ("Theme support," "Health API connectivity test") — they are authorized, not silently invented — but per the same traceability rule applied to endpoints above, they still need to be logged rather than left undocumented.

@@ -88,7 +88,8 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/middleware/rbac.py` (role + ownership check dependency)
 - `backend/app/routers/auth.py`
 - `backend/app/services/auth_service.py`
-- `backend/alembic/versions/0002_user.py`
+- `backend/app/repositories/user_repository.py` (per `CLAUDE.md` §6 layering — routers/services never touch the ORM session directly; not originally enumerated here, same precedent as Milestone 1)
+- `backend/alembic/versions/0003_user.py` (corrected from `0002_user.py` — revision `0002` was already consumed by Milestone 1's `0002_core_reference_data`, a stale artifact from before real sequential migrations existed)
 - `frontend/src/auth/` (auth context, token storage, route guards)
 - `frontend/src/pages/Login/`
 

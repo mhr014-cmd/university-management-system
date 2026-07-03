@@ -78,8 +78,8 @@
 - **Validation:** Refresh token must be well-formed and not expired/revoked.
 - **Possible Errors:** Refresh token missing (422); refresh token invalid, expired, or revoked (401).
 - **Status Codes:** 200 OK, 401 Unauthorized, 422 Unprocessable Entity.
-- **Database Tables Used:** `user` (implicitly, to re-verify `is_active` status before issuing a new token).
-- **Business Rules:** Refresh tokens are rotated on use (NFR-004) — the old refresh token is invalidated once a new one is issued.
+- **Database Tables Used:** `user` — re-verifies `is_active`, and compares the presented token's `jti` claim against `user.current_refresh_token_jti` (per `Database_Design.md` §6.1 Milestone 2 design note) to detect reuse of an already-rotated or logged-out token.
+- **Business Rules:** Refresh tokens are rotated on use (NFR-004) — `user.current_refresh_token_jti` is updated to the new token's `jti` and `refresh_token_expires_at` extended; the old `jti` no longer matches and is rejected if presented again.
 
 ### 1.3 `POST /auth/logout`
 
@@ -91,7 +91,7 @@
 - **Validation:** none beyond authentication.
 - **Possible Errors:** Missing/invalid access token (401).
 - **Status Codes:** 204 No Content, 401 Unauthorized.
-- **Database Tables Used:** `user` (session/refresh-token revocation record, if tracked separately).
+- **Database Tables Used:** `user` — clears `current_refresh_token_jti` and `refresh_token_expires_at` (per `Database_Design.md` §6.1 Milestone 2 design note), so the refresh token the client discards is also rejected server-side if it's ever presented again.
 - **Business Rules:** none beyond immediate session invalidation.
 
 ### 1.4 `PUT /auth/password`
