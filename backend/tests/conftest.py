@@ -103,3 +103,74 @@ def auth_headers():
         return {"Authorization": f"Bearer {access_token}"}
 
     return _auth_headers
+
+
+@pytest.fixture
+def make_department(db_session):
+    from app.models.department import Department
+
+    def _make_department(name: str = "Computer Science", code: str = "CS") -> Department:
+        department = Department(name=name, code=code)
+        db_session.add(department)
+        db_session.commit()
+        db_session.refresh(department)
+        return department
+
+    return _make_department
+
+
+@pytest.fixture
+def make_student_user(db_session, make_user, make_department):
+    from datetime import date
+
+    from app.models.student import Student
+
+    def _make_student_user(email: str, password: str, department=None, is_active: bool = True) -> tuple:
+        department = department or make_department()
+        user = make_user(email, password, "student", is_active=is_active)
+        student = Student(
+            user_id=user.id,
+            department_id=department.id,
+            first_name="Test",
+            last_name="Student",
+            enrollment_date=date(2026, 1, 1),
+        )
+        db_session.add(student)
+        db_session.commit()
+        db_session.refresh(student)
+        return user, student
+
+    return _make_student_user
+
+
+@pytest.fixture
+def make_teacher_user(db_session, make_user, make_department):
+    from app.models.teacher import Teacher
+
+    def _make_teacher_user(email: str, password: str, department=None, is_active: bool = True) -> tuple:
+        department = department or make_department()
+        user = make_user(email, password, "teacher", is_active=is_active)
+        teacher = Teacher(
+            user_id=user.id, department_id=department.id, first_name="Test", last_name="Teacher"
+        )
+        db_session.add(teacher)
+        db_session.commit()
+        db_session.refresh(teacher)
+        return user, teacher
+
+    return _make_teacher_user
+
+
+@pytest.fixture
+def make_admin_user(db_session, make_user):
+    from app.models.admin import Admin
+
+    def _make_admin_user(email: str, password: str) -> tuple:
+        user = make_user(email, password, "admin")
+        admin = Admin(user_id=user.id, first_name="Test", last_name="Admin")
+        db_session.add(admin)
+        db_session.commit()
+        db_session.refresh(admin)
+        return user, admin
+
+    return _make_admin_user

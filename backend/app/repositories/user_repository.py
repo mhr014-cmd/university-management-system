@@ -1,18 +1,31 @@
 """
-Data access repository: user.
+Data access repository: user (and role-profile tables — student, teacher,
+parent, admin).
 
-All SQLAlchemy queries for the `user` table live here, per CLAUDE.md §6.
-No user-creation method here — Milestone 2 has no account-creation
-endpoint (that's Milestone 3, User Management); adding one now would be
-scope beyond what this milestone needs.
+All SQLAlchemy queries for the `user` table and its 1:1 role-profile
+tables live here, per CLAUDE.md §6. Milestone 3 extends this same module
+(rather than adding student_repository.py/teacher_repository.py) per the
+design already established by this file's Milestone 2 docstring and
+Implementation_Roadmap.md's Milestone 3 file list, which names only this
+one repository file for the whole user domain.
+
+No transaction commits for the create/update methods below — the service
+layer owns transaction boundaries (e.g. creating a `user` row and its
+profile row atomically), per CLAUDE.md §6. `session.flush()` is used
+instead, so generated defaults (id, timestamps) are available to the
+caller without ending the transaction.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.admin import Admin
+from app.models.parent import Parent
+from app.models.student import Student
+from app.models.teacher import Teacher
 from app.models.user import User
 
 
@@ -40,3 +53,103 @@ class UserRepository:
         user.password_hash = password_hash
         session.add(user)
         session.commit()
+
+    def create_user(self, session: Session, *, email: str, password_hash: str, role: str) -> User:
+        user = User(email=email, password_hash=password_hash, role=role)
+        session.add(user)
+        session.flush()
+        return user
+
+    # --- student -----------------------------------------------------
+
+    def get_student_profile_by_user_id(self, session: Session, user_id: uuid.UUID) -> Student | None:
+        return session.scalar(select(Student).where(Student.user_id == user_id))
+
+    def get_student_with_user(self, session: Session, student_id: uuid.UUID) -> tuple[Student, User] | None:
+        row = session.execute(
+            select(Student, User).join(User, Student.user_id == User.id).where(Student.id == student_id)
+        ).first()
+        return (row[0], row[1]) if row else None
+
+    def list_students_with_user(
+        self, session: Session, page: int, page_size: int, department_id: uuid.UUID | None = None
+    ) -> tuple[list[tuple[Student, User]], int]:
+        stmt = select(Student, User).join(User, Student.user_id == User.id)
+        if department_id is not None:
+            stmt = stmt.where(Student.department_id == department_id)
+        stmt = stmt.order_by(Student.last_name, Student.first_name)
+        total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        rows = session.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
+        return [(row[0], row[1]) for row in rows], total
+
+    def create_student(
+        self,
+        session: Session,
+        *,
+        user_id: uuid.UUID,
+        department_id: uuid.UUID,
+        first_name: str,
+        last_name: str,
+        enrollment_date: date,
+    ) -> Student:
+        student = Student(
+            user_id=user_id,
+            department_id=department_id,
+            first_name=first_name,
+            last_name=last_name,
+            enrollment_date=enrollment_date,
+        )
+        session.add(student)
+        session.flush()
+        return student
+
+    # --- teacher -------------------------------------------------------
+
+    def get_teacher_profile_by_user_id(self, session: Session, user_id: uuid.UUID) -> Teacher | None:
+        return session.scalar(select(Teacher).where(Teacher.user_id == user_id))
+
+    def get_teacher_with_user(self, session: Session, teacher_id: uuid.UUID) -> tuple[Teacher, User] | None:
+        row = session.execute(
+            select(Teacher, User).join(User, Teacher.user_id == User.id).where(Teacher.id == teacher_id)
+        ).first()
+        return (row[0], row[1]) if row else None
+
+    def list_teachers_with_user(
+        self, session: Session, page: int, page_size: int, department_id: uuid.UUID | None = None
+    ) -> tuple[list[tuple[Teacher, User]], int]:
+        stmt = select(Teacher, User).join(User, Teacher.user_id == User.id)
+        if department_id is not None:
+            stmt = stmt.where(Teacher.department_id == department_id)
+        stmt = stmt.order_by(Teacher.last_name, Teacher.first_name)
+        total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        rows = session.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
+        return [(row[0], row[1]) for row in rows], total
+
+    def create_teacher(
+        self,
+        session: Session,
+        *,
+        user_id: uuid.UUID,
+        department_id: uuid.UUID,
+        first_name: str,
+        last_name: str,
+        hire_date: date | None,
+    ) -> Teacher:
+        teacher = Teacher(
+            user_id=user_id,
+            department_id=department_id,
+            first_name=first_name,
+            last_name=last_name,
+            hire_date=hire_date,
+        )
+        session.add(teacher)
+        session.flush()
+        return teacher
+
+    # --- parent / admin (read-only in Milestone 3 — see app/models/parent.py) --
+
+    def get_parent_profile_by_user_id(self, session: Session, user_id: uuid.UUID) -> Parent | None:
+        return session.scalar(select(Parent).where(Parent.user_id == user_id))
+
+    def get_admin_profile_by_user_id(self, session: Session, user_id: uuid.UUID) -> Admin | None:
+        return session.scalar(select(Admin).where(Admin.user_id == user_id))

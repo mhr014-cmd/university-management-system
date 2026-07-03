@@ -115,13 +115,15 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement role-specific profile tables, self-service profile endpoints, and Admin-driven account lifecycle (create/update/deactivate) for Students and Teachers. Seed the first Admin account here (per `Database_Design.md` §11, item 4).
 
+**Milestone 3 scope note (added during M3 pre-implementation review):** the `parent` and `parent_student_link` tables are created in this milestone (required by `Database_Design.md` and by later milestones' `BR-007`/`NFR-003` Parent-scoping needs), but **no REST endpoint creates a Parent account or a `ParentStudentLink` row** — the proposal never defines a parent-to-student linkage mechanism (`Requirement_Analysis.md` §14 item 8, still unresolved) and no endpoint for it appears in this milestone's own API list below. Confirmed with the user: the `parent`/`parent_student_link` tables are created and migration-verified in Milestone 3 but stay empty — seeding Parent accounts is `backend/scripts/seed_demo_data.py`'s job (a later milestone per this document), and a REST-driven creation/linking flow is deferred until a future milestone (or the ambiguity in §14 item 8 is resolved) if ever required. Similarly, `POST /users/students`/`/teachers`'s "password... or omitted if invite-based provisioning" clause is not implemented — confirmed with the user that Admin always supplies an initial password directly; no invite/email-dispatch mechanism exists in the codebase yet (that would be Milestone 9, Notifications, scope).
+
 **Files to create:**
 - `backend/app/models/student.py`, `teacher.py`, `parent.py`, `admin.py`, `parent_student_link.py`
-- `backend/app/schemas/student.py`, `teacher.py`, `parent.py`, `user_profile.py`
+- `backend/app/schemas/student.py`, `teacher.py`, `user.py` (corrected from `user_profile.py` — Milestone 0 had already scaffolded this placeholder as `user.py`, not `user_profile.py`; no separate `schemas/parent.py`/`admin.py` were added since Admin has no dedicated CRUD endpoints and Parent's `/users/me` profile shape is covered by the shared `UserProfile` schema in `user.py`)
 - `backend/app/routers/users.py`
 - `backend/app/services/user_service.py`
-- `backend/app/repositories/user_repository.py`
-- `backend/alembic/versions/0003_role_profiles.py`
+- `backend/app/repositories/user_repository.py` (extends the same file Milestone 2 created — no separate `student_repository.py`/`teacher_repository.py`, per that file's own Milestone 2 docstring)
+- `backend/alembic/versions/0004_role_profiles.py` (corrected from `0003_role_profiles.py` — revision `0003` was already consumed by Milestone 2's `0003_user.py`, the same class of stale-reference issue already fixed once for M2's own migration filename)
 - `backend/scripts/seed_admin.py` (bootstrap the first Admin — cannot be self-registered)
 - `frontend/src/pages/Profile/`
 - `frontend/src/pages/Admin/UserManagement/`

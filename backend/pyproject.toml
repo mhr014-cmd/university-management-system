@@ -17,7 +17,14 @@ dependencies = [
     "pydantic>=2.7,<3.0",
     "pydantic-settings>=2.3,<3.0",
     "python-jose[cryptography]>=3.3,<4.0",
-    "passlib[bcrypt]>=1.7,<2.0",
+    # passlib removed, bcrypt used directly, email-validator added for
+    # pydantic.EmailStr — this pyproject.toml list had drifted out of sync
+    # with requirements.txt since Milestone 2's passlib fix; corrected here
+    # (found during Milestone 3's pre-implementation review) rather than
+    # left stale, since pyproject.toml is documented above as "kept in
+    # sync" with requirements.txt.
+    "bcrypt>=4.1,<5.0",
+    "email-validator>=2.0,<3.0",
     "python-multipart>=0.0.9",
     "python-dotenv>=1.0,<2.0",
 ]
