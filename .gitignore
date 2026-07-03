@@ -1,7 +1,19 @@
-# Environment files
+# Environment files — developer-local, never committed (see CLAUDE.md
+# "Local Environment Files" policy). Broadened beyond plain .env to cover
+# common variants (.env.local, .env.*.local, per-environment files) so a
+# stray one is never one `git add` away from being committed.
 .env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
 backend/.env
+backend/.env.local
+backend/.env.*.local
 frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 
 # Python
 __pycache__/
