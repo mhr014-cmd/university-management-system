@@ -11,6 +11,7 @@ import LoginPage from "../pages/Login";
 import DashboardPage from "../pages/Dashboard";
 import ProfilePage from "../pages/Profile";
 import UserManagementPage from "../pages/Admin/UserManagement";
+import TimetablePage from "../pages/Timetable";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -39,6 +40,10 @@ export const router = createBrowserRouter([
           {
             path: "/admin/users",
             element: <UserManagementPage />,
+          },
+          {
+            path: "/timetable",
+            element: <TimetablePage />,
           },
         ],
       },

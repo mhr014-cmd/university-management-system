@@ -29,6 +29,7 @@ export function AppLayout() {
         <nav className="flex items-center gap-4 text-sm">
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/profile">Profile</Link>
+          <Link to="/timetable">Timetable</Link>
           {/* Admin-only nav link, per docs/UI_Wireframes.md Section 10
               Role Visibility — server-side RBAC (require_roles("admin"))
               is the actual enforcement; this is UX only, per CLAUDE.md
