@@ -89,6 +89,12 @@ python-jose[cryptography]==3.5.0
 cryptography==49.0.0
 bcrypt==5.0.0
 ecdsa==0.19.2
+# email-validator: required for pydantic.EmailStr, used to implement VR-001
+# (login requires a syntactically valid email) in app/schemas/auth.py.
+# Resolved from a separate clean install, not guessed; dnspython is its
+# only new transitive dependency (idna already pinned above, same version).
+email-validator==2.3.0
+dnspython==2.8.0
 pyasn1==0.6.3
 rsa==4.9.1
 six==1.17.0
