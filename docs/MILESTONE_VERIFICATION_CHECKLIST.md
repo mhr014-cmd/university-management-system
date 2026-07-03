@@ -121,9 +121,10 @@
 
 ## 11. Git Status
 
-- [ ] `git status` is clean — no untracked files that should have been committed, no accidentally-staged build artifacts (`node_modules/`, `dist/`, `.venv/`, `__pycache__/`)
+- [ ] `git status` run immediately before staging **and** immediately before committing (per `CLAUDE.md` §8/§14 item 14 — not a one-time check at the start of the milestone). If a local developer configuration file (`.env`/variants, IDE settings, personal secrets) appears staged or unstaged and wasn't an intended target of this milestone's work, **stop and ask before committing or touching it**.
+- [ ] `git status` is otherwise clean — no untracked files that should have been committed, no accidentally-staged build artifacts (`node_modules/`, `dist/`, `.venv/`, `__pycache__/`)
 - [ ] Commits for this milestone are logically separated (per `CLAUDE.md` §8 — not one giant commit), with imperative present-tense messages referencing the milestone/requirement ID where useful
-- [ ] No secrets, `.env` files, or credentials were committed — diff the milestone's commits explicitly for this, don't just trust `.gitignore`
+- [ ] No secrets, `.env` files, or credentials were committed — diff the milestone's commits explicitly for this (`git diff --staged`, not just filenames from `git status`), don't just trust `.gitignore`
 - [ ] No schema migration was mixed into the same commit as unrelated feature code (per `CLAUDE.md` §8)
 - [ ] Branch is up to date with the target integration branch (no unresolved merge conflicts, no stale rebase state)
 - [ ] `PROJECT_PROGRESS.md`'s Git Commit Hash column for this milestone is updated to the actual final commit, not left stale

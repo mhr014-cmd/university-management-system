@@ -9,6 +9,7 @@ All notable changes to this project are documented here. Format loosely follows 
 ### Changed
 - `.gitignore` env-file patterns broadened from exact `.env` matches to also cover `.env.local` and other common variants (`.env.*.local`, `.env.development`, `.env.production`, `.env.test`) after `backend/.env.local` was found sitting untracked (one `git add` away from being committed) under the old, narrower patterns
 - Codified a mandatory "never touch local `.env` files" policy in `CLAUDE.md` §8/§14 — no deleting, overwriting, recreating, renaming, or cleaning `backend/.env`/`frontend/.env` under any circumstance, including temporary use during verification; env var changes go through `.env.example` only, with instructions for the user to copy manually
+- Codified a mandatory pre-commit `git status` check in `CLAUDE.md` §8/§14 and `docs/MILESTONE_VERIFICATION_CHECKLIST.md` §11 — run immediately before staging and before committing; if any local developer configuration file (`.env`/variants, IDE settings, personal secrets) appears unexpectedly in the diff, stop and ask for confirmation rather than committing or modifying it
 
 ### Added
 - Project foundation: FastAPI backend and React 18 + TypeScript frontend scaffolding (Milestone 0)
