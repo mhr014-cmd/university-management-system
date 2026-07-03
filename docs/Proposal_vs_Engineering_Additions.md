@@ -1,9 +1,9 @@
 # Proposal vs. Engineering Additions
 ## University Management System (ICT Education) — REST API
 
-**Source inputs:** `docs/product_proposal.pdf` §3–§7, `docs/API_Contract.md`, `docs/Requirement_Analysis.md` §14
-**Purpose:** A single, explicit ledger of every endpoint documented in `API_Contract.md` that does **not** appear in the proposal's own §6 API Specification, so implementation starts with a clear line between what the client (ICT Bangladesh) asked for and what this design process added to make that request buildable.
-**Scope:** No endpoints are removed or altered by this document — it is a review and classification layer only.
+**Source inputs:** `docs/product_proposal.pdf` §3–§7, `docs/API_Contract.md`, `docs/UI_Wireframes.md`, `docs/Requirement_Analysis.md` §14
+**Purpose:** A single, explicit ledger of every endpoint **and, per the Milestone 0 proposal-traceability review, every frontend addition** that does **not** appear in the proposal itself, so implementation starts with — and stays on — a clear line between what the client (ICT Bangladesh) asked for and what this project added to make that request buildable or verifiable. Extended beyond API endpoints on 2026-07-03 after a traceability check found two undocumented frontend additions (see "Frontend / UI Engineering Decisions" below).
+**Scope:** No endpoints or UI elements are removed by this document — it is a review and classification layer only.
 
 ---
 
@@ -137,4 +137,20 @@ Two further categories of engineering-necessary endpoints were noted in `Impleme
 ### `GET /health`
 **Classification: Design Enhancement.** A liveness-check endpoint has no proposal linkage whatsoever — it exists purely to verify deployment wiring (`Implementation_Roadmap.md` Milestone 0). It is the one item in this entire document that is pure engineering convenience with zero traceability to any proposal sentence, direct or indirect.
 
-These two items are noted rather than fully specified here because doing so is outside this document's stated purpose (reviewing what's already in `API_Contract.md`); they should be added to `API_Contract.md` as their own entries before implementation reaches the milestone that needs them.
+These two items are noted rather than fully specified here because doing so is outside this document's original stated purpose (reviewing what's already in `API_Contract.md`); they should be added to `API_Contract.md` as their own entries before implementation reaches the milestone that needs them.
+
+---
+
+## Frontend / UI Engineering Decisions (Not API Endpoints)
+
+Found during the Milestone 0 proposal-traceability review: two frontend elements shipped in Milestone 0 with no corresponding proposal sentence and no wireframe in `docs/UI_Wireframes.md`. Both were explicitly requested in the Milestone 0 implementation prompt ("Theme support," "Health API connectivity test") — they are authorized, not silently invented — but per the same traceability rule applied to endpoints above, they still need to be logged rather than left undocumented.
+
+### Light/dark theme toggle
+**Where:** `frontend/src/app/ThemeProvider.tsx`, toggle button in `frontend/src/components/AppLayout.tsx`.
+**Classification: Design Enhancement.** No proposal sentence, feature-list row, or wireframe mentions a theme/dark-mode capability anywhere. It exists purely as a Milestone 0 foundation task (project-setup conventions), not a business requirement — zero proposal linkage, direct or indirect.
+**Disposition:** Keep. It's inert with respect to every other requirement (doesn't touch data, auth, or any FR-mapped flow) and low-risk to carry forward. If a future UI pass wants pixel-exact parity with `UI_Wireframes.md`'s ASCII layouts, note that none of those wireframes depict a theme toggle in the header — reconcile at that time rather than removing a working, harmless feature now.
+
+### Dashboard "Backend connectivity" health widget
+**Where:** `frontend/src/pages/Dashboard/index.tsx`, calls `useHealthCheck()` (`frontend/src/lib/useHealthCheck.ts`).
+**Classification: Design Enhancement**, paired with the already-logged `GET /health` endpoint above (same rationale: verifies deployment wiring, zero proposal linkage).
+**Disposition:** Temporary, not permanent. `docs/UI_Wireframes.md`'s Dashboard wireframe (page 2) specifies Upcoming Exams / Attendance % / Fee Status / Recent Results widgets — none of which is a connectivity debug panel. This widget exists only because Milestone 0 has no business data yet to populate the real widgets. **Action:** remove the health-check widget from `Dashboard/index.tsx` when Milestone 10 (Dashboards & Reporting) implements the real widgets from `UI_Wireframes.md`, so the page converges on the approved wireframe rather than accumulating debug UI permanently. Track this removal in `PROJECT_PROGRESS.md`'s M10 Notes.
