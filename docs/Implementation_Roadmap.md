@@ -80,12 +80,14 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement the `User` entity, JWT login/refresh/logout, password change, and the RBAC + ownership-check middleware that every subsequent endpoint relies on.
 
+**Milestone 2 scope note (added during M2 review):** the "ownership-check" half of the Goal/file-list wording above describes the eventual capability this milestone's dependency chain enables, not something delivered *in* M2 itself. M2 has no `/me`-scoped or parent-linked endpoints — those first appear in Milestone 3 (`GET /users/me`, per `Requirement_Traceability_Matrix.md` NFR-002) and later milestones. `backend/app/middleware/rbac.py` therefore implements only role checks (`require_roles`) in M2; ownership/linkage checks belong in the service layer of whichever milestone first introduces an ownership-scoped resource, per `CLAUDE.md` §6 ("verify ownership/linkage in the service layer on every request"), not in this shared RBAC module. This is a deliberate scope boundary, not an oversight — there is nothing to check ownership of yet.
+
 **Files to create:**
 - `backend/app/models/user.py`
 - `backend/app/schemas/auth.py`
 - `backend/app/core/security.py` (password hashing, JWT encode/decode)
 - `backend/app/middleware/auth.py` (token verification dependency)
-- `backend/app/middleware/rbac.py` (role + ownership check dependency)
+- `backend/app/middleware/rbac.py` (role-check dependency; ownership checks are implemented per-endpoint at the service layer per `CLAUDE.md` §6, not in this shared module — see the Milestone 2 note below)
 - `backend/app/routers/auth.py`
 - `backend/app/services/auth_service.py`
 - `backend/app/repositories/user_repository.py` (per `CLAUDE.md` §6 layering — routers/services never touch the ORM session directly; not originally enumerated here, same precedent as Milestone 1)

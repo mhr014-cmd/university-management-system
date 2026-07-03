@@ -16,8 +16,11 @@ class Course(Base):
     __tablename__ = "course"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # index=True matches the explicit op.create_index("ix_course_department_id",
+    # ...) in alembic/versions/0002_core_reference_data.py — see the identical
+    # note on user.role in app/models/user.py (Milestone 2 review).
     department_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("department.id", ondelete="RESTRICT"), nullable=False
+        UUID(as_uuid=True), ForeignKey("department.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String, nullable=False)
     code: Mapped[str] = mapped_column(String, unique=True, nullable=False)

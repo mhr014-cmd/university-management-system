@@ -51,6 +51,9 @@ def upgrade() -> None:
     # UniqueConstraint above already creates that unique index automatically
     # in PostgreSQL, so no separate index is created here (would be a
     # redundant duplicate). Only `role` needs its own explicit index.
+    # Mirrored on the model as User.role's index=True (Milestone 2 review)
+    # so `alembic revision --autogenerate` doesn't report this as a removed
+    # index — see app/models/user.py.
     op.create_index("ix_user_role", "user", ["role"])
 
 

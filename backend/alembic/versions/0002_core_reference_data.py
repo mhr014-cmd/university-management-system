@@ -49,6 +49,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["department_id"], ["department.id"], name="fk_course_department_id", ondelete="RESTRICT"),
         sa.UniqueConstraint("code", name="uq_course_code"),
     )
+    # Mirrored on the model as Course.department_id's index=True (Milestone 2
+    # review) so `alembic revision --autogenerate` doesn't report this as a
+    # removed index — see app/models/course.py.
     op.create_index("ix_course_department_id", "course", ["department_id"])
 
     op.create_table(
