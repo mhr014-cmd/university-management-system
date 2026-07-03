@@ -2,7 +2,7 @@
 
 Single source of truth for milestone-level progress. Milestone numbering, names, and order are copied verbatim from `docs/Implementation_Roadmap.md` (the approved, frozen build order) — this file tracks *status against* that plan, it does not redefine it. For each milestone's Goal, Files, APIs, DB tables, Frontend pages, and Dependencies, see the roadmap directly. For per-requirement status (Testing/Implementation/Verification), see `docs/Requirement_Traceability_Matrix.md`.
 
-**Last updated:** 2026-07-03 (post Milestone 0 full documentation self-review, per `CLAUDE.md` §14 item 12)
+**Last updated:** 2026-07-03 (post Milestone 0 clean-clone reproducibility verification)
 
 ---
 
@@ -14,7 +14,7 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 | **Current Milestone** | M0 — Project Scaffolding & Environment Setup *(complete, self-reviewed, awaiting explicit approval — see Review Status below)* |
 | **Last Completed Milestone** | M0 — Project Scaffolding & Environment Setup |
 | **Next Milestone** | M1 — Core Reference Data Model *(blocked on M0 approval, per the original Milestone 0 instruction to wait for sign-off before starting M1)* |
-| **Current Git Commit** | `cfef1e8` |
+| **Current Git Commit** | `f4044d5` |
 
 **Schedule risk (from `Implementation_Roadmap.md`):** full 12-milestone scope is ~20 working days solo against the July 13, 2026 deadline (10-day runway from project start). Planned Dates below are computed from the roadmap's own cumulative day estimates and show M6 onward landing **after** July 13 — this is the same risk the roadmap already flags, not a new finding. Committed core is M0–M7 + M11; M8 (Fees) and parts of M10 (advanced reporting) are the first items to cut if the timeline slips further.
 
@@ -24,7 +24,7 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 
 | Milestone | Status | Planned Date | Completed Date | Git Commit Hash | Review Status | Notes |
 |---|---|---|---|---|---|---|
-| **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `cfef1e8` | Pending | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Full 9-document self-review run (`5fe42ca`, `cfef1e8`) — found and fixed two gaps (undocumented frontend additions, undocumented backend middleware/utilities); live browser verification performed (see Milestone Detail Log). Awaiting explicit approval to start M1 per original instruction. |
+| **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `f4044d5` | Pending | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Full 9-document self-review run (`5fe42ca`, `cfef1e8`) — found and fixed two gaps (undocumented frontend additions, undocumented backend middleware/utilities). **Reproducibility verified from a genuinely fresh `git clone`** (not the working tree) — clean install, exact pinned versions, real backend+frontend boot, real browser check, all pass. One known, explicitly-scoped exception: `alembic upgrade head` execution against a live DB not demonstrated (no known-good local Postgres credentials, no Docker in this sandbox) — recommended before M1 adds real schema. Awaiting explicit approval to start M1 per original instruction. |
 | **M1** — Core Reference Data Model | Not Started | 2026-07-04 | — | — | Pending | Blocked on M0 approval. Depends on M0 only. |
 | **M2** — Authentication & Authorization | Not Started | 2026-07-05 | — | — | Pending | Depends on M0 only — can run in parallel with M1 per roadmap, but sequenced after it here. |
 | **M3** — User Management & Profiles (Student, Teacher, Parent, Admin) | Not Started | 2026-07-07 | — | — | Pending | Depends on M1, M2. Seeds the first Admin account. |
@@ -70,5 +70,27 @@ Also performed **live verification beyond the original completion pass** (which 
 - No untracked/stray files left behind — temporary `.env` files used for this test were removed afterward; `.claude/launch.json` added as a reusable (gitignored) tool for future milestones' Section 8/13 checks
 
 Both `PROJECT_PROGRESS.md`'s Summary and this milestone's row were stale before this review (`Current Git Commit` pointed at `d9ff4d2`, several commits behind actual HEAD) — corrected as part of this same pass.
+
+#### Clean-clone reproducibility verification (2026-07-03)
+
+Everything above had been verified from the working tree, which can accumulate local state (stale `.venv`, cached wheels, manually-edited files) that masks a real reproducibility problem. Re-verified from a genuinely fresh `git clone` (not a copy) into an isolated temp directory, at commit `f4044d5`:
+
+| Step | Result |
+|---|---|
+| `git clone` (local) | Only tracked files present — confirmed no `.venv`, `.env`, `node_modules`, `.claude/`, or build artifacts came along |
+| `python -m venv .venv` + `pip install --no-cache-dir -r requirements.txt` | Clean install, exit 0, **no pip cache used at all** |
+| `pip check` | "No broken requirements found" |
+| Resolved package set vs. `requirements.txt` pins | Exact match, all 46 packages (verified programmatically with PEP 503 name normalization, not eyeballed) |
+| `cp .env.example .env` (no manual edits) | — |
+| `alembic upgrade head` | **Alembic mechanism confirmed working** (loads `env.py`, resolves settings, attempts connection) — **connection itself failed**: the documented placeholder `DATABASE_URL` (`user`/`password`) doesn't match this machine's real local PostgreSQL 18 instance, whose actual credentials are unknown to me. Deliberately did not brute-force guess further after two reasonable attempts (`postgres`/`postgres`, `postgres`/`password`) both failed — that would be inappropriate against a real local database. **Known limitation, not a defect**: M0's only migration is an empty baseline (no schema to verify), so the meaningful check — does the Alembic wiring itself work — passed; a genuine `upgrade head` success run still needs to happen once, with real credentials, before M1 adds actual schema. |
+| `uvicorn app.main:app` (real process, real port, real HTTP via `curl`) | `GET /health` → `200 {"status":"degraded","database":"unreachable"}` (correct graceful degradation, matching working-tree behavior exactly); `GET /openapi.json` → 200, title correct |
+| `npm ci` (lockfile-exact install, not `npm install`) | Clean, same known esbuild/vite dev-server advisory as previously logged (Known Issue, unchanged) |
+| `npx tsc --noEmit` | Zero errors |
+| `npm run build` | Succeeds, same output shape as working-tree build |
+| `npm run dev` (real Vite process, real port) | Boots in 263ms; `curl` confirms `index.html` and `/src/main.tsx` both serve correctly, title tag correct |
+| Backend + frontend paired live (different clean-clone ports) | `GET /health` reachable from the frontend's configured API base — full stack wired correctly end-to-end |
+| Cleanup | All test processes stopped by exact PID (command-line matched, not by name — avoided touching unrelated `python`/`node` processes on the machine); temp clone directory removed entirely; main working tree confirmed untouched (`git status` clean) throughout |
+
+**Conclusion: Milestone 0 is reproducible from a clean clone**, with one explicitly-scoped exception: full `alembic upgrade head` execution success against a live database has not been demonstrated in this sandbox (credentials for the one reachable local Postgres instance are unknown, and no Docker is available here to spin up a throwaway one). Recommended next step: run `docker compose up` (per `README.md`) or supply real `DATABASE_URL` credentials once, specifically to confirm migration execution — low urgency for M0 itself (nothing to migrate yet) but should happen before M1 adds real schema.
 
 **Outstanding before M1 can start:** explicit approval of M0 (see Review Status in the tracker above — the original Milestone 0 instruction was "wait for my approval before Milestone 1," which has not yet been given).

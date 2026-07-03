@@ -9,13 +9,16 @@
 
 ## 1. Build Verification
 
-- [ ] Backend: fresh `pip install -r backend/requirements.txt` into a **clean** virtual environment succeeds with no errors
+- [ ] Verification is performed from a **genuinely fresh `git clone`** into an isolated directory — not the working tree, not a copy — so accumulated local state (stale `.venv`, cached wheels, manually-edited files) can't mask a real reproducibility problem. Confirm the clone contains only tracked files (no `.venv`, `.env`, `node_modules`, `.claude/`, build artifacts) before proceeding.
+- [ ] Backend: `pip install --no-cache-dir -r backend/requirements.txt` into a **clean** virtual environment succeeds with no errors (the `--no-cache-dir` flag matters — a plain clean venv can still silently reuse pip's global wheel cache)
 - [ ] Backend: `pip check` reports no broken requirements
-- [ ] Frontend: fresh `npm install` in `frontend/` succeeds with no `npm ERR!` output
+- [ ] Backend: resolved package versions verified programmatically against `requirements.txt`'s pins (not eyeballed) — exact match required, accounting for PEP 503 name normalization (e.g. `pydantic-core` vs `pydantic_core` are the same package)
+- [ ] Frontend: `npm ci` (not `npm install`) from the committed `package-lock.json` succeeds with no `npm ERR!` output — `npm ci` fails loudly if the lockfile and `package.json` are out of sync, which `npm install` would silently paper over
 - [ ] Frontend: `npx tsc --noEmit` passes with zero type errors
 - [ ] Frontend: `npm run build` completes and produces `frontend/dist/`
 - [ ] No new dependency was added without updating `backend/requirements.txt` / `frontend/package.json` accordingly (per `CLAUDE.md` §14.8 — no undeclared dependencies)
 - [ ] `npm audit` / dependency vulnerability output reviewed; any new high/critical findings are either fixed or explicitly logged under Known Issues with justification
+- [ ] Clean-clone directory removed after verification; confirm the main working tree's `git status` is unaffected
 
 ---
 
@@ -42,7 +45,7 @@
 ## 4. Database Migration
 
 - [ ] A new Alembic revision was generated for every schema change this milestone (per `CLAUDE.md` §6 — never hand-edited after generation, never applied as manual DDL)
-- [ ] `alembic upgrade head` runs cleanly against a fresh database
+- [ ] `alembic upgrade head` runs cleanly against a fresh database — use `docker compose up` (a database with credentials the project itself controls) or another disposable instance created for this purpose. **Never attempt this against an unfamiliar local database by guessing at its credentials** — if no known-good database is available, this item is a justified "N/A, blocked" entry, not something to force through
 - [ ] `alembic downgrade -1` (or to the previous milestone's head) runs cleanly and doesn't leave orphaned objects — test this explicitly, not just the upgrade path
 - [ ] New tables/columns match `docs/Database_Design.md` exactly (names, types, nullability, constraints) — no ad hoc columns, no relaxed constraints for convenience
 - [ ] Every index listed for the new tables in `Database_Design.md` §9 is present
