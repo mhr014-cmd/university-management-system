@@ -2,7 +2,7 @@
 
 Single source of truth for milestone-level progress. Milestone numbering, names, and order are copied verbatim from `docs/Implementation_Roadmap.md` (the approved, frozen build order) — this file tracks *status against* that plan, it does not redefine it. For each milestone's Goal, Files, APIs, DB tables, Frontend pages, and Dependencies, see the roadmap directly. For per-requirement status (Testing/Implementation/Verification), see `docs/Requirement_Traceability_Matrix.md`.
 
-**Last updated:** 2026-07-03
+**Last updated:** 2026-07-03 (post Milestone 0 full documentation self-review, per `CLAUDE.md` §14 item 12)
 
 ---
 
@@ -11,10 +11,10 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 | Field | Value |
 |---|---|
 | **Overall Progress** | 8% (1 of 12 milestones completed) |
-| **Current Milestone** | M0 — Project Scaffolding & Environment Setup *(complete, awaiting explicit approval — see Review Status below)* |
+| **Current Milestone** | M0 — Project Scaffolding & Environment Setup *(complete, self-reviewed, awaiting explicit approval — see Review Status below)* |
 | **Last Completed Milestone** | M0 — Project Scaffolding & Environment Setup |
 | **Next Milestone** | M1 — Core Reference Data Model *(blocked on M0 approval, per the original Milestone 0 instruction to wait for sign-off before starting M1)* |
-| **Current Git Commit** | `d9ff4d2` (`d9ff4d2ad67357142de4a9910ecd902268593f3b`) |
+| **Current Git Commit** | `cfef1e8` |
 
 **Schedule risk (from `Implementation_Roadmap.md`):** full 12-milestone scope is ~20 working days solo against the July 13, 2026 deadline (10-day runway from project start). Planned Dates below are computed from the roadmap's own cumulative day estimates and show M6 onward landing **after** July 13 — this is the same risk the roadmap already flags, not a new finding. Committed core is M0–M7 + M11; M8 (Fees) and parts of M10 (advanced reporting) are the first items to cut if the timeline slips further.
 
@@ -24,7 +24,7 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 
 | Milestone | Status | Planned Date | Completed Date | Git Commit Hash | Review Status | Notes |
 |---|---|---|---|---|---|---|
-| **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `9e9680d` | Pending | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Awaiting explicit approval to start M1 per original instruction. |
+| **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `cfef1e8` | Pending | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Full 9-document self-review run (`5fe42ca`, `cfef1e8`) — found and fixed two gaps (undocumented frontend additions, undocumented backend middleware/utilities); live browser verification performed (see Milestone Detail Log). Awaiting explicit approval to start M1 per original instruction. |
 | **M1** — Core Reference Data Model | Not Started | 2026-07-04 | — | — | Pending | Blocked on M0 approval. Depends on M0 only. |
 | **M2** — Authentication & Authorization | Not Started | 2026-07-05 | — | — | Pending | Depends on M0 only — can run in parallel with M1 per roadmap, but sequenced after it here. |
 | **M3** — User Management & Profiles (Student, Teacher, Parent, Admin) | Not Started | 2026-07-07 | — | — | Pending | Depends on M1, M2. Seeds the first Admin account. |
@@ -56,5 +56,19 @@ Two follow-up fix passes after initial completion:
 - API display metadata (OpenAPI title/description, Swagger, startup log banner) renamed from "ICT Education API" to "University Management System API" (`9e9680d`).
 
 **Commits:** `71019ef` (backend foundation), `8c9e25f` (frontend foundation), `7eff95d` (infra), `fdaaf59` (dependency pins v1), `889465e` (dependency pins v2 — verified fix), `9e9680d` (metadata rename).
+
+#### Full documentation self-review (2026-07-03, per `CLAUDE.md` §14 item 12)
+
+Ran `docs/MILESTONE_VERIFICATION_CHECKLIST.md` Section 13 against all nine governing documents. Two real gaps found and fixed (documentation-only, no implementation changed):
+- **Undocumented frontend additions** — the theme toggle and Dashboard health widget had no proposal linkage and no `Proposal_vs_Engineering_Additions.md` entry. Fixed in `07695ab`: both logged as Design Enhancements, theme toggle kept permanently, health widget scheduled for removal at M10.
+- **Undocumented backend middleware/utilities** — exception handlers, request logging middleware, structured logging config, settings validation, DB session/engine, CORS, and the Alembic baseline had no entry either, despite the same-commit policy (added the commit before this review) explicitly naming "middleware, utility." Fixed in `5fe42ca`: all seven logged as Derived (unavoidable prerequisites for Required features, each implementing a mechanism `System_Architecture.md` already mandates).
+
+Also performed **live verification beyond the original completion pass** (which had used `TestClient`, not a real browser): started the actual backend (`uvicorn`, port 8010) and frontend (`vite`, port 5173) via `.claude/launch.json`, in a real browser —
+- Zero console errors; only Vite HMR debug logs and a harmless React Router v6 future-flag notice
+- `GET http://localhost:8010/health` succeeded cross-origin from the frontend (confirms CORS actually works end-to-end, not just in unit tests) — real network tab evidence, response `{"status":"degraded","database":"unreachable"}` (correct — no live Postgres in this environment)
+- Login (`/`) and Dashboard (`/dashboard`) pages render correctly; theme toggle clicked and confirmed switching light/dark and updating its own label
+- No untracked/stray files left behind — temporary `.env` files used for this test were removed afterward; `.claude/launch.json` added as a reusable (gitignored) tool for future milestones' Section 8/13 checks
+
+Both `PROJECT_PROGRESS.md`'s Summary and this milestone's row were stale before this review (`Current Git Commit` pointed at `d9ff4d2`, several commits behind actual HEAD) — corrected as part of this same pass.
 
 **Outstanding before M1 can start:** explicit approval of M0 (see Review Status in the tracker above — the original Milestone 0 instruction was "wait for my approval before Milestone 1," which has not yet been given).
