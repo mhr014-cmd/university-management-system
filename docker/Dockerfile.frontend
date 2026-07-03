@@ -1,0 +1,17 @@
+# Dockerfile — frontend (React SPA build)
+# Produces a static build served by nginx, per docs/System_Architecture.md
+# Section 8 (frontend served from a CDN in production; this image is for
+# local/staging parity, not the production deployment target itself).
+# Local development uses docker-compose's Vite dev server instead of this
+# image, for fast HMR (see docker/docker-compose.yml).
+
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80

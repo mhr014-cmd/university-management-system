@@ -1,0 +1,56 @@
+# docker-compose — local development orchestration.
+# Runs Postgres, the FastAPI backend (with reload + bind mount for fast
+# iteration), and the Vite dev server. The production Dockerfiles
+# (Dockerfile.backend, Dockerfile.frontend) are used for staging/deployment
+# builds, not for this local dev loop — see docs/System_Architecture.md
+# Section 8.
+
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ict_education
+      POSTGRES_PASSWORD: ict_education
+      POSTGRES_DB: ict_education
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ict_education"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../backend:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ../frontend:/app
+    ports:
+      - "5173:5173"
+    env_file:
+      - ../frontend/.env
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
