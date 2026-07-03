@@ -1,0 +1,34 @@
+[project]
+name = "ict-education-backend"
+version = "0.1.0"
+description = "University Management System (ICT Education) — REST API backend"
+requires-python = ">=3.12"
+readme = "../README.md"
+
+# Canonical dependency list is backend/requirements.txt (kept in sync here
+# for tooling that reads pyproject.toml directly). PDF generation library
+# still TBD — see docs/System_Architecture.md Section 9 Risks, R-005.
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.13,<2.0",
+    "psycopg2-binary>=2.9,<3.0",
+    "pydantic>=2.7,<3.0",
+    "pydantic-settings>=2.3,<3.0",
+    "python-jose[cryptography]>=3.3,<4.0",
+    "passlib[bcrypt]>=1.7,<2.0",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0,<2.0",
+]
+
+[project.optional-dependencies]
+dev = []
+test = ["pytest>=8.0,<9.0", "pytest-asyncio>=0.23,<1.0", "httpx>=0.27,<1.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
