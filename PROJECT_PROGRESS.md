@@ -2,7 +2,7 @@
 
 Single source of truth for milestone-level progress. Milestone numbering, names, and order are copied verbatim from `docs/Implementation_Roadmap.md` (the approved, frozen build order) — this file tracks *status against* that plan, it does not redefine it. For each milestone's Goal, Files, APIs, DB tables, Frontend pages, and Dependencies, see the roadmap directly. For per-requirement status (Testing/Implementation/Verification), see `docs/Requirement_Traceability_Matrix.md`.
 
-**Last updated:** 2026-07-04 (Milestone 1 `alembic upgrade head` real-machine failure fixed)
+**Last updated:** 2026-07-04 (Milestone 2 — Authentication & Authorization — completed)
 
 ---
 
@@ -10,11 +10,11 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 
 | Field | Value |
 |---|---|
-| **Overall Progress** | 17% (2 of 12 milestones completed) |
-| **Current Milestone** | M1 — Core Reference Data Model *(complete, awaiting explicit approval — see Review Status below)* |
-| **Last Completed Milestone** | M1 — Core Reference Data Model |
-| **Next Milestone** | M2 — Authentication & Authorization *(blocked on M1 approval, same wait-for-sign-off convention established after M0)* |
-| **Current Git Commit** | `37f3ce4` |
+| **Overall Progress** | 25% (3 of 12 milestones completed) |
+| **Current Milestone** | M2 — Authentication & Authorization *(complete, awaiting explicit approval — see Review Status below)* |
+| **Last Completed Milestone** | M2 — Authentication & Authorization |
+| **Next Milestone** | M3 — User Management & Profiles *(blocked on M2 approval, same wait-for-sign-off convention established after M0/M1)* |
+| **Current Git Commit** | `494b60f` |
 
 **Schedule risk (from `Implementation_Roadmap.md`):** full 12-milestone scope is ~20 working days solo against the July 13, 2026 deadline (10-day runway from project start). Planned Dates below are computed from the roadmap's own cumulative day estimates and show M6 onward landing **after** July 13 — this is the same risk the roadmap already flags, not a new finding. Committed core is M0–M7 + M11; M8 (Fees) and parts of M10 (advanced reporting) are the first items to cut if the timeline slips further.
 
@@ -25,8 +25,8 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 | Milestone | Status | Planned Date | Completed Date | Git Commit Hash | Review Status | Notes |
 |---|---|---|---|---|---|---|
 | **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `8cb72c1` | **Approved** | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Full 9-document self-review run (`5fe42ca`, `cfef1e8`) — found and fixed two gaps. Reproducibility verified from a genuinely fresh `git clone`. `HTTP_422_UNPROCESSABLE_ENTITY` deprecation warning fixed (`8cb72c1`). **Approved by user 2026-07-04.** |
-| **M1** — Core Reference Data Model | Completed | 2026-07-04 | 2026-07-04 | `37f3ce4` | Pending | Department/Course/Room/Semester models, schemas, repository, service, router (12 endpoints, list/create/get-by-id per entity) implemented exactly per `Database_Design.md` §6.7/6.8/6.11/6.20 and the new `API_Contract.md` §10. Alembic revision `0002_core_reference_data`. **Post-completion fix:** user-reported real-machine failure — `cd backend && alembic upgrade head` raised `ModuleNotFoundError: No module named 'app'` because verification had only ever used `python -m alembic`, not the bare console script. Fixed via `prepend_sys_path` + a `__file__`-based fallback in `env.py`; reproduced-then-fixed-then-reverified from a fresh clone. `MILESTONE_VERIFICATION_CHECKLIST.md` updated so this can't recur. Remaining known issues — see Milestone Detail Log: (1) endpoints unauthenticated until M2 (tracked, not accidental); (2) migration still not `--autogenerate`-diff-checked against a live DB (no known-good local Postgres credentials in this sandbox). |
-| **M2** — Authentication & Authorization | Not Started | 2026-07-05 | — | — | Pending | Depends on M0 only — can run in parallel with M1 per roadmap, but sequenced after it here. |
+| **M1** — Core Reference Data Model | Completed | 2026-07-04 | 2026-07-04 | `37f3ce4` | **Approved** | Department/Course/Room/Semester models, schemas, repository, service, router (12 endpoints, list/create/get-by-id per entity) implemented exactly per `Database_Design.md` §6.7/6.8/6.11/6.20 and the new `API_Contract.md` §10. Alembic revision `0002_core_reference_data`. **Post-completion fix:** user-reported real-machine failure — `cd backend && alembic upgrade head` raised `ModuleNotFoundError: No module named 'app'` because verification had only ever used `python -m alembic`, not the bare console script. Fixed via `prepend_sys_path` + a `__file__`-based fallback in `env.py`; reproduced-then-fixed-then-reverified from a fresh clone. `MILESTONE_VERIFICATION_CHECKLIST.md` updated so this can't recur. Known issues from M1 (endpoints unauthenticated; migration not autogenerate-diff-checked) both addressed/closed in M2 — see M2 row and Milestone Detail Log. **Approved by user 2026-07-04.** |
+| **M2** — Authentication & Authorization | Completed | 2026-07-05 | 2026-07-04 | `494b60f` | Pending | JWT access/refresh auth (login/refresh/logout/change-password), bcrypt password hashing, `require_roles` RBAC dependency retrofitted onto all 12 M1 reference-data endpoints, and the full frontend auth module (token storage, interceptors, AuthContext, RouteGuard, Login page). Alembic revision `0003_user`. 41 backend tests added (previously zero existed project-wide) covering BR-006, VR-002, refresh-token rotation/reuse, and RBAC negative cases — see Milestone Detail Log. Full `MILESTONE_VERIFICATION_CHECKLIST.md` self-review run; no unresolved findings. |
 | **M3** — User Management & Profiles (Student, Teacher, Parent, Admin) | Not Started | 2026-07-07 | — | — | Pending | Depends on M1, M2. Seeds the first Admin account. |
 | **M4** — Scheduling & Timetable | Not Started | 2026-07-09 | — | — | Pending | Depends on M1, M3. Unblocks Attendance and Exams. |
 | **M5** — Attendance | Not Started | 2026-07-11 | — | — | Pending | Depends on M4. |
@@ -125,4 +125,35 @@ User-reported, reproduced, and fixed. `cd backend && alembic upgrade head` (the 
 
 **Verified:** fresh `pip install`, all new modules syntax-checked, app imports and boots, all 12 endpoints present in `/openapi.json` under `/api/v1`, field-validation (422) and semester date-order validation (422, post-fix) both produce the standard error envelope, duplicate-name/code paths correctly designed to return 409 (exercised at the service-logic level; full round-trip against a live DB blocked by the same credentials limitation as the migration), graceful 500 (not a crash) when the database is unreachable, and all Milestone 0 behaviors (`/health`, 404 shape, app title) remain unchanged.
 
-**Outstanding before M2 can start:** explicit approval of M1.
+**Outstanding before M2 can start:** explicit approval of M1. **Approved by user 2026-07-04.**
+
+### M2 — Authentication & Authorization (Completed — 2026-07-04)
+
+Implemented exactly the scope `Implementation_Roadmap.md` defines for Milestone 2: JWT-based login/refresh/logout/change-password, RBAC middleware, and its retrofit onto Milestone 1's endpoints. Nothing from Milestone 3 (account creation, user profiles) was implemented — `UserRepository` deliberately has no `create()` method.
+
+**Design gap resolved first (docs-only, `414bc30`):** `Database_Design.md`'s `user` table had no mechanism to support refresh-token rotation/revocation. Presented the tradeoff to the user via `AskUserQuestion` (a dedicated session table vs. two columns on `user`); user chose the two-column approach. `current_refresh_token_jti`/`refresh_token_expires_at` added to `Database_Design.md` §6.1 with an explicit design note: this is a single-active-session-per-user model — logging in on a second device invalidates the first session's refresh token. `API_Contract.md` updated to reference the resolved design.
+
+**Database:** `user` table (`id`, `email` unique, `password_hash`, `role` enum, `is_active`, the two refresh-tracking columns, `created_at`/`updated_at`) matching `Database_Design.md` §6.1 exactly. Alembic revision `0003_user` (down_revision `0002`).
+
+**Backend:** `app/core/security.py` (bcrypt hashing, JWT encode/decode), `app/repositories/user_repository.py`, `app/services/auth_service.py` (BR-006 deactivation check on both login and refresh; refresh-token rotation with jti-mismatch reuse detection; VR-002 change-password check), `app/middleware/auth.py` (`get_current_user`, re-checks `is_active` on every request per `CLAUDE.md` §12) and `app/middleware/rbac.py` (`require_roles`), `app/routers/auth.py` (4 endpoints under `/api/v1/auth`). RBAC retrofitted onto all 12 M1 reference-data endpoints (GET: any authenticated role; POST: Admin), closing M1's tracked known issue.
+
+**Frontend:** `frontend/src/auth/` (tokenStorage, AuthContext, RouteGuard), Axios request/response interceptors in `lib/apiClient.ts` (Bearer attachment, silent refresh-and-retry on 401), a real Login page, logout action + user email display in `AppLayout`. localStorage chosen for token persistence over httpOnly cookies — documented tradeoff (the API returns tokens in the JSON body, not `Set-Cookie`; an httpOnly-cookie approach would need a backend-for-frontend layer this project doesn't have).
+
+**Real defects found and fixed during verification (not deferred):**
+1. `passlib==1.7.4` (unmaintained, final release) crashes against `bcrypt>=4.1` — probes a removed `bcrypt.__about__.__version__` attribute. Replaced with direct `bcrypt.hashpw`/`checkpw` calls (`ce6a5af`).
+2. Alembic migration `0003_user`: redundant explicit `user_role.create()` in `upgrade()` conflicted with `op.create_table()`'s automatic enum creation (`DuplicateObject`); and `op.drop_table()` was confirmed to *not* drop the enum type on its own, so the explicit `.drop()` in `downgrade()` is required and was kept. Found via the first genuine `alembic upgrade`/`downgrade`/`upgrade` cycle run against a real, disposable PostgreSQL database in this project's history (`8bbc009`).
+3. Frontend: the response interceptor's silent-refresh logic was hijacking `/auth/login`'s own 401 (wrong password) — no refresh token exists yet, so the doomed refresh attempt force-navigated to `/login`, wiping the login form's error state before the user ever saw it. Fixed by excluding `/auth/login`/`/auth/refresh` from the refresh-and-retry flow (`42aaac6`).
+4. `backend/tests/` had zero test files project-wide (`pytest` reported "no tests ran") despite `CLAUDE.md` §10's requirement that every BR-xxx/VR-xxx rule have a test — caught during this milestone's own self-review, not by the user. Added 41 tests: unit tests for `core/security.py` and `AuthService` (repository stubbed, no DB dependency, always run), plus integration tests for the auth router and the RBAC retrofit (full request→DB→response against a disposable Postgres database, gated on `TEST_DATABASE_URL`, skipped rather than failing when unavailable) (`494b60f`).
+
+**Verified (not just claimed):** `pytest` — 41 passed (23 unit + 18 integration) against a disposable `ict_education_m2_test` database, created and dropped solely for this run. `npx tsc --noEmit` and `npm run build` both clean. `pip check` — no broken requirements. `alembic upgrade head` / `downgrade -1` / `upgrade head` all clean via the bare `alembic` console-script entry point (the specific historical failure mode from M1) against a fresh disposable database. Full live-browser verification of the frontend auth flow (wrong-password error banner, successful login + redirect + user display, logout, direct-navigation route guarding while unauthenticated) via the preview browser tools against a real backend + real Postgres, using `.claude/launch.json`'s `env` field so no `.env` file was ever touched. All disposable test/verification databases (`ict_education_m2_verify`, `ict_education_m2_test`, `ict_education_m2_migration_check`) dropped after use; the developer's real `university_management_db` was never touched.
+
+**Known issues (tracked, not oversights):**
+1. Migration `0003_user` (like `0002` before it) was hand-authored, not `alembic revision --autogenerate`'d — mirrors the SQLAlchemy model exactly and was reviewed carefully, and its upgrade/downgrade cycle is now confirmed working against a real database (unlike M0/M1, which lacked credentials), but a live autogenerate diff-check has still not been performed.
+2. FR-005 (redirect to role-specific dashboard) currently redirects every role to the same generic `/dashboard` — role-specific dashboard *content* is out of scope until the role-owning domains (M3+) exist. Login/redirect mechanism itself is complete and tested.
+3. Single-active-session-per-user is a deliberate scope decision (see design-gap resolution above), not a defect — logging in on a second device invalidates the first device's refresh token (the first device's access token remains valid until it naturally expires, then its silent-refresh attempt will fail and redirect to `/login`).
+
+**Commits (`37f3ce4`..`494b60f`):** `414bc30` (design gap resolution, docs-only), `1ed5a68` (User model + migration), `ce6a5af` (security utilities), `affe337` (auth schemas), `8bbc009` (migration bug fix), `99b13df` (user repository + auth service), `c600ff3` (auth + RBAC middleware), `c95c6e9` (auth router), `23f7bff` (RBAC retrofit on M1 endpoints), `42aaac6` (frontend auth module), `494b60f` (backend test suite).
+
+**Full documentation self-review run** (`CLAUDE.md` §14 item 12, `MILESTONE_VERIFICATION_CHECKLIST.md`): `Database_Design.md` and `API_Contract.md` updated in the same change as the design-gap resolution (not backfilled). `Requirement_Traceability_Matrix.md` FR-001–FR-005 and NFR-001/NFR-004 updated to Verified. `Proposal_vs_Engineering_Additions.md`'s M2 schema addition and reference-data auth-note entries confirmed present and accurate. No undocumented additions found. One real gap found and fixed by this review itself: the missing test suite (see Real Defects #4, above) — fixed in the same pass, before this milestone was marked Completed, per the checklist's own instruction not to mark Completed with a known, unfixed finding.
+
+**Outstanding before M3 can start:** explicit approval of M2.
