@@ -6,6 +6,30 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 3 — User Management & Profiles)
+- `student`, `teacher`, `parent`, `admin`, `parent_student_link` tables (Alembic revision `0004_role_profiles`, corrected from the roadmap's stale `0003_role_profiles` filename — `0003` was already consumed by Milestone 2), matching `Database_Design.md` §6.2-6.6 column-for-column, with `index=True`/`UniqueConstraint` declared on the models themselves so `alembic revision --autogenerate` stayed clean on the first attempt (applying the Milestone 2 review's finding proactively this time)
+- `GET /users/me` / `PUT /users/me`: self-service profile retrieval/update, merged with role-specific fields (Student/Teacher/Parent/Admin), VR-009 (role/`is_active`/`department_id` cannot be edited via this endpoint) enforced structurally by the request schema having no such field, not just a runtime check
+- Admin-driven Student account lifecycle: `GET/POST /users/students`, `GET/PUT/DELETE /users/students/{id}` (Admin+Teacher read, Admin write, per `API_Contract.md` §2.3-2.7); `user` + `student` rows created in a single atomic transaction so a duplicate-email failure never orphans either row
+- Admin-driven Teacher account management: `GET/POST /users/teachers`, `PUT /users/teachers/{id}` (Admin-only for both read and write, narrower than `/users/students`, per `API_Contract.md` §2.8-2.10)
+- `backend/scripts/seed_admin.py`: bootstraps the first Admin account from process-level environment variables, idempotent, verified via the bare `python -m scripts.seed_admin` invocation
+- Frontend: `features/users/index.ts` (React Query hooks for `/users/me` and Student/Teacher CRUD), `features/departments/index.ts` (new — thin wrapper around the existing Milestone 1 `GET /departments` endpoint, needed for the Admin page's department selector; logged in `Proposal_vs_Engineering_Additions.md`), `pages/Profile/index.tsx` (personal-info form + Change Password form reusing the existing Milestone 2 `useChangePassword()` hook), `pages/Admin/UserManagement/index.tsx` (Students/Teachers tab toggle, department filter, create/edit modals, deactivate/reactivate with confirmation)
+- Backend test suite: `tests/unit/test_user_service.py` (repository-stubbed) and `tests/integration/test_users_router.py` (disposable-database, full RBAC + lifecycle coverage) — 49 new tests, 72 total passing
+
+### Fixed (Milestone 3)
+- `backend/pyproject.toml` still listed `passlib[bcrypt]` and was missing `email-validator`, having drifted out of sync with `requirements.txt` since Milestone 2's passlib removal despite the file's own header comment claiming it's "kept in sync" — found during this milestone's pre-implementation review, corrected in the same commit as the M3 work that surfaced it
+
+### Changed (Milestone 3 — Documentation)
+- `docs/Implementation_Roadmap.md`: corrected Milestone 3's migration filename (`0003_role_profiles.py` → `0004_role_profiles.py`, the same class of stale-reference issue already fixed once for Milestone 2's own migration) and the `schemas/user_profile.py` reference (Milestone 0 had actually scaffolded this placeholder as `schemas/user.py`); added a Milestone 3 scope note (confirmed with the user before implementation) that Parent account creation/linking and invite-based password provisioning are out of scope for this milestone — no endpoint, seed data, or invite mechanism exists in the proposal, the API contract, or the codebase for either
+- `docs/Requirement_Traceability_Matrix.md`: FR-006-FR-016 Testing/Implementation/Verification Status columns updated; FR-008 left honestly `Pending` with an explanatory note, since `GET /users/me`'s actual contracted response has no academic-history fields and the underlying `enrollment`/`result` tables don't exist until later milestones
+- `docs/Proposal_vs_Engineering_Additions.md`: added the `features/departments/index.ts` Derived-addition entry
+- `PROJECT_PROGRESS.md`: Milestone 2's Review Status updated to Approved (per explicit user sign-off, git tag `v0.3-milestone2`); Milestone 3 row and full Milestone Detail Log entry added; Summary section updated (33% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 3)
+- The Profile and Admin: User Management frontend pages have not been visually exercised in a browser this milestone — per this milestone's explicit environment-safety instructions, the preview tooling (subject of the prior milestone's `.env`-drift audit) was not used; verification was limited to `tsc --noEmit`, `npm run build`, and manual code review.
+- FR-008 (student academic history via `GET /users/me`) is not deliverable by the endpoint as actually contracted — see the RTM note above.
+- Migration `0004_role_profiles` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Parent account creation/linking and invite-based provisioning remain explicitly unimplemented — a deliberate scope decision confirmed with the user, not a silently dropped requirement.
+
 ### Added (Milestone 2 — Authentication & Authorization)
 - `user` table (Alembic revision `0003_user`): id, email (unique), password_hash, role (`student`/`teacher`/`parent`/`admin`), is_active, `current_refresh_token_jti`/`refresh_token_expires_at` (single-active-session refresh tracking — see `Database_Design.md` §6.1 M2 design note), created_at/updated_at
 - Password hashing (`bcrypt` directly) and JWT access/refresh token issuance/decoding (`app/core/security.py`)
