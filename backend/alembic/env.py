@@ -5,7 +5,20 @@ Wires Alembic's runtime to the SQLAlchemy Base/metadata and database URL
 from app.core.config.
 """
 
+import sys
 from logging.config import fileConfig
+from pathlib import Path
+
+# Guarantee `backend/` (this file's grandparent directory) is importable as
+# the root of the `app` package, regardless of invocation method or cwd.
+# `alembic.ini`'s `prepend_sys_path = .` already covers the normal case, but
+# this is a self-contained fallback: unlike relying on cwd, `python -m
+# alembic` vs. the bare `alembic` console-script entry point (the latter
+# does NOT add cwd to sys.path, causing `ModuleNotFoundError: No module
+# named 'app'`), or ini-parsing edge cases, __file__ is always correct.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool

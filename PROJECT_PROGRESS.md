@@ -2,7 +2,7 @@
 
 Single source of truth for milestone-level progress. Milestone numbering, names, and order are copied verbatim from `docs/Implementation_Roadmap.md` (the approved, frozen build order) — this file tracks *status against* that plan, it does not redefine it. For each milestone's Goal, Files, APIs, DB tables, Frontend pages, and Dependencies, see the roadmap directly. For per-requirement status (Testing/Implementation/Verification), see `docs/Requirement_Traceability_Matrix.md`.
 
-**Last updated:** 2026-07-04 (Milestone 1 complete)
+**Last updated:** 2026-07-04 (Milestone 1 `alembic upgrade head` real-machine failure fixed)
 
 ---
 
@@ -14,7 +14,7 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 | **Current Milestone** | M1 — Core Reference Data Model *(complete, awaiting explicit approval — see Review Status below)* |
 | **Last Completed Milestone** | M1 — Core Reference Data Model |
 | **Next Milestone** | M2 — Authentication & Authorization *(blocked on M1 approval, same wait-for-sign-off convention established after M0)* |
-| **Current Git Commit** | `8cb72c1` |
+| **Current Git Commit** | `37f3ce4` |
 
 **Schedule risk (from `Implementation_Roadmap.md`):** full 12-milestone scope is ~20 working days solo against the July 13, 2026 deadline (10-day runway from project start). Planned Dates below are computed from the roadmap's own cumulative day estimates and show M6 onward landing **after** July 13 — this is the same risk the roadmap already flags, not a new finding. Committed core is M0–M7 + M11; M8 (Fees) and parts of M10 (advanced reporting) are the first items to cut if the timeline slips further.
 
@@ -25,7 +25,7 @@ Single source of truth for milestone-level progress. Milestone numbering, names,
 | Milestone | Status | Planned Date | Completed Date | Git Commit Hash | Review Status | Notes |
 |---|---|---|---|---|---|---|
 | **M0** — Project Scaffolding & Environment Setup | Completed | 2026-07-03 | 2026-07-03 | `8cb72c1` | **Approved** | Backend app factory, DB/Alembic wiring, `/health`, frontend shell all verified working (see Milestone Detail Log). Dependency-pin defect found and fixed post-hoc (`fdaaf59` → `889465e`). Full 9-document self-review run (`5fe42ca`, `cfef1e8`) — found and fixed two gaps. Reproducibility verified from a genuinely fresh `git clone`. `HTTP_422_UNPROCESSABLE_ENTITY` deprecation warning fixed (`8cb72c1`). **Approved by user 2026-07-04.** |
-| **M1** — Core Reference Data Model | Completed | 2026-07-04 | 2026-07-04 | *(this milestone's commit)* | Pending | Department/Course/Room/Semester models, schemas, repository, service, router (12 endpoints, list/create/get-by-id per entity) implemented exactly per `Database_Design.md` §6.7/6.8/6.11/6.20 and the new `API_Contract.md` §10. Alembic revision `0002_core_reference_data`. Two known issues — see Milestone Detail Log: (1) endpoints are unauthenticated (M2 hasn't landed yet, tracked not accidental); (2) migration hand-authored, not `--autogenerate`'d against a live DB (no known-good local Postgres credentials in this sandbox). One real defect found and fixed during verification: Pydantic v2 custom-validator errors (`ctx.error`) aren't JSON-serializable by default — fixed via `jsonable_encoder` in the shared exception handler (a Milestone-0 file, fixed because M1's own documented semester-date validation required it to work). |
+| **M1** — Core Reference Data Model | Completed | 2026-07-04 | 2026-07-04 | `37f3ce4` | Pending | Department/Course/Room/Semester models, schemas, repository, service, router (12 endpoints, list/create/get-by-id per entity) implemented exactly per `Database_Design.md` §6.7/6.8/6.11/6.20 and the new `API_Contract.md` §10. Alembic revision `0002_core_reference_data`. **Post-completion fix:** user-reported real-machine failure — `cd backend && alembic upgrade head` raised `ModuleNotFoundError: No module named 'app'` because verification had only ever used `python -m alembic`, not the bare console script. Fixed via `prepend_sys_path` + a `__file__`-based fallback in `env.py`; reproduced-then-fixed-then-reverified from a fresh clone. `MILESTONE_VERIFICATION_CHECKLIST.md` updated so this can't recur. Remaining known issues — see Milestone Detail Log: (1) endpoints unauthenticated until M2 (tracked, not accidental); (2) migration still not `--autogenerate`-diff-checked against a live DB (no known-good local Postgres credentials in this sandbox). |
 | **M2** — Authentication & Authorization | Not Started | 2026-07-05 | — | — | Pending | Depends on M0 only — can run in parallel with M1 per roadmap, but sequenced after it here. |
 | **M3** — User Management & Profiles (Student, Teacher, Parent, Admin) | Not Started | 2026-07-07 | — | — | Pending | Depends on M1, M2. Seeds the first Admin account. |
 | **M4** — Scheduling & Timetable | Not Started | 2026-07-09 | — | — | Pending | Depends on M1, M3. Unblocks Attendance and Exams. |
@@ -110,6 +110,18 @@ Implemented exactly the scope `Implementation_Roadmap.md` defines for Milestone 
 2. **Migration hand-authored, not `--autogenerate`'d.** Same sandbox limitation as Milestone 0 (no known-good local Postgres credentials, no Docker available) — autogenerate requires a live DB connection to diff against. The migration was written to mirror the SQLAlchemy models column-for-column and reviewed carefully, but a real `alembic revision --autogenerate` diff-check against a live database (expected to show *no* changes if this migration is correct) has not been performed. Recommended before this migration is trusted in a real deployment.
 
 **Real defect found and fixed during verification (not deferred):** Pydantic v2's error details for custom `@model_validator` failures (used by `SemesterCreate` for the `start_date < end_date` check) embed a raw, non-JSON-serializable exception instance in `error["ctx"]["error"]`. The shared `validation_exception_handler` in `app/middleware/error_handlers.py` (a Milestone 0 file) was passing this straight into `json.dumps()`, causing a `TypeError` that surfaced as an unhandled 500 instead of the documented 422. Fixed by routing `exc.errors()` through `fastapi.encoders.jsonable_encoder` before building the response. This is a Milestone-0-file fix made during Milestone 1 because M1's own documented behavior (`API_Contract.md` §10.11: "start_date >= end_date (422)") depended on it — not scope creep into Milestone 2.
+
+#### Post-completion fix: `alembic upgrade head` failed on a real machine (2026-07-04)
+
+User-reported, reproduced, and fixed. `cd backend && alembic upgrade head` (the bare console-script entry point — how a real developer actually runs it) failed with `ModuleNotFoundError: No module named 'app'` from `backend/alembic/env.py`. Root cause: my own verification throughout Milestone 0 and Milestone 1 only ever invoked Alembic via `python -m alembic` (which implicitly adds the current working directory to `sys.path`) or through direct Python imports (`from app.main import app`) — never the plain `alembic` command, which does **not** add cwd to `sys.path`. This is a genuine gap in the verification methodology itself, not just the code.
+
+**Fix:** `prepend_sys_path = .` added to `alembic.ini` (the standard Alembic mechanism for exactly this problem — interpreted relative to the ini file's own location, correct regardless of invocation cwd), plus a `__file__`-based `sys.path` insertion directly in `env.py` as a self-contained fallback.
+
+**Verified properly, not just patched:** reproduced the exact failure first (fresh `git clone`, fresh venv, bare `alembic` console script — confirmed identical error/traceback to the report), applied the fix, confirmed `alembic upgrade head` now proceeds past the import and reaches a real database connection attempt (fails only on placeholder credentials, the same pre-existing documented limitation, not a new bug), confirmed `alembic history`/`alembic current` work, and confirmed `python -m alembic` still works with no regression.
+
+**Process fix, not just a code fix:** `docs/MILESTONE_VERIFICATION_CHECKLIST.md` §4 updated to require testing the bare console-script form specifically — testing only `python -m alembic` is no longer sufficient evidence for future milestones.
+
+**No application architecture changed** — fix is scoped entirely to `alembic.ini` and `alembic/env.py` import/path resolution.
 
 **Verified:** fresh `pip install`, all new modules syntax-checked, app imports and boots, all 12 endpoints present in `/openapi.json` under `/api/v1`, field-validation (422) and semester date-order validation (422, post-fix) both produce the standard error envelope, duplicate-name/code paths correctly designed to return 409 (exercised at the service-logic level; full round-trip against a live DB blocked by the same credentials limitation as the migration), graceful 500 (not a crash) when the database is unreachable, and all Milestone 0 behaviors (`/health`, 404 shape, app title) remain unchanged.
 
