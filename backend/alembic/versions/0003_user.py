@@ -28,7 +28,12 @@ user_role = postgresql.ENUM("student", "teacher", "parent", "admin", name="user_
 
 
 def upgrade() -> None:
-    user_role.create(op.get_bind(), checkfirst=True)
+    # Do not call user_role.create() explicitly here — op.create_table()
+    # below already creates the enum type automatically as part of the
+    # table's DDL (SQLAlchemy fires a "before_create" event for any
+    # postgresql.ENUM column type used in the table). Calling both raised
+    # psycopg2.errors.DuplicateObject: type "user_role" already exists,
+    # confirmed against a real PostgreSQL database.
     op.create_table(
         "user",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
@@ -52,4 +57,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_user_role", table_name="user")
     op.drop_table("user")
+    # Unlike creation, op.drop_table() does NOT automatically drop the
+    # enum type it used — confirmed against a real database: without this
+    # explicit drop, the orphaned "user_role" type survives the table drop
+    # and a subsequent upgrade fails with DuplicateObject. checkfirst=True
+    # so this is a no-op if the type is somehow already gone.
     user_role.drop(op.get_bind(), checkfirst=True)
