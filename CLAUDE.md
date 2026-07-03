@@ -112,6 +112,7 @@ frontend/src/{app,pages,features,components,auth,styles}
 - Reference the relevant milestone or requirement ID in commit messages where useful (e.g., `Implement result approval workflow (BR-002, M7)`).
 - Feature branches map to milestones or a coherent slice of one (`feat/m6-exam-builder`), not to arbitrary daily snapshots.
 - Do not mix schema migrations with unrelated feature code in the same commit.
+- A commit that introduces anything not explicitly required by the proposal (endpoint, page, middleware, utility, UI component) is not complete until `docs/Proposal_vs_Engineering_Additions.md` is updated in that same commit — see Section 9.
 
 ---
 
@@ -121,6 +122,7 @@ frontend/src/{app,pages,features,components,auth,styles}
 - No new standalone `.md` files unless explicitly requested — extend the existing docs (`Requirement_Analysis.md`, `System_Architecture.md`, `Database_Design.md`, `Implementation_Roadmap.md`) instead of creating parallel ones.
 - Code comments follow the "why, not what" rule from Section 3 — they are not a substitute for keeping `docs/` accurate.
 - Any newly resolved ambiguity from `Requirement_Analysis.md` §14 should be reflected back into that section (mark resolved, note the decision) rather than left stale.
+- **Engineering additions are documented immediately, in the same commit, never deferred to a later audit.** Any endpoint, page, middleware, utility, or UI component added that is not explicitly required by `docs/product_proposal.pdf` gets an entry in `docs/Proposal_vs_Engineering_Additions.md` — classified (Required / Derived / Design Enhancement per that document's definitions) and, for anything not permanent, given an explicit disposition (keep vs. remove-when) — before the commit that introduces it, not discovered retroactively during a traceability review (see the Milestone 0 review that found the theme toggle and Dashboard health widget undocumented for a concrete example of what this rule prevents).
 
 ---
 
@@ -180,3 +182,4 @@ When asked to generate code in this repository:
 8. **Do not add dependencies or swap technologies** outside the stack in Section 2 without an explicit request.
 9. **Keep docs and code in sync** — if implementation forces a decision on an ambiguity, update the relevant doc in the same change (Section 9).
 10. **No premature optimization or abstraction** — build what the current milestone/requirement needs, following Section 3's coding standards, not a hypothetical future version of the system.
+11. **Log every non-proposal-required addition immediately.** Before committing a new endpoint, page, middleware, utility, or UI component, check whether `docs/product_proposal.pdf` actually asked for it. If not, add its entry to `docs/Proposal_vs_Engineering_Additions.md` in the same commit — do not wait for the next traceability audit to catch it (per Section 9).
