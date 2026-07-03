@@ -1,10 +1,13 @@
 """
 API router: reference data (Department, Course, Room, Semester).
 
-See docs/API_Contract.md §10. Unauthenticated in Milestone 1 — Milestone 2
-(Authentication & Authorization) has not landed yet, so there is no RBAC
-mechanism to apply. This is a tracked, temporary state (see
-PROJECT_PROGRESS.md Milestone 1 notes), not an oversight.
+See docs/API_Contract.md §10. RBAC retrofit (Milestone 2): read endpoints
+(list/get-by-id) require authentication but are open to any authenticated
+role — this is lookup data every role needs (students see their
+department, teachers see courses, scheduling needs rooms, etc.) and the
+proposal never restricted reads. Create endpoints are Admin-only, per the
+"User Roles (intended): Admin" already documented for them since
+Milestone 1 — this is completing a stated intent, not a new decision.
 """
 
 import uuid
@@ -13,6 +16,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.middleware.auth import get_current_user
+from app.middleware.rbac import require_roles
 from app.schemas.common import PaginatedResponse
 from app.schemas.course import CourseCreate, CourseRead
 from app.schemas.department import DepartmentCreate, DepartmentRead
@@ -27,8 +32,11 @@ course_service = CourseService()
 room_service = RoomService()
 semester_service = SemesterService()
 
+_require_authenticated = Depends(get_current_user)
+_require_admin = Depends(require_roles("admin"))
 
-@router.get("/departments", response_model=PaginatedResponse[DepartmentRead])
+
+@router.get("/departments", response_model=PaginatedResponse[DepartmentRead], dependencies=[_require_authenticated])
 def list_departments(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -38,17 +46,19 @@ def list_departments(
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("/departments", response_model=DepartmentRead, status_code=201)
+@router.post("/departments", response_model=DepartmentRead, status_code=201, dependencies=[_require_admin])
 def create_department(payload: DepartmentCreate, db: Session = Depends(get_db)):
     return department_service.create(db, payload)
 
 
-@router.get("/departments/{department_id}", response_model=DepartmentRead)
+@router.get(
+    "/departments/{department_id}", response_model=DepartmentRead, dependencies=[_require_authenticated]
+)
 def get_department(department_id: uuid.UUID, db: Session = Depends(get_db)):
     return department_service.get(db, department_id)
 
 
-@router.get("/courses", response_model=PaginatedResponse[CourseRead])
+@router.get("/courses", response_model=PaginatedResponse[CourseRead], dependencies=[_require_authenticated])
 def list_courses(
     department_id: uuid.UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
@@ -59,17 +69,17 @@ def list_courses(
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("/courses", response_model=CourseRead, status_code=201)
+@router.post("/courses", response_model=CourseRead, status_code=201, dependencies=[_require_admin])
 def create_course(payload: CourseCreate, db: Session = Depends(get_db)):
     return course_service.create(db, payload)
 
 
-@router.get("/courses/{course_id}", response_model=CourseRead)
+@router.get("/courses/{course_id}", response_model=CourseRead, dependencies=[_require_authenticated])
 def get_course(course_id: uuid.UUID, db: Session = Depends(get_db)):
     return course_service.get(db, course_id)
 
 
-@router.get("/rooms", response_model=PaginatedResponse[RoomRead])
+@router.get("/rooms", response_model=PaginatedResponse[RoomRead], dependencies=[_require_authenticated])
 def list_rooms(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -79,17 +89,17 @@ def list_rooms(
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("/rooms", response_model=RoomRead, status_code=201)
+@router.post("/rooms", response_model=RoomRead, status_code=201, dependencies=[_require_admin])
 def create_room(payload: RoomCreate, db: Session = Depends(get_db)):
     return room_service.create(db, payload)
 
 
-@router.get("/rooms/{room_id}", response_model=RoomRead)
+@router.get("/rooms/{room_id}", response_model=RoomRead, dependencies=[_require_authenticated])
 def get_room(room_id: uuid.UUID, db: Session = Depends(get_db)):
     return room_service.get(db, room_id)
 
 
-@router.get("/semesters", response_model=PaginatedResponse[SemesterRead])
+@router.get("/semesters", response_model=PaginatedResponse[SemesterRead], dependencies=[_require_authenticated])
 def list_semesters(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -99,11 +109,11 @@ def list_semesters(
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("/semesters", response_model=SemesterRead, status_code=201)
+@router.post("/semesters", response_model=SemesterRead, status_code=201, dependencies=[_require_admin])
 def create_semester(payload: SemesterCreate, db: Session = Depends(get_db)):
     return semester_service.create(db, payload)
 
 
-@router.get("/semesters/{semester_id}", response_model=SemesterRead)
+@router.get("/semesters/{semester_id}", response_model=SemesterRead, dependencies=[_require_authenticated])
 def get_semester(semester_id: uuid.UUID, db: Session = Depends(get_db)):
     return semester_service.get(db, semester_id)
