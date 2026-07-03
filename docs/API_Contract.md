@@ -1019,6 +1019,67 @@
 - **Business Rules:** BR-004, BR-005.
 - **Note:** Same gap-fill status as 7.6.
 
+### 7.8 `POST /schedule/class-sessions` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** Admin creates a class session — an offering of a `Course` taught by a `Teacher` in a `Semester` (e.g., "CS101, Section A, Fall 2026"). Prerequisite for `POST /schedule` (a `schedule_entry` requires an existing `class_session_id`) and for `POST /schedule/enrollments`.
+- **Authentication Required:** Yes
+- **User Roles:** Admin
+- **Request Body:**
+```json
+{
+  "course_id": "uuid",
+  "teacher_id": "uuid",
+  "semester_id": "uuid",
+  "section_label": "string"
+}
+```
+- **Response Body (201):**
+```json
+{
+  "id": "uuid",
+  "course_id": "uuid",
+  "teacher_id": "uuid",
+  "semester_id": "uuid",
+  "section_label": "string",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+```
+- **Validation:** `course_id`, `teacher_id`, `semester_id` must each reference an existing row.
+- **Possible Errors:** any referenced ID not found (422); caller is not Admin (403).
+- **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
+- **Database Tables Used:** `class_session`, `course`, `teacher`, `semester`.
+- **Business Rules:** none beyond referential validity.
+- **Note:** Neither this endpoint nor `class_session` creation is described anywhere in the proposal. Added because `class_session` is a required foreign key throughout the Scheduling, Exams, and Attendance endpoints above with no other way to create one — confirmed with the user during the Milestone 4 pre-implementation review (Option 1 of two presented). Classified **Derived** (not Design Enhancement) — it is an unavoidable prerequisite for Required features (scheduling, exams, attendance), not a discretionary addition. See `Proposal_vs_Engineering_Additions.md`.
+
+### 7.9 `POST /schedule/enrollments` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** Admin enrolls a Student into a `ClassSession`. Prerequisite for `GET /schedule/me` (Student view), attendance marking, and exam/result scoping, all of which read from `enrollment`.
+- **Authentication Required:** Yes
+- **User Roles:** Admin
+- **Request Body:**
+```json
+{
+  "student_id": "uuid",
+  "class_session_id": "uuid"
+}
+```
+- **Response Body (201):**
+```json
+{
+  "id": "uuid",
+  "student_id": "uuid",
+  "class_session_id": "uuid",
+  "enrolled_at": "timestamp"
+}
+```
+- **Validation:** `student_id` and `class_session_id` must each reference an existing row; duplicate enrollment is rejected (`Database_Design.md` §6.10's unique constraint on `(student_id, class_session_id)`).
+- **Possible Errors:** referenced ID not found (422); duplicate enrollment (409); caller is not Admin (403).
+- **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `enrollment`, `student`, `class_session`.
+- **Business Rules:** none beyond uniqueness and referential validity.
+- **Note:** Same gap-fill/Derived status as 7.8 — `enrollment` has no creation endpoint anywhere in the source documents despite being required by `GET /schedule/me`'s own documented response shape (§7.1).
+
 ---
 
 ## 8. Notifications *(gap-fill module — not listed in proposal §6)*

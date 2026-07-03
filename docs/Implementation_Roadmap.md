@@ -62,7 +62,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/schemas/department.py`, `course.py`, `room.py`, `semester.py`
 - `backend/app/routers/reference_data.py` (or split per entity)
 - `backend/app/services/reference_data_service.py`
-- `backend/alembic/versions/0001_core_reference_data.py`
+- `backend/alembic/versions/0002_core_reference_data.py` (corrected from `0001_core_reference_data.py` — revision `0001` is consumed by Milestone 0's baseline migration; the actual implemented migration always used `0002`, this entry was simply never updated to match. Found during the Milestone 4 pre-implementation review while fixing the same class of stale-reference issue across every later milestone's entry.)
 
 **APIs:** Not explicitly listed in the proposal's API spec (§6 has no `/departments`, `/courses`, `/rooms`, `/semesters` endpoints — this is a gap in the source proposal, consistent with `Requirement_Analysis.md` §14). Minimal internal/admin CRUD is required regardless for the system to function; treat as an implementation necessity, not a proposal deviation.
 
@@ -155,13 +155,15 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement `ClassSession`, `Enrollment`, `ScheduleEntry`, and `ScheduleChangeRequest`, including conflict detection — this unblocks Attendance and Exams, both of which are scoped to a `ClassSession`.
 
+**Milestone 4 scope note (added during M4 pre-implementation review):** `class_session` and `enrollment` are both required tables (referenced as foreign keys throughout `API_Contract.md` — `POST /schedule`, exams, attendance) but neither has a creation endpoint anywhere in the proposal or this document's original API list. Unlike Milestone 3's Parent-linking gap, this one is load-bearing for M4's own stated deliverables: without a way to create a `class_session`, `POST /schedule` can never be exercised, and M5/M6 both explicitly depend on `class_session` existing. Confirmed with the user (Option 1 of two presented): add minimal Admin-only creation endpoints — `POST /schedule/class-sessions` and `POST /schedule/enrollments` — as Derived Engineering Additions, same precedent as Milestone 1's reference-data CRUD ("implementation necessity, not a proposal deviation"). Documented in `API_Contract.md` §7.8-7.9 and `Proposal_vs_Engineering_Additions.md`.
+
 **Files to create:**
 - `backend/app/models/class_session.py`, `enrollment.py`, `schedule_entry.py`, `schedule_change_request.py`
 - `backend/app/schemas/schedule.py`
 - `backend/app/routers/schedule.py`
 - `backend/app/services/schedule_service.py` (includes conflict-detection logic — BR-005)
 - `backend/app/repositories/schedule_repository.py`
-- `backend/alembic/versions/0004_scheduling.py`
+- `backend/alembic/versions/0005_scheduling.py` (corrected from `0004_scheduling.py` — revision `0004` was already consumed by Milestone 3's `0004_role_profiles.py`, the same class of stale-reference issue already fixed for M2's and M3's own migration filenames)
 - `frontend/src/pages/Timetable/`
 - `frontend/src/features/schedule/`
 
@@ -171,6 +173,10 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `PUT /schedule/{id}`
 - `DELETE /schedule/{id}`
 - `GET /schedule/conflicts`
+- `POST /schedule/change-requests` *(gap-fill — not in the proposal's §6 API spec; supports FR-050/BR-004. Was previously missing from this list even though `schedule_change_request.py` above and `API_Contract.md` §7.6 both already scoped it to this milestone — corrected during the M4 pre-implementation review, not newly added scope.)*
+- `POST /schedule/change-requests/{id}/resolve` *(gap-fill, same note as above; `API_Contract.md` §7.7)*
+- `POST /schedule/class-sessions` *(Derived addition, confirmed with the user during the M4 pre-implementation review — see the scope note above; `API_Contract.md` §7.8)*
+- `POST /schedule/enrollments` *(Derived addition, same note; `API_Contract.md` §7.9)*
 
 **Database tables:** `class_session`, `enrollment`, `schedule_entry`, `schedule_change_request`
 
@@ -192,7 +198,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/routers/attendance.py`
 - `backend/app/services/attendance_service.py` (percentage calculation, warning trigger — BR-008)
 - `backend/app/repositories/attendance_repository.py`
-- `backend/alembic/versions/0005_attendance.py`
+- `backend/alembic/versions/0006_attendance.py` (corrected from `0005_attendance.py` — revision `0005` is Milestone 4's; corrected during the M4 pre-implementation review's roadmap-wide migration numbering fix, per the same off-by-one pattern already fixed for M2/M3/M4)
 - `frontend/src/pages/Attendance/` (student view)
 - `frontend/src/pages/Teacher/AttendanceMarker/`
 - `frontend/src/features/attendance/`
@@ -224,7 +230,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/routers/exams.py`
 - `backend/app/services/exam_service.py` (status transitions — BR-003), `grading_service.py` (VR-006 marks-cap check)
 - `backend/app/repositories/exam_repository.py`
-- `backend/alembic/versions/0006_exams.py`
+- `backend/alembic/versions/0007_exams.py` (corrected from `0006_exams.py` — see the Milestone 4 pre-implementation review's roadmap-wide migration numbering fix)
 - `frontend/src/pages/ExamList/`
 - `frontend/src/pages/ExamRoom/` (timed exam interface)
 - `frontend/src/pages/Teacher/ExamBuilder/`
@@ -261,7 +267,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/routers/results.py`
 - `backend/app/services/result_service.py` (workflow state machine — BR-002)
 - `backend/app/pdf/transcript_generator.py`
-- `backend/alembic/versions/0007_results.py`
+- `backend/alembic/versions/0008_results.py` (corrected from `0007_results.py` — see the Milestone 4 pre-implementation review's roadmap-wide migration numbering fix)
 - `frontend/src/pages/ResultsView/`
 - `frontend/src/pages/Admin/ResultApproval/`
 - `frontend/src/features/results/`
@@ -292,7 +298,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/routers/fees.py`
 - `backend/app/services/fee_service.py`
 - `backend/app/pdf/invoice_generator.py`
-- `backend/alembic/versions/0008_fees.py`
+- `backend/alembic/versions/0009_fees.py` (corrected from `0008_fees.py` — see the Milestone 4 pre-implementation review's roadmap-wide migration numbering fix)
 - `frontend/src/pages/FeeCentre/` (Student/Parent)
 - `frontend/src/pages/Admin/FeeDashboard/`
 - `frontend/src/features/fees/`
@@ -326,7 +332,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `backend/app/schemas/notification.py`
 - `backend/app/routers/notifications.py` (new — not in proposal §6, required to satisfy the Notifications feature/screen)
 - `backend/app/notifications/dispatcher.py` (event hooks triggered from Result/Attendance/Schedule/Fee services)
-- `backend/alembic/versions/0009_notifications.py`
+- `backend/alembic/versions/0010_notifications.py` (corrected from `0009_notifications.py` — see the Milestone 4 pre-implementation review's roadmap-wide migration numbering fix)
 - `frontend/src/pages/Notifications/`
 - `frontend/src/features/notifications/`
 
