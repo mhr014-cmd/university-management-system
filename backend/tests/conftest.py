@@ -107,10 +107,18 @@ def auth_headers():
 
 @pytest.fixture
 def make_department(db_session):
+    import uuid
+
     from app.models.department import Department
 
-    def _make_department(name: str = "Computer Science", code: str = "CS") -> Department:
-        department = Department(name=name, code=code)
+    def _make_department(name: str | None = None, code: str | None = None) -> Department:
+        # Unique-by-default so a test creating a department via multiple
+        # independent fixture calls (e.g. make_course() and
+        # make_teacher_user() each calling make_department() internally)
+        # never collides on department.name/code's unique constraints —
+        # this exact collision was found and fixed during Milestone 4.
+        suffix = uuid.uuid4().hex[:8]
+        department = Department(name=name or f"Department {suffix}", code=code or f"D{suffix}")
         db_session.add(department)
         db_session.commit()
         db_session.refresh(department)
@@ -174,3 +182,68 @@ def make_admin_user(db_session, make_user):
         return user, admin
 
     return _make_admin_user
+
+
+@pytest.fixture
+def make_course(db_session, make_department):
+    from app.models.course import Course
+
+    def _make_course(department=None, name: str = "Intro to CS", code: str = "CS101", credit_hours: int = 3) -> Course:
+        department = department or make_department()
+        course = Course(department_id=department.id, name=name, code=code, credit_hours=credit_hours)
+        db_session.add(course)
+        db_session.commit()
+        db_session.refresh(course)
+        return course
+
+    return _make_course
+
+
+@pytest.fixture
+def make_room(db_session):
+    from app.models.room import Room
+
+    def _make_room(name: str = "Room 101", building: str | None = "Main", capacity: int | None = 30) -> Room:
+        room = Room(name=name, building=building, capacity=capacity)
+        db_session.add(room)
+        db_session.commit()
+        db_session.refresh(room)
+        return room
+
+    return _make_room
+
+
+@pytest.fixture
+def make_semester(db_session):
+    from datetime import date
+
+    from app.models.semester import Semester
+
+    def _make_semester(
+        name: str = "Fall 2026", start_date: date = date(2026, 9, 1), end_date: date = date(2026, 12, 20)
+    ) -> Semester:
+        semester = Semester(name=name, start_date=start_date, end_date=end_date)
+        db_session.add(semester)
+        db_session.commit()
+        db_session.refresh(semester)
+        return semester
+
+    return _make_semester
+
+
+@pytest.fixture
+def make_class_session(db_session, make_course, make_semester):
+    from app.models.class_session import ClassSession
+
+    def _make_class_session(course=None, teacher=None, semester=None, section_label: str = "Section A") -> ClassSession:
+        course = course or make_course()
+        semester = semester or make_semester()
+        class_session = ClassSession(
+            course_id=course.id, teacher_id=teacher.id, semester_id=semester.id, section_label=section_label
+        )
+        db_session.add(class_session)
+        db_session.commit()
+        db_session.refresh(class_session)
+        return class_session
+
+    return _make_class_session
