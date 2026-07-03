@@ -8,6 +8,7 @@ Translates every raised error into the single consistent JSON error shape:
 import logging
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -26,11 +27,14 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         logger.info("Validation error on %s %s: %s", request.method, request.url.path, exc.errors())
+        # Pydantic v2 embeds the raw exception instance in error["ctx"]["error"] for
+        # custom validators (e.g. @model_validator raising ValueError) — not JSON
+        # serializable as-is, so it must go through jsonable_encoder before json.dumps.
         return _error_response(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "validation_error",
             "Request validation failed.",
-            details=exc.errors(),
+            details=jsonable_encoder(exc.errors()),
         )
 
     @app.exception_handler(StarletteHTTPException)

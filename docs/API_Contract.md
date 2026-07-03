@@ -1121,6 +1121,98 @@
 
 ---
 
+## 10. Reference Data (Department, Course, Room, Semester) *(gap-fill domain — not listed in proposal §6)*
+
+> **Note:** The proposal never names Department, Course, Room, or Semester as standalone API resources, and §6 has no corresponding endpoints. But every Required feature that references a department, course, room, or semester (student/teacher creation, scheduling, fee structures, results) needs somewhere to source those IDs from — this domain is classified **Derived** in `docs/Proposal_vs_Engineering_Additions.md` ("Reference data CRUD" entry), not Required or Design Enhancement: it is an unavoidable mechanical prerequisite, not a feature the proposal asked for. Scope is deliberately minimal per `Implementation_Roadmap.md` Milestone 1 ("basic Admin CRUD to unblock later milestones") — list, create, and get-by-id only; update/delete are not implemented in Milestone 1 since nothing yet needs to edit or remove reference data.
+>
+> **Auth note:** Milestone 1 lands before Milestone 2 (Authentication & Authorization) per the roadmap's own dependency graph. These endpoints are therefore **unauthenticated in Milestone 1** — there is no auth system yet to enforce the "Admin" role implied below. This is a temporary, explicitly-tracked state, not an oversight; see `PROJECT_PROGRESS.md` Milestone 1 notes and Known Issues. RBAC enforcement is added when Milestone 2 lands, per `System_Architecture.md` §6.
+
+### 10.1 `GET /departments`
+- **Purpose:** List all departments. **Authentication Required:** Deferred to M2 (see note above). **User Roles (intended):** Admin, Teacher, Student (read).
+- **Request Body:** none. Query params: `page`, `page_size`.
+- **Response Body (200):** `{ "items": [{ "id": "uuid", "name": "string", "code": "string", "created_at": "timestamp", "updated_at": "timestamp" }], "total": "integer", "page": "integer", "page_size": "integer" }`
+- **Validation:** none beyond query param types.
+- **Possible Errors:** none milestone-1-specific.
+- **Status Codes:** 200 OK.
+- **Database Tables Used:** `department`.
+- **Business Rules:** none.
+
+### 10.2 `POST /departments`
+- **Purpose:** Create a department. **Authentication Required:** Deferred to M2. **User Roles (intended):** Admin.
+- **Request Body:** `{ "name": "string", "code": "string" }`
+- **Response Body (201):** created department object (see 10.1 shape).
+- **Validation:** `name` and `code` required, non-empty; both unique (`Database_Design.md` §10).
+- **Possible Errors:** duplicate `name` or `code` (409); missing/empty fields (422).
+- **Status Codes:** 201 Created, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `department`.
+- **Business Rules:** none.
+
+### 10.3 `GET /departments/{id}`
+- **Purpose:** Retrieve a single department. **Authentication Required:** Deferred to M2.
+- **Response Body (200):** department object. **Possible Errors:** not found (404). **Status Codes:** 200 OK, 404 Not Found. **Database Tables Used:** `department`.
+
+### 10.4 `GET /courses`
+- **Purpose:** List all courses. **Authentication Required:** Deferred to M2.
+- **Request Body:** none. Query params: `department_id` (optional filter), `page`, `page_size`.
+- **Response Body (200):** `{ "items": [{ "id": "uuid", "department_id": "uuid", "name": "string", "code": "string", "credit_hours": "integer", "created_at": "timestamp", "updated_at": "timestamp" }], "total": "integer", "page": "integer", "page_size": "integer" }`
+- **Validation:** `department_id` if provided must reference an existing department.
+- **Possible Errors:** invalid `department_id` (422).
+- **Status Codes:** 200 OK, 422 Unprocessable Entity.
+- **Database Tables Used:** `course`, `department`.
+
+### 10.5 `POST /courses`
+- **Purpose:** Create a course. **Authentication Required:** Deferred to M2. **User Roles (intended):** Admin.
+- **Request Body:** `{ "department_id": "uuid", "name": "string", "code": "string", "credit_hours": "integer" }`
+- **Response Body (201):** created course object.
+- **Validation:** all fields required; `code` unique; `department_id` must reference an existing department.
+- **Possible Errors:** duplicate `code` (409); invalid/nonexistent `department_id` (422); missing fields (422).
+- **Status Codes:** 201 Created, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `course`, `department`.
+
+### 10.6 `GET /courses/{id}`
+- **Purpose:** Retrieve a single course. **Authentication Required:** Deferred to M2.
+- **Response Body (200):** course object. **Possible Errors:** not found (404). **Status Codes:** 200 OK, 404 Not Found. **Database Tables Used:** `course`.
+
+### 10.7 `GET /rooms`
+- **Purpose:** List all rooms. **Authentication Required:** Deferred to M2.
+- **Request Body:** none. Query params: `page`, `page_size`.
+- **Response Body (200):** `{ "items": [{ "id": "uuid", "name": "string", "building": "string | null", "capacity": "integer | null" }], "total": "integer", "page": "integer", "page_size": "integer" }`
+- **Database Tables Used:** `room`.
+
+### 10.8 `POST /rooms`
+- **Purpose:** Create a room. **Authentication Required:** Deferred to M2. **User Roles (intended):** Admin.
+- **Request Body:** `{ "name": "string", "building": "string (optional)", "capacity": "integer (optional)" }`
+- **Response Body (201):** created room object.
+- **Validation:** `name` required, unique.
+- **Possible Errors:** duplicate `name` (409); missing `name` (422).
+- **Status Codes:** 201 Created, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `room`.
+
+### 10.9 `GET /rooms/{id}`
+- **Purpose:** Retrieve a single room. **Authentication Required:** Deferred to M2.
+- **Response Body (200):** room object. **Possible Errors:** not found (404). **Status Codes:** 200 OK, 404 Not Found. **Database Tables Used:** `room`.
+
+### 10.10 `GET /semesters`
+- **Purpose:** List all semesters. **Authentication Required:** Deferred to M2.
+- **Request Body:** none. Query params: `page`, `page_size`.
+- **Response Body (200):** `{ "items": [{ "id": "uuid", "name": "string", "start_date": "date", "end_date": "date" }], "total": "integer", "page": "integer", "page_size": "integer" }`
+- **Database Tables Used:** `semester`.
+
+### 10.11 `POST /semesters`
+- **Purpose:** Create a semester. **Authentication Required:** Deferred to M2. **User Roles (intended):** Admin.
+- **Request Body:** `{ "name": "string", "start_date": "date", "end_date": "date" }`
+- **Response Body (201):** created semester object.
+- **Validation:** `name` required, unique; `start_date < end_date` (`Database_Design.md` §10 check constraint).
+- **Possible Errors:** duplicate `name` (409); `start_date >= end_date` (422); missing fields (422).
+- **Status Codes:** 201 Created, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `semester`.
+
+### 10.12 `GET /semesters/{id}`
+- **Purpose:** Retrieve a single semester. **Authentication Required:** Deferred to M2.
+- **Response Body (200):** semester object. **Possible Errors:** not found (404). **Status Codes:** 200 OK, 404 Not Found. **Database Tables Used:** `semester`.
+
+---
+
 ## Summary
 
 | Domain | Endpoints Documented |
@@ -1134,6 +1226,7 @@
 | Scheduling (incl. 2 gap-fill) | 7 |
 | Notifications (gap-fill) | 2 |
 | Reports (gap-fill) | 2 |
-| **Total** | **49** |
+| Reference Data (gap-fill, Derived) | 12 |
+| **Total** | **61** |
 
-**Gap-fill endpoints** (7.6, 7.7, 8.1, 8.2, 6.7, 9.1, 9.2 — 7 total) are not present in the proposal's own §6 API specification but are required to satisfy features (FR-050, FR-052, FR-053, FR-054, FR-055, FR-056) that the proposal does describe elsewhere. Each is explicitly marked above rather than silently merged into the "official" list, consistent with the traceability approach in `Requirement_Traceability_Matrix.md`. The Reports gap and the overdue-notify gap were identified during the Project Readiness Audit (see `Requirement_Analysis.md` §14 items 15–16).
+**Gap-fill endpoints** (7.6, 7.7, 8.1, 8.2, 6.7, 9.1, 9.2, and all of §10 — 19 total) are not present in the proposal's own §6 API specification. The first seven are required to satisfy features (FR-050, FR-052, FR-053, FR-054, FR-055, FR-056) that the proposal does describe elsewhere (classification: Required). Section 10's twelve Reference Data endpoints are different in kind — the proposal never describes Department/Course/Room/Semester management as a feature at all; they exist purely as unavoidable plumbing for other Required features (classification: Derived). Each is explicitly marked above rather than silently merged into the "official" list, consistent with the traceability approach in `Requirement_Traceability_Matrix.md` and `Proposal_vs_Engineering_Additions.md`.

@@ -127,17 +127,15 @@ Every endpoint below is **Required** at the capability level (all seven trace to
 
 ---
 
-## Additional Items Identified But Not Yet Formally Specified
+## Additional Items Identified Outside the Proposal's §6 API Table
 
-Two further categories of engineering-necessary endpoints were noted in `Implementation_Roadmap.md` (Milestones 0–1) but have **not** been written up as formal entries in `API_Contract.md`. They are surfaced here for completeness and correct classification, since they are also absent from the proposal's §6 table:
+Two categories of engineering-necessary endpoints, both absent from the proposal's §6 table, with two different resolutions:
 
-### Reference data CRUD (Department, Course, Room, Semester)
-**Classification: Derived.** The proposal never names these as endpoints, and never even fully names them as standalone entities — but Required features cannot function without them: `POST /users/students` needs a `department_id` to reference, `POST /schedule` needs a `room_id`, `POST /fees` needs a `semester_id`, and so on. These are pure plumbing, logically unavoidable given the Required features that depend on them. **Action:** formalize as a "Reference Data" section in `API_Contract.md` before Milestone 1 begins.
+### Reference data CRUD (Department, Course, Room, Semester) — formalized in Milestone 1
+**Classification: Derived.** The proposal never names these as endpoints, and never even fully names them as standalone entities — but Required features cannot function without them: `POST /users/students` needs a `department_id` to reference, `POST /schedule` needs a `room_id`, `POST /fees` needs a `semester_id`, and so on. These are pure plumbing, logically unavoidable given the Required features that depend on them. **Status:** formalized as `API_Contract.md` §10 (12 endpoints: list/create/get-by-id for each of Department, Course, Room, Semester) and implemented in Milestone 1. Scope deliberately minimal — update/delete were not implemented, since nothing yet needs to edit or remove reference data; add them only when a later milestone actually requires it, not preemptively. **Auth note:** these endpoints ship unauthenticated in Milestone 1, since Milestone 2 (Authentication & Authorization) hasn't landed yet — tracked as a known, temporary state in `PROJECT_PROGRESS.md`, not a silent gap; RBAC is added when M2 lands.
 
-### `GET /health`
-**Classification: Design Enhancement.** A liveness-check endpoint has no proposal linkage whatsoever — it exists purely to verify deployment wiring (`Implementation_Roadmap.md` Milestone 0). It is the one item in this entire document that is pure engineering convenience with zero traceability to any proposal sentence, direct or indirect.
-
-These two items are noted rather than fully specified here because doing so is outside this document's original stated purpose (reviewing what's already in `API_Contract.md`); they should be added to `API_Contract.md` as their own entries before implementation reaches the milestone that needs them.
+### `GET /health` — deliberately kept out of `API_Contract.md`
+**Classification: Design Enhancement.** A liveness-check endpoint has no proposal linkage whatsoever — it exists purely to verify deployment wiring (`Implementation_Roadmap.md` Milestone 0). It is the one item in this entire document that is pure engineering convenience with zero traceability to any proposal sentence, direct or indirect. Unlike Reference Data above, this one is **not** meant to be added to `API_Contract.md` — it's infrastructure, not a versioned business resource (see `backend/app/routers/health.py`'s own docstring), so its absence from the contract is the correct, permanent state, not a pending action.
 
 ---
 

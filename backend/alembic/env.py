@@ -2,9 +2,7 @@
 Alembic migration environment.
 
 Wires Alembic's runtime to the SQLAlchemy Base/metadata and database URL
-from app.core.config. No models are registered yet (Milestone 0) — the
-baseline revision in versions/ establishes an empty migration history that
-Milestone 1's first real revision will build on.
+from app.core.config.
 """
 
 from logging.config import fileConfig
@@ -14,6 +12,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.db.base import Base
+from app import models  # noqa: F401 - import registers all implemented models on Base.metadata
 
 config = context.config
 
