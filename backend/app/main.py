@@ -17,7 +17,7 @@ from app.core.logging_config import configure_logging
 from app.db.session import engine
 from app.middleware.error_handlers import register_exception_handlers
 from app.middleware.logging import RequestLoggingMiddleware
-from app.routers import health, reference_data
+from app.routers import auth, health, reference_data
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(health.router)
+    app.include_router(auth.router, prefix=settings.api_v1_prefix)
     app.include_router(reference_data.router, prefix=settings.api_v1_prefix)
 
     return app
