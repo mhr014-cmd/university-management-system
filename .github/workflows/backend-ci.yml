@@ -1,0 +1,29 @@
+# Backend CI — placeholder workflow.
+# Intended to run lint + tests for backend/ on push/PR.
+# To be implemented during Milestone 11 (see docs/Implementation_Roadmap.md).
+
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+  pull_request:
+    paths:
+      - "backend/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # - name: Set up Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: "3.12"
+      # - name: Install dependencies
+      #   run: pip install -r backend/requirements.txt
+      # - name: Run tests
+      #   run: pytest backend/tests
+      - name: Placeholder
+        run: echo "Backend CI not yet implemented — see docs/Implementation_Roadmap.md Milestone 11."
