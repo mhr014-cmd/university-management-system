@@ -27,7 +27,7 @@ logger = logging.getLogger("app.startup")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting up in '%s' environment", settings.environment)
+    logger.info("Starting %s in '%s' environment", app.title, settings.environment)
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -40,7 +40,9 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="ICT Education API",
+        title="University Management System API",
+        description="REST API for the University Management System (ICT Education) — "
+        "attendance, exams, results, fees, and scheduling.",
         version="0.1.0",
         lifespan=lifespan,
     )
