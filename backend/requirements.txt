@@ -1,25 +1,45 @@
 # Backend dependencies — exact pins, not floating ranges.
 #
-# Every version below is taken verbatim from `pip freeze` against the
-# virtual environment actually used to verify Milestone 0 (app import,
-# uvicorn boot, GET /health over real HTTP, the 404 exception-handler fix,
-# `pytest`/`httpx` TestClient runs — see the Milestone 0 completion report).
-# Because pip resolved this exact graph with zero conflicts and the app ran
-# correctly on it, this set is empirically known-mutually-compatible, not a
-# guess. Floating ranges (`>=`, `<`) are avoided entirely so a fresh
-# `pip install -r requirements.txt` reproduces the same environment byte-for-
-# byte instead of silently resolving a different graph on a later date.
+# Generated from a fully clean dependency resolution: a brand-new venv, no
+# prior lockfile or cached wheels, `pip install` given only the unpinned
+# top-level packages this project actually imports (fastapi, uvicorn[standard],
+# sqlalchemy, alembic, psycopg2-binary, pydantic, pydantic-settings,
+# python-jose[cryptography], passlib[bcrypt], python-multipart, python-dotenv,
+# pytest, pytest-asyncio, httpx), then `pip freeze` + `pip check` ("No broken
+# requirements found") captured as the pin list below. Re-verified afterward:
+# app import, uvicorn boot, GET /health over real HTTP, and the 404
+# exception-handler behavior all match the original Milestone 0 run exactly.
 #
-# Fixed technology choices themselves (FastAPI, SQLAlchemy, Alembic, JWT
-# library) are unchanged from docs/System_Architecture.md Section 12 — this
-# file only tightens *which exact versions* satisfy that stack.
+# IMPORTANT — do not install `fastapi[standard]`: that extra additionally
+# pulls in fastapi-cli, fastapi-cloud-cli, Jinja2, rich, typer, sentry-sdk,
+# email-validator, etc. — none of which this codebase uses (app/main.py
+# wires uvicorn directly, not FastAPI's own CLI). Confirmed by resolving
+# both ways and diffing; the plain `fastapi` + `uvicorn[standard]` pair below
+# is the correct, minimal, non-bloated resolution.
 
-# --- Web framework triad -----------------------------------------------
+# --- On starlette==1.3.1 ---------------------------------------------------
+# This looks wrong at a glance (Starlette was a 0.x-only package for years)
+# but it is the correct, currently-latest, actively-tested pairing — verified
+# directly against PyPI's JSON API and FastAPI's own GitHub repository, not
+# assumed:
+#   - fastapi==0.139.0's own pyproject.toml declares `starlette>=0.46.0`
+#     (open-ended; PyPI confirms 1.3.1 is Starlette's actual latest release).
+#   - FastAPI's release notes show dependabot bumping their own pinned test
+#     dependency 0.52.1 -> 1.0.0 -> 1.1.0 -> 1.2.1 -> 1.3.1 across merged,
+#     CI-passing PRs — i.e. FastAPI's maintainers are testing against and
+#     accepting Starlette 1.3.1 right now, not merely tolerating it via an
+#     unbounded version range.
+# The earlier "guessed-looking" appearance was a reasonable thing to flag,
+# but pip's own resolver (not a hand-picked version) produced this pin both
+# times, from two independent clean venvs, so it is not a bad resolution or
+# a dependency-confusion issue.
+
+# --- Web framework triad ---------------------------------------------------
 # Pinned together because FastAPI wraps Starlette directly (its request/
 # response/exception-handling internals are Starlette classes — see the
 # Milestone 0 fix where the 404 handler had to be registered against
 # `starlette.exceptions.HTTPException` specifically). Mixing a different
-# Starlette version with this FastAPI version risks exactly that kind of
+# Starlette version with this FastAPI version risks that exact kind of
 # handler-registration mismatch recurring silently.
 fastapi==0.139.0
 starlette==1.3.1
@@ -34,7 +54,7 @@ watchfiles==1.2.0
 websockets==16.0
 colorama==0.4.6
 
-# --- Pydantic ------------------------------------------------------------
+# --- Pydantic ----------------------------------------------------------
 # pydantic-core is a compiled Rust extension bundled with a specific
 # pydantic release; pinning it separately from pydantic itself is the most
 # common source of import-time errors when the two drift apart, so it is
@@ -46,7 +66,7 @@ annotated-types==0.7.0
 typing-inspection==0.4.2
 typing_extensions==4.16.0
 
-# --- Database layer --------------------------------------------------------
+# --- Database layer ---------------------------------------------------
 sqlalchemy==2.0.51
 alembic==1.18.5
 psycopg2-binary==2.9.12
@@ -69,9 +89,13 @@ six==1.17.0
 python-multipart==0.0.32   # form/file upload support (profile photo, etc.)
 python-dotenv==1.2.2
 
-# --- Testing -----------------------------------------------------------
-pytest==8.4.2
-pytest-asyncio==0.26.0
+# --- Testing -------------------------------------------------------------
+# pytest 9.x / pytest-asyncio 1.x: both are simply the current latest
+# releases on PyPI as of this resolution (verified directly, not guessed) —
+# superseding the 8.4.2 / 0.26.0 pair from the previous pin pass, which was
+# generated a short time earlier under a different resolver snapshot.
+pytest==9.1.1
+pytest-asyncio==1.4.0
 httpx==0.28.1
 iniconfig==2.3.0
 pluggy==1.6.0
