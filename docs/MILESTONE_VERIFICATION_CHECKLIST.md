@@ -138,6 +138,24 @@
 
 ---
 
+## 13. Full Documentation Self-Review
+
+Run this section last, after 1–12 above are checked, per `CLAUDE.md` §14 item 12. This is a cross-check against every governing document, not a repeat of sections 1–12 — it's specifically looking for inconsistencies *between* documents and code that individual verification steps don't surface.
+
+- [ ] `docs/Requirement_Analysis.md` — every FR/NFR this milestone claims to implement is actually described there; no functionality shipped that isn't traceable to a requirement (or is explicitly logged as an Engineering Decision)
+- [ ] `docs/System_Architecture.md` — this milestone's code follows the layered architecture, folder structure, error handling, logging, and security strategy exactly as designed; no silent architectural deviation
+- [ ] `docs/Database_Design.md` — any schema touched by this milestone matches the ERD, table/column list, indexes, and constraints exactly
+- [ ] `docs/API_Contract.md` — every endpoint this milestone adds/changes matches the contract exactly (method, URL, request/response shape, status codes, roles); any genuine-defect-driven contract change is reflected in both the contract and here
+- [ ] `docs/UI_Wireframes.md` — every page/component this milestone adds matches the approved wireframe; anything that doesn't is logged in `Proposal_vs_Engineering_Additions.md`, not left silently divergent
+- [ ] `docs/Requirement_Traceability_Matrix.md` — Testing/Implementation/Verification status columns updated in place for every FR/NFR this milestone touches
+- [ ] `docs/Proposal_vs_Engineering_Additions.md` — every endpoint, page, middleware, utility, or UI component added this milestone that isn't explicitly required by the proposal has an entry (classification + disposition), added in the same commit that introduced it, not backfilled here as an afterthought
+- [ ] `PROJECT_PROGRESS.md` — Summary section (Overall Progress, Current/Last/Next Milestone, Current Git Commit) and this milestone's tracker row are both accurate as of the actual current HEAD, not stale from an earlier commit
+- [ ] `docs/MILESTONE_VERIFICATION_CHECKLIST.md` (this document) — if running this checklist revealed the checklist itself was missing a check that would have caught a real issue, add that check here in the same pass, don't just note it and move on
+
+**If this section finds anything** — an inconsistency, an undocumented deviation, or a missing proposal requirement — fix or document it before proceeding to Sign-off. Do not mark the milestone Complete with a known, unfixed finding from this section.
+
+---
+
 ## Sign-off
 
 A milestone is not "Completed" in `PROJECT_PROGRESS.md` until every section above is either checked or has an explicit, justified "N/A"/Known Issue entry. Completion (all boxes checked) and Approval (explicit reviewer sign-off) are tracked as two separate fields in `PROJECT_PROGRESS.md` — finishing this checklist moves Status to "Completed," it does not by itself move Review Status to "Approved."
