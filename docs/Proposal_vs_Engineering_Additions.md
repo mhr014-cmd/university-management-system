@@ -2,7 +2,7 @@
 ## University Management System (ICT Education) — REST API
 
 **Source inputs:** `docs/product_proposal.pdf` §3–§7, `docs/API_Contract.md`, `docs/UI_Wireframes.md`, `docs/Requirement_Analysis.md` §14
-**Purpose:** A single, explicit ledger of every endpoint **and, per the Milestone 0 proposal-traceability review, every frontend addition** that does **not** appear in the proposal itself, so implementation starts with — and stays on — a clear line between what the client (ICT Bangladesh) asked for and what this project added to make that request buildable or verifiable. Extended beyond API endpoints on 2026-07-03 after a traceability check found two undocumented frontend additions (see "Frontend / UI Engineering Decisions" below).
+**Purpose:** A single, explicit ledger of every endpoint, frontend addition, and backend middleware/utility that does **not** appear in the proposal itself, so implementation starts with — and stays on — a clear line between what the client (ICT Bangladesh) asked for and what this project added to make that request buildable or verifiable. Extended beyond API endpoints on 2026-07-03 after a traceability review found two undocumented frontend additions (see "Frontend / UI Engineering Decisions") and, on immediate self-review against the newly-added same-commit policy, a full category of unlogged backend middleware/utilities (see "Backend Middleware & Utilities").
 **Scope:** No endpoints or UI elements are removed by this document — it is a review and classification layer only.
 
 ---
@@ -138,6 +138,24 @@ Two further categories of engineering-necessary endpoints were noted in `Impleme
 **Classification: Design Enhancement.** A liveness-check endpoint has no proposal linkage whatsoever — it exists purely to verify deployment wiring (`Implementation_Roadmap.md` Milestone 0). It is the one item in this entire document that is pure engineering convenience with zero traceability to any proposal sentence, direct or indirect.
 
 These two items are noted rather than fully specified here because doing so is outside this document's original stated purpose (reviewing what's already in `API_Contract.md`); they should be added to `API_Contract.md` as their own entries before implementation reaches the milestone that needs them.
+
+---
+
+## Backend Middleware & Utilities (Milestone 0 Foundation)
+
+Found during a Milestone 0 self-review against the full documentation set (per the standing policy in `CLAUDE.md` §14 item 11): the pieces of backend infrastructure below are middleware and utility code with no proposal linkage, and had not been logged here despite the policy explicitly naming "middleware" and "utility" as things requiring an entry. Unlike the frontend items above, none of these need a "keep vs. remove" disposition — they are foundational plumbing, not optional/debug UI, and every one of them implements a mechanism already mandated by an approved planning document (`System_Architecture.md`), not an ad hoc invention.
+
+| Item | Where | Classification | Why |
+|---|---|---|---|
+| Global exception handlers | `app/middleware/error_handlers.py` | Derived | No proposal sentence asks for a specific error shape, but `System_Architecture.md` §9 mandates the `{"error":{...}}` envelope, and no Required endpoint can be delivered without *some* error handling. |
+| Request logging middleware | `app/middleware/logging.py` | Derived | Implements `System_Architecture.md` §10's structured logging strategy; a prerequisite for any endpoint to be operable/debuggable, not a feature in its own right. |
+| Structured logging config | `app/core/logging_config.py` | Derived | Same rationale — `System_Architecture.md` §10. |
+| Settings / config validation | `app/core/config.py` | Derived | Required for any endpoint to read `DATABASE_URL`, CORS origins, etc. — unavoidable given SQLAlchemy and CORS are both Required by the stack in `System_Architecture.md` §12. |
+| SQLAlchemy engine/session (`get_db` dependency) | `app/db/session.py`, `app/db/base.py` | Derived | Direct implementation of `System_Architecture.md` §4 (PostgreSQL Architecture) — no Required feature that touches the database can exist without it. |
+| CORS middleware | `app/main.py` (`CORSMiddleware`) | Derived | Required for the frontend (a Required deliverable) to call the backend (also Required) from a different origin at all — mandated implicitly by the decoupled SPA+API architecture in `System_Architecture.md` §1. |
+| Alembic baseline revision | `alembic/versions/0001_initial_baseline.py` | Derived | Implements `System_Architecture.md` §4.3 (versioned migrations, never manual DDL) — establishes the migration chain before any schema exists. |
+
+**Disposition:** N/A for all rows — none are optional or slated for removal; each is a permanent, unavoidable prerequisite for delivering the Required features layered on top of it in later milestones.
 
 ---
 
