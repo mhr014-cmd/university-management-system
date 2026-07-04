@@ -752,7 +752,41 @@
 - **Database Tables Used:** `result`, `exam`, `exam_submission`, `question_grade`, `enrollment`.
 - **Business Rules:** BR-002 — enters `submitted` status, not visible to Student/Parent yet. Per Milestone 7's Domain Rule 9, this endpoint only *reads* `exam`/`exam_submission`/`answer`/`question_grade` — it never modifies them.
 
-### 5.3 `POST /results/{id}/approve`
+### 5.3 `GET /results/pending` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** Admin retrieves the queue of results awaiting review, grouped by the exam/course submission batch, each with its per-student grade entries — the data the Admin: Result Approval page (`UI_Wireframes.md` §11) needs to render its queue table and expandable per-exam review panel. Added during Milestone 7 implementation: none of this milestone's other three endpoints can list or retrieve pending results at all, and `GET /results/reports` (§9.1) is a different, aggregate-only, published-results-only reporting endpoint out of Milestone 7's scope.
+- **Authentication Required:** Yes
+- **User Roles:** Admin
+- **Request Body:** none. Query params: `status` (optional, default `submitted`; also accepts `published`/`rejected` per the wireframe's Status filter).
+- **Response Body (200):**
+```json
+{
+  "items": [
+    {
+      "exam_id": "uuid | null",
+      "exam_title": "string | null",
+      "course_id": "uuid",
+      "course_name": "string",
+      "submitted_by_teacher_id": "uuid",
+      "submitted_by_teacher_name": "string",
+      "submitted_at": "timestamp",
+      "status": "submitted | published | rejected",
+      "results": [
+        { "result_id": "uuid", "student_id": "uuid", "student_name": "string", "grade_letter": "string | null", "grade_point": "number | null" }
+      ]
+    }
+  ]
+}
+```
+- Rows are grouped by `(exam_id, course_id, submitted_by_teacher_id, submitted_at)` — the same batch a single `POST /results/{examId}/submit` call created or last updated.
+- **Validation:** `status` if provided must be one of `submitted`/`published`/`rejected`.
+- **Possible Errors:** invalid `status` value (422); caller is not Admin (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
+- **Database Tables Used:** `result`, `exam`, `course`, `teacher`, `student`.
+- **Business Rules:** none beyond the Admin-only RBAC check above.
+- **Note:** Classified **Derived** — required to make the documented Admin: Result Approval queue functional at all, not a new feature beyond what `UI_Wireframes.md` §11 already describes. Confirmed with the user during Milestone 7 implementation. See `Proposal_vs_Engineering_Additions.md`.
+
+### 5.4 `POST /results/{id}/approve`
 
 - **Purpose:** Admin approves and publishes submitted results. (FR-035)
 - **Authentication Required:** Yes
@@ -771,7 +805,7 @@
 - **Database Tables Used:** `result`.
 - **Business Rules:** BR-002 — enforces the `submitted → published` (or `→ rejected`) state transition. Publication triggering a notification (FR-052) is **not implemented in Milestone 7** — the `notification` table/dispatch mechanism doesn't exist until Milestone 9, same pattern as Milestone 4/5's schedule-change/attendance-warning notification gaps.
 
-### 5.4 `GET /results/{studentId}/transcript`
+### 5.5 `GET /results/{studentId}/transcript`
 
 - **Purpose:** Download an official PDF transcript with university seal. (FR-036)
 - **Authentication Required:** Yes

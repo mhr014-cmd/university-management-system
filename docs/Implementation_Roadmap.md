@@ -273,6 +273,8 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement the result submission → approval → publication workflow and PDF transcript generation.
 
+**Milestone 7 scope note 2 (added during M7 implementation, confirmed with the user):** `GET /results/pending` (Derived Engineering Addition) is required for the Admin: Result Approval page (`UI_Wireframes.md` §11) to function at all — none of the milestone's other four endpoints can list/retrieve pending results, and `GET /results/reports` (§9.1) is a different, aggregate/published-only reporting endpoint out of Milestone 7's scope. See `API_Contract.md` §5.3 and `Proposal_vs_Engineering_Additions.md`.
+
 **Milestone 7 scope note (added during the M7 pre-implementation review, confirmed with the user):** `result.exam_id` (nullable FK, Derived Engineering Addition) was added to `Database_Design.md` §6.21 — the original draft had no way to trace a `result` row back to the exam that triggered it, which the Admin: Result Approval queue's per-exam grouping and Domain Rule 6 both require. `(student_id, course_id, semester_id)` remains the authoritative business key (one final result per course per semester); a rejected result may be resubmitted (updated in place) via `POST /results/{examId}/submit`, but a `submitted`/`published` one still blocks a duplicate with 409. See `API_Contract.md` §5.2 and `Proposal_vs_Engineering_Additions.md`. GPA (`GET /results/me`) is computed as a credit-hour-weighted average per semester, resolving `Requirement_Analysis.md` §14 item 6 per that document's own A-004 assumption — not a new formula invented for this milestone. PDF transcript generation (`backend/app/pdf/transcript_generator.py`) uses `reportlab` (added to `backend/requirements.txt`) — `System_Architecture.md` §12 already flags PDF library choice as "to be selected during implementation," so this is not a new undocumented dependency-policy gap.
 
 **Files to create:**
@@ -289,6 +291,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 **APIs:**
 - `GET /results/me`
 - `POST /results/{examId}/submit`
+- `GET /results/pending` *(Derived addition, confirmed with the user during M7 implementation — see the scope note above; `API_Contract.md` §5.3)*
 - `POST /results/{id}/approve`
 - `GET /results/{studentId}/transcript`
 
