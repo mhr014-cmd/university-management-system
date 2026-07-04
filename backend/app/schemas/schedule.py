@@ -143,3 +143,17 @@ class ScheduleChangeRequestResolveResponse(BaseModel):
     id: uuid.UUID
     status: Literal["approved", "rejected"]
     resolved_at: datetime
+
+
+# --- class_session roster (Derived, API_Contract.md Section 7.10) ---------
+
+
+class RosterEntry(BaseModel):
+    student_id: uuid.UUID
+    first_name: str
+    last_name: str
+
+
+class ClassSessionRosterResponse(BaseModel):
+    class_session_id: uuid.UUID
+    students: list[RosterEntry]

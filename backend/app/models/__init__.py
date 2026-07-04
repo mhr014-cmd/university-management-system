@@ -6,6 +6,7 @@ not yet implemented (still placeholder modules) are not imported.
 """
 
 from app.models.admin import Admin  # noqa: F401
+from app.models.attendance_record import AttendanceRecord  # noqa: F401
 from app.models.class_session import ClassSession  # noqa: F401
 from app.models.course import Course  # noqa: F401
 from app.models.department import Department  # noqa: F401

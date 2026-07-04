@@ -20,6 +20,7 @@ from app.models.enrollment import Enrollment
 from app.models.room import Room
 from app.models.schedule_change_request import ScheduleChangeRequest
 from app.models.schedule_entry import ScheduleEntry
+from app.models.student import Student
 from app.models.teacher import Teacher
 
 
@@ -67,10 +68,25 @@ class ScheduleRepository:
     def list_class_session_ids_for_student(self, session: Session, student_id: uuid.UUID) -> list[uuid.UUID]:
         return list(session.scalars(select(Enrollment.class_session_id).where(Enrollment.student_id == student_id)))
 
+    def list_enrolled_students(self, session: Session, class_session_id: uuid.UUID) -> list[Student]:
+        stmt = (
+            select(Student)
+            .join(Enrollment, Enrollment.student_id == Student.id)
+            .where(Enrollment.class_session_id == class_session_id)
+            .order_by(Student.last_name, Student.first_name)
+        )
+        return list(session.scalars(stmt))
+
     # --- schedule_entry ------------------------------------------------------
 
     def get_schedule_entry(self, session: Session, schedule_entry_id: uuid.UUID) -> ScheduleEntry | None:
         return session.get(ScheduleEntry, schedule_entry_id)
+
+    def class_session_has_schedule_entry(self, session: Session, class_session_id: uuid.UUID) -> bool:
+        return (
+            session.scalar(select(ScheduleEntry.id).where(ScheduleEntry.class_session_id == class_session_id))
+            is not None
+        )
 
     def create_schedule_entry(
         self,

@@ -20,8 +20,10 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.schedule import (
     ClassSessionCreate,
     ClassSessionRead,
+    ClassSessionRosterResponse,
     EnrollmentCreate,
     EnrollmentRead,
+    RosterEntry,
     ScheduleChangeRequestCreate,
     ScheduleChangeRequestCreateResponse,
     ScheduleChangeRequestResolve,
@@ -75,6 +77,29 @@ class ScheduleService:
         session.commit()
         session.refresh(class_session)
         return ClassSessionRead.model_validate(class_session)
+
+    def get_roster(
+        self, session: Session, current_user: User, class_session_id: uuid.UUID
+    ) -> ClassSessionRosterResponse:
+        class_session = schedule_repo.get_class_session(session, class_session_id)
+        if class_session is None:
+            raise _not_found("Class session not found")
+
+        if current_user.role == "teacher":
+            teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
+            if class_session.teacher_id != teacher.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not the assigned Teacher for this class session.",
+                )
+
+        students = schedule_repo.list_enrolled_students(session, class_session_id)
+        return ClassSessionRosterResponse(
+            class_session_id=class_session_id,
+            students=[
+                RosterEntry(student_id=s.id, first_name=s.first_name, last_name=s.last_name) for s in students
+            ],
+        )
 
     # --- enrollment (Derived, API_Contract.md Section 7.9) -----------------
 

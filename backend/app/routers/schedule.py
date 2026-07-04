@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.schedule import (
     ClassSessionCreate,
     ClassSessionRead,
+    ClassSessionRosterResponse,
     EnrollmentCreate,
     EnrollmentRead,
     ScheduleChangeRequestCreate,
@@ -35,6 +36,7 @@ schedule_service = ScheduleService()
 _require_admin = Depends(require_roles("admin"))
 _require_teacher = Depends(require_roles("teacher"))
 _require_student_or_teacher = Depends(require_roles("student", "teacher"))
+_require_teacher_or_admin = Depends(require_roles("teacher", "admin"))
 
 
 @router.get("/me", response_model=ScheduleMeResponse, dependencies=[_require_student_or_teacher])
@@ -108,3 +110,16 @@ def create_class_session(payload: ClassSessionCreate, db: Session = Depends(get_
 )
 def create_enrollment(payload: EnrollmentCreate, db: Session = Depends(get_db)):
     return schedule_service.create_enrollment(db, payload)
+
+
+@router.get(
+    "/class-sessions/{class_session_id}/roster",
+    response_model=ClassSessionRosterResponse,
+    dependencies=[_require_teacher_or_admin],
+)
+def get_class_session_roster(
+    class_session_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return schedule_service.get_roster(db, current_user, class_session_id)

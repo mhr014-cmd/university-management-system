@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.models.admin import Admin
 from app.models.parent import Parent
+from app.models.parent_student_link import ParentStudentLink
 from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.user import User
@@ -153,3 +154,16 @@ class UserRepository:
 
     def get_admin_profile_by_user_id(self, session: Session, user_id: uuid.UUID) -> Admin | None:
         return session.scalar(select(Admin).where(Admin.user_id == user_id))
+
+    def parent_has_linked_student(self, session: Session, parent_id: uuid.UUID, student_id: uuid.UUID) -> bool:
+        # BR-007/NFR-003: a Parent's data access is scoped strictly to
+        # their own linked child/children — used by Milestone 5's
+        # GET /attendance/{classId} Parent-scoped ownership check.
+        return (
+            session.scalar(
+                select(ParentStudentLink.id).where(
+                    ParentStudentLink.parent_id == parent_id, ParentStudentLink.student_id == student_id
+                )
+            )
+            is not None
+        )
