@@ -13,7 +13,7 @@ from app.middleware.rbac import require_roles
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.exam import ExamCreate, ExamListItem, ExamRead, ExamUpdate
-from app.schemas.grading import ExamGradeRequest, ExamGradeResponse, ExamResultsResponse
+from app.schemas.grading import ExamGradeRequest, ExamGradeResponse, ExamResultsResponse, ExamSubmissionDetailResponse
 from app.schemas.submission import ExamStartResponse, ExamSubmitRequest, ExamSubmitResponse
 from app.services.exam_service import ExamService
 from app.services.grading_service import GradingService
@@ -88,6 +88,20 @@ def submit_exam(
     db: Session = Depends(get_db),
 ):
     return exam_service.submit_exam(db, current_user, exam_id, payload)
+
+
+@router.get(
+    "/{exam_id}/submissions/{submission_id}",
+    response_model=ExamSubmissionDetailResponse,
+    dependencies=[_require_teacher_or_admin],
+)
+def get_submission_detail(
+    exam_id: uuid.UUID,
+    submission_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return grading_service.get_submission_detail(db, current_user, exam_id, submission_id)
 
 
 @router.post("/{exam_id}/grade", response_model=ExamGradeResponse, dependencies=[_require_teacher])

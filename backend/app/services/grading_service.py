@@ -26,7 +26,14 @@ from sqlalchemy.orm import Session
 from app.models.user import User
 from app.repositories.exam_repository import ExamRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.grading import ExamGradeRequest, ExamGradeResponse, ExamResultsResponse, ExamResultsSubmissionSummary
+from app.schemas.grading import (
+    ExamGradeRequest,
+    ExamGradeResponse,
+    ExamResultsResponse,
+    ExamResultsSubmissionSummary,
+    ExamSubmissionDetailResponse,
+    SubmissionQuestionDetail,
+)
 
 exam_repo = ExamRepository()
 user_repo = UserRepository()
@@ -49,6 +56,58 @@ def _conflict(detail: str) -> HTTPException:
 
 
 class GradingService:
+    # --- GET /exams/{id}/submissions/{submission_id} (Derived — see -------
+    # docs/Proposal_vs_Engineering_Additions.md) -----------------------------
+
+    def get_submission_detail(
+        self, session: Session, current_user: User, exam_id: uuid.UUID, submission_id: uuid.UUID
+    ) -> ExamSubmissionDetailResponse:
+        exam = exam_repo.get_exam(session, exam_id)
+        if exam is None:
+            raise _not_found("Exam not found")
+
+        if current_user.role == "teacher":
+            teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
+            if exam.created_by_teacher_id != teacher.id:
+                raise _forbidden("You are not the creator of this exam.")
+        elif current_user.role != "admin":
+            raise _forbidden("Only the exam's creating Teacher or an Admin may view submission detail.")
+
+        submission = exam_repo.get_submission(session, submission_id)
+        if submission is None or submission.exam_id != exam_id:
+            raise _not_found("Submission not found")
+
+        questions = exam_repo.list_questions_for_exam(session, exam_id)
+        answers_by_question = {a.question_id: a for a in exam_repo.list_answers_for_submission(session, submission.id)}
+        grades_by_answer = {g.answer_id: g for g in exam_repo.list_grades_for_submission(session, submission.id)}
+
+        question_details = []
+        for question in questions:
+            answer = answers_by_question.get(question.id)
+            grade = grades_by_answer.get(answer.id) if answer is not None else None
+            question_details.append(
+                SubmissionQuestionDetail(
+                    question_id=question.id,
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    marks=float(question.marks),
+                    order_index=question.order_index,
+                    answer_id=answer.id if answer is not None else None,
+                    answer_text=answer.answer_text if answer is not None else None,
+                    selected_option_id=answer.selected_option_id if answer is not None else None,
+                    awarded_marks=float(grade.awarded_marks) if grade is not None else None,
+                    feedback=grade.feedback if grade is not None else None,
+                )
+            )
+
+        return ExamSubmissionDetailResponse(
+            submission_id=submission.id,
+            exam_id=submission.exam_id,
+            student_id=submission.student_id,
+            status=submission.status,
+            questions=question_details,
+        )
+
     # --- POST /exams/{id}/grade (FR-023, VR-006) ---------------------------
 
     def grade_submission(
