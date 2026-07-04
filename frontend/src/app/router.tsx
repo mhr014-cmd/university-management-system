@@ -20,6 +20,8 @@ import ExamBuilderPage from "../pages/Teacher/ExamBuilder";
 import GradingInterfacePage from "../pages/Teacher/GradingInterface";
 import ResultsViewPage from "../pages/ResultsView";
 import ResultApprovalPage from "../pages/Admin/ResultApproval";
+import FeeCentrePage from "../pages/FeeCentre";
+import FeeDashboardPage from "../pages/Admin/FeeDashboard";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -88,6 +90,14 @@ export const router = createBrowserRouter([
           {
             path: "/admin/result-approval",
             element: <ResultApprovalPage />,
+          },
+          {
+            path: "/fees",
+            element: <FeeCentrePage />,
+          },
+          {
+            path: "/admin/fee-dashboard",
+            element: <FeeDashboardPage />,
           },
         ],
       },

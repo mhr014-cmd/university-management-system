@@ -199,6 +199,14 @@ Found during a Milestone 0 self-review against the full documentation set (per t
 
 ---
 
+## Milestone 8 Addition: `frontend/src/features/semesters/index.ts`
+
+**Classification: Derived.** Same precedent as `features/departments/index.ts` above — the backend `GET /semesters` endpoint it wraps already exists and is documented (Milestone 1, §10 of this document). Added because the Admin: Fee Dashboard's "New Fee Structure" form (`docs/UI_Wireframes.md` §12) needs a Semester selector, and no frontend wrapper for this reference-data endpoint existed yet.
+
+**Disposition:** Permanent — every future milestone whose UI needs a semester picker will reuse this hook rather than duplicating it.
+
+---
+
 ## Frontend / UI Engineering Decisions (Not API Endpoints)
 
 Found during the Milestone 0 proposal-traceability review: two frontend elements shipped in Milestone 0 with no corresponding proposal sentence and no wireframe in `docs/UI_Wireframes.md`. Both were explicitly requested in the Milestone 0 implementation prompt ("Theme support," "Health API connectivity test") — they are authorized, not silently invented — but per the same traceability rule applied to endpoints above, they still need to be logged rather than left undocumented.
