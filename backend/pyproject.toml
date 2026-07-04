@@ -7,7 +7,8 @@ readme = "../README.md"
 
 # Canonical dependency list is backend/requirements.txt (kept in sync here
 # for tooling that reads pyproject.toml directly). PDF generation library
-# still TBD — see docs/System_Architecture.md Section 9 Risks, R-005.
+# finalized in Milestone 7 as reportlab — see docs/System_Architecture.md
+# Section 9 Risks, R-005, and requirements.txt's note.
 dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30,<1.0",
@@ -27,6 +28,8 @@ dependencies = [
     "email-validator>=2.0,<3.0",
     "python-multipart>=0.0.9",
     "python-dotenv>=1.0,<2.0",
+    # PDF library finalized in Milestone 7 — see requirements.txt's note.
+    "reportlab>=5.0,<6.0",
 ]
 
 [project.optional-dependencies]

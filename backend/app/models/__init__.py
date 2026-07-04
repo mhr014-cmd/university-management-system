@@ -19,6 +19,7 @@ from app.models.parent_student_link import ParentStudentLink  # noqa: F401
 from app.models.question import Question  # noqa: F401
 from app.models.question_grade import QuestionGrade  # noqa: F401
 from app.models.question_option import QuestionOption  # noqa: F401
+from app.models.result import Result  # noqa: F401
 from app.models.room import Room  # noqa: F401
 from app.models.schedule_change_request import ScheduleChangeRequest  # noqa: F401
 from app.models.schedule_entry import ScheduleEntry  # noqa: F401

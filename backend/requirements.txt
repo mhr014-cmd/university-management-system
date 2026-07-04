@@ -130,4 +130,13 @@ PyYAML==6.0.3
 greenlet==3.5.3   # SQLAlchemy's async/greenlet bridge
 
 # PDF generation (library choice not fixed by proposal — see
-# docs/System_Architecture.md Section 12, to be finalized in Milestone 7/8)
+# docs/System_Architecture.md Section 12). Finalized in Milestone 7:
+# reportlab chosen over alternatives (weasyprint needs system libraries
+# not guaranteed available in deployment; fpdf2 has a much thinner
+# feature set) — pure-Python-plus-C-extension, no external binary
+# dependency, BSD-licensed, and the de facto standard for server-side
+# PDF generation in Python. Used for the transcript (Milestone 7) and,
+# per the roadmap's own file list, invoice generation (Milestone 8).
+reportlab==5.0.0
+pillow==12.3.0
+charset-normalizer==3.4.7

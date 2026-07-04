@@ -1,6 +1,82 @@
 """
-Pydantic request/response schemas: result (see docs/API_Contract.md).
-
-Placeholder module — no implementation yet.
-See docs/System_Architecture.md and docs/Implementation_Roadmap.md for scope.
+Pydantic request/response schemas: result (see docs/API_Contract.md
+Section 5).
 """
+
+import uuid
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+ResultStatus = Literal["submitted", "published", "rejected"]
+ApprovalDecision = Literal["approve", "reject"]
+
+
+class ResultCourseEntry(BaseModel):
+    course_id: uuid.UUID
+    course_name: str
+    grade_letter: str
+    grade_point: float
+
+
+class ResultSemesterEntry(BaseModel):
+    semester_id: uuid.UUID
+    semester_name: str
+    gpa: float
+    courses: list[ResultCourseEntry]
+
+
+class ResultsMeResponse(BaseModel):
+    semesters: list[ResultSemesterEntry]
+
+
+class ResultSubmitEntry(BaseModel):
+    student_id: uuid.UUID
+    grade_letter: str = Field(min_length=1)
+    grade_point: float = Field(ge=0)
+
+
+class ResultSubmitRequest(BaseModel):
+    results: list[ResultSubmitEntry] = Field(min_length=1)
+
+
+class ResultSubmitResponse(BaseModel):
+    exam_id: uuid.UUID
+    status: ResultStatus
+    submitted_at: datetime
+
+
+class ResultApprovalRequest(BaseModel):
+    decision: ApprovalDecision
+    comment: str | None = None
+
+
+class ResultApprovalResponse(BaseModel):
+    id: uuid.UUID
+    status: ResultStatus
+    approved_at: datetime | None
+
+
+class PendingResultDetailEntry(BaseModel):
+    result_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    grade_letter: str | None
+    grade_point: float | None
+
+
+class PendingResultQueueEntry(BaseModel):
+    exam_id: uuid.UUID | None
+    exam_title: str | None
+    course_id: uuid.UUID
+    course_name: str
+    submitted_by_teacher_id: uuid.UUID
+    submitted_by_teacher_name: str
+    submitted_at: datetime
+    status: ResultStatus
+    results: list[PendingResultDetailEntry]
+
+
+class PendingResultsResponse(BaseModel):
+    items: list[PendingResultQueueEntry]
