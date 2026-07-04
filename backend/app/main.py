@@ -50,12 +50,21 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # Milestone 11 (Security Strategy, System_Architecture.md §11): the
+    # interactive API docs/schema expose the full endpoint surface and are
+    # a reasonable target to close off in production, while staying
+    # available in every other environment for grading/demo purposes.
+    docs_enabled = not settings.is_production
+
     app = FastAPI(
         title="University Management System API",
         description="REST API for the University Management System (ICT Education) — "
         "attendance, exams, results, fees, and scheduling.",
         version="0.1.0",
         lifespan=lifespan,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
 
     app.add_middleware(

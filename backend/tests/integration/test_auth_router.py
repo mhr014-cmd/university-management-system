@@ -162,3 +162,19 @@ def test_change_password_new_equal_to_current_returns_422(client, make_user):
     )
 
     assert response.status_code == 422
+
+
+class TestLoginRateLimit:
+    def test_sixth_login_attempt_within_window_returns_429(self, client, make_user):
+        make_user("student@example.com", "correct-password", "student")
+
+        for _ in range(5):
+            response = client.post(
+                "/api/v1/auth/login", json={"email": "student@example.com", "password": "wrong-password"}
+            )
+            assert response.status_code == 401
+
+        limited = client.post(
+            "/api/v1/auth/login", json={"email": "student@example.com", "password": "wrong-password"}
+        )
+        assert limited.status_code == 429

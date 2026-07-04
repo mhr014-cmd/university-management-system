@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.middleware.auth import get_current_user
+from app.middleware.rate_limit import enforce_login_rate_limit
 from app.models.user import User
 from app.schemas.auth import (
     AuthenticatedUser,
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 auth_service = AuthService()
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(enforce_login_rate_limit)])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     access_token, refresh_token, user = auth_service.login(db, payload.email, payload.password)
     return TokenResponse(

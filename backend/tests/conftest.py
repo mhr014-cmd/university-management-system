@@ -72,11 +72,19 @@ def db_session(test_engine) -> Session:
 def client(test_engine, db_session):
     from app.db.session import get_db
     from app.main import app
+    from app.middleware.rate_limit import _attempts as login_rate_limit_attempts
 
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    # Milestone 11's login rate limiter is keyed by client IP; TestClient
+    # sends every request from the same host ("testclient"), so its
+    # in-memory bucket must be reset per test — otherwise tests that call
+    # POST /auth/login several times (directly or via a shared `_login()`
+    # helper) would eventually trip the real 429 limit across unrelated
+    # test functions in the same run.
+    login_rate_limit_attempts.clear()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

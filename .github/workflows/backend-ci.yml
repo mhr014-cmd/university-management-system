@@ -1,6 +1,7 @@
-# Backend CI — placeholder workflow.
-# Intended to run lint + tests for backend/ on push/PR.
-# To be implemented during Milestone 11 (see docs/Implementation_Roadmap.md).
+# Backend CI (Milestone 11 — replaces the Milestone 0 placeholder).
+# Runs pip check, Alembic migrations, and the full pytest suite against a
+# disposable Postgres service container — never a developer's real
+# database, matching this project's own disposable-database discipline.
 
 name: Backend CI
 
@@ -8,22 +9,66 @@ on:
   push:
     paths:
       - "backend/**"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
       - "backend/**"
+      - ".github/workflows/backend-ci.yml"
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ict_education_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ict_education_ci
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/ict_education_ci
+      JWT_SECRET_KEY: ci-only-secret-not-for-production
+
     steps:
       - uses: actions/checkout@v4
-      # - name: Set up Python
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.12"
-      # - name: Install dependencies
-      #   run: pip install -r backend/requirements.txt
-      # - name: Run tests
-      #   run: pytest backend/tests
-      - name: Placeholder
-        run: echo "Backend CI not yet implemented — see docs/Implementation_Roadmap.md Milestone 11."
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: pip check
+        working-directory: backend
+        run: pip check
+
+      - name: Run Alembic migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Verify no pending schema changes
+        working-directory: backend
+        run: |
+          output=$(alembic revision --autogenerate -m "ci_diff_check" 2>&1)
+          echo "$output"
+          find alembic/versions -name "*_ci_diff_check.py" -delete
+          if echo "$output" | grep -q "Detected"; then
+            echo "alembic revision --autogenerate detected schema/model drift — see 'Detected ...' lines above"
+            exit 1
+          fi
+
+      - name: Run pytest
+        working-directory: backend
+        run: pytest
