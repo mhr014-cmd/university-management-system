@@ -6,6 +6,35 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 9 — Notifications)
+- `notification` table (Alembic revision `0010_notifications`), matching `Database_Design.md` §6.26 column-for-column, with `Index`/`is_read` default declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `GET /notifications`: authenticated user's own feed (newest first), with `is_read` filter and pagination, plus `unread_count`
+- `PUT /notifications/{id}/read`: idempotent mark-as-read, ownership-hidden as 404 for another user's notification
+- `app/notifications/dispatcher.py`: four automatic notification triggers, each dispatched by its originating service only after that service's own transaction commits, and each wrapped so a dispatch failure can never break or roll back the originating business operation —
+  - `result_published` on `POST /results/{id}/approve` (`decision: approve`), to the Student only
+  - `schedule_change` on `PUT`/`DELETE /schedule/{id}`, to enrolled students **and** the assigned Teacher (see Fixed, below)
+  - `attendance_warning` on `POST /attendance`, only on a genuine threshold crossing (`>=80%` before the new record, `<80%` after) — not repeated while the student stays below 80%
+  - `fee_due` on `POST /fees`'s invoice auto-generation, to each newly-invoiced Student and any linked Parent
+- Frontend: `features/notifications/index.ts`, `pages/Notifications/index.tsx` (chronological feed, unread styling, "Mark all as read", per-item deep-link by type), a persistent notification bell with an unread-count badge in `AppLayout`
+- Backend test suite: `tests/unit/test_notification_dispatcher.py`, `tests/unit/test_notification_service.py`, `tests/integration/test_notifications_router.py` — 25 new tests, 318 total passing
+
+### Fixed (Milestone 9)
+- `Requirement_Analysis.md` FR-051 and `API_Contract.md` both said schedule-change notifications go to Students only — `UI_Wireframes.md` §16's own Role Visibility line explicitly lists "schedule changes for Student/Teacher." Corrected during pre-implementation review; the entry's assigned Teacher is now notified alongside enrolled students.
+
+### Changed (Milestone 9 — Documentation)
+- `docs/API_Contract.md`: added Section 8.3 (Notification Triggers, Recipients, and Message Templates) documenting all four automatic triggers exactly; updated §4.2 (attendance), §5.4 (result approval), §6.2 (fee structure creation), and §7.3/§7.4 (schedule update/delete) to reference the now-implemented dispatch
+- `docs/Requirement_Analysis.md`: FR-051 corrected to include Teacher recipients
+- `docs/Requirement_Traceability_Matrix.md`: FR-031, FR-044, FR-051, FR-052, FR-053 updated (FR-044 honestly marked partially implemented — the invoice-issuance `fee_due` notification is built, a scheduled day-before-due-date reminder is not, since no cron/scheduler exists anywhere in this project); added notes for the FR-051 recipients correction, the attendance-warning threshold-crossing resolution, and the exam-notification-scope resolution
+- `docs/Implementation_Roadmap.md`: added a Milestone 9 scope note recording all three pre-implementation resolutions
+- `PROJECT_PROGRESS.md`: Milestone 8's Review Status updated to Approved (user sign-off, git tag `v0.9-milestone8`); Milestone 9 row and full Milestone Detail Log entry added; Summary section updated (83% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 9)
+- FR-044's scheduled-reminder half (a due-date reminder sent some days before `due_date`) is not implemented — no cron/scheduler mechanism exists anywhere in this project; only the event-driven `fee_due` notification at invoice-issuance time is built.
+- The notification bell links directly to the full Notifications page rather than also offering the wireframe's optional desktop dropdown panel — a documented simplification, same class as Milestone 5's Attendance Calendar view.
+- `POST /fees/overdue/notify` (FR-056, manual overdue-notify action) is explicitly Milestone 10 scope per `Implementation_Roadmap.md`'s own note — not built here even though the `notification` table it needs now exists.
+- Migration `0010_notifications` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+
 ### Added (Milestone 8 — Fees, Optional)
 - `fee_structure`, `invoice`, `payment` tables (Alembic revision `0009_fees`), matching `Database_Design.md` §6.23-6.25 column-for-column, including the Milestone 8 addition of a unique `(student_id, fee_structure_id)` constraint on `invoice`, with `index=True`/`UniqueConstraint`/`CheckConstraint` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `POST /fees`: Admin defines a fee structure (department/semester-scoped or university-wide); automatically generates one `unpaid` invoice for every currently-active, enrolled-that-semester, department-matching student — the only place `invoice` rows are created (resolved during pre-implementation review, confirmed with the user)
