@@ -27,6 +27,8 @@ venv/
 node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/coverage/
+npm-debug.log*
 
 # Editors / OS / local tool config
 .vs/
@@ -41,3 +43,10 @@ Thumbs.db
 
 # Docker
 docker/.env
+
+# Logs
+*.log
+logs/*.log
+
+# PDF build scratch (generated locally when re-rendering Project_SRS.pdf)
+*.pdf.tmp
