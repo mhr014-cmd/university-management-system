@@ -6,6 +6,38 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 5 — Attendance)
+- `attendance_record` table (Alembic revision `0006_attendance`), matching `Database_Design.md` §6.22 column-for-column (deliberately no `created_at`/`updated_at` — the schema doesn't call for them), with `UniqueConstraint`/`Index` declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `POST /attendance`: Teacher marks attendance, enforcing all 10 mandatory Attendance Domain Rules explicitly at the service layer before any write — student exists and is active, class session exists, a schedule entry exists for it, Teacher is assigned to it, student has a valid enrollment, no duplicate record, and the whole batch is validated before any record is created
+- `GET /attendance/me`: Student's own attendance summary with a computed `overall_percentage` and `low_attendance_warning` (BR-008, 80% threshold), never cached (NFR-016)
+- `GET /attendance/{classId}`: Teacher/Admin class-level view, plus Parent access scoped via `ParentStudentLink` and a required `student_id` — the only endpoint where Parent access to attendance is granted at all
+- `PUT /attendance/{id}`: Teacher/Admin correction, same ownership check as marking
+- `GET /attendance/reports`: Admin department/semester-scoped percentage summary
+- `GET /schedule/class-sessions/{class_session_id}/roster` (Derived Engineering Addition, confirmed with the user): minimal endpoint listing enrolled students for a class session — no endpoint anywhere provided this, and the Teacher: Attendance Marker page's documented roster-preview workflow couldn't function without it
+- Frontend: `features/attendance/index.ts`, `pages/Attendance/index.tsx` (percentage bar, warning badge, filters, records table — Calendar view present but not implemented), `pages/Teacher/AttendanceMarker/index.tsx` (roster table, bulk "Mark all present," Save with automatic correction-mode detection)
+- Backend test suite: `tests/unit/test_attendance_service.py`, `tests/integration/test_attendance_router.py` — 35 new tests, 134 total passing
+
+### Fixed (Milestone 5)
+- A real routing bug: `GET /attendance/reports` was going to be captured by `GET /attendance/{class_id}`'s UUID path parameter (matching `class_id="reports"` and failing validation) since FastAPI matches routes in declaration order — fixed by registering `/reports` before `/{class_id}`, caught during implementation before it ever shipped
+- `GET /attendance/{classId}`'s documented response shape (`API_Contract.md` §4.3) had no record `id`, only `student_id`/`date`/`status` — the Teacher: Attendance Marker's correction workflow (`PUT /attendance/{id}`) had no way to resolve which record to correct from that response alone. Added `id` to the response schema and updated `API_Contract.md` in the same change; existing unit tests re-run clean afterward
+- `docs/Requirement_Traceability_Matrix.md`'s note claiming Parent-facing attendance access "reuses Student-facing endpoints" was overly broad — FR-032 actually reuses the Teacher/Admin class-based endpoint, not `GET /attendance/me`; narrowed the wording during pre-implementation review
+
+### Changed (Milestone 5 — Documentation)
+- `docs/Requirement_Analysis.md`: BR-008/FR-031's previously-undefined low-attendance threshold resolved to 80%, evidenced by two independent "Below 80%" mockups in `UI_Wireframes.md` (§14 item 4); added a new §14 item 17 recording the attendance percentage formula as a documented engineering assumption (`present`+`late` counted, `excused` excluded from the denominator) since no proposal/wireframe evidence exists for this one
+- `docs/API_Contract.md`: added Section 7.10 `GET /schedule/class-sessions/{class_session_id}/roster`; annotated `GET /attendance/me`'s response with the computed `low_attendance_warning` field; added `id` to `GET /attendance/{classId}`'s response shape
+- `docs/Requirement_Traceability_Matrix.md`: FR-026-FR-032 and NFR-002/NFR-003/NFR-016 updated — FR-031/FR-032 and the three NFRs marked honestly as partially implemented where a later milestone (results, fees, notifications) owns the remainder, not silently marked complete
+- `docs/Proposal_vs_Engineering_Additions.md`: classified the roster endpoint as Derived, documenting why it's implemented via the schedule domain rather than attendance
+- `docs/Implementation_Roadmap.md`: added a Milestone 5 scope note recording both pre-implementation resolutions and the roster endpoint's addition to M5's API list
+- `docs/System_Architecture.md`: added the attendance/roster ownership checks (Teacher-assigned-to-class-session, Parent-via-ParentStudentLink) to Section 6's ownership-check list, which had never enumerated them
+- `PROJECT_PROGRESS.md`: Milestone 4's Review Status updated to Approved (user sign-off, git tag `v0.5-milestone4`); Milestone 5 row and full Milestone Detail Log entry added; Summary section updated (50% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 5)
+- Calendar view on the Student Attendance page is not implemented — Table view is fully functional.
+- FR-031/FR-032's notification-dispatch half (instant warnings/absence alerts) is not implemented — depends on the Milestone 9 notification module. The computed indicators themselves are fully implemented and tested.
+- The attendance percentage formula is a documented engineering assumption with no proposal/wireframe evidence — flagged for revisit if the institution's actual policy is specified.
+- Migration `0006_attendance` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+
 ### Added (Milestone 4 — Scheduling & Timetable)
 - `class_session`, `enrollment`, `schedule_entry`, `schedule_change_request` tables (Alembic revision `0005_scheduling`, corrected from the roadmap's stale `0004_scheduling` filename), matching `Database_Design.md` §6.9-6.13 column-for-column, with `index=True`/`UniqueConstraint`/`Index` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `GET /schedule/me`: Student/Teacher own timetable, scoped via `enrollment`/`teacher_id` respectively
