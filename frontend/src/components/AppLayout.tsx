@@ -39,6 +39,9 @@ export function AppLayout() {
             <Link to="/attendance">Attendance</Link>
           )}
           {user?.role === "teacher" && <Link to="/teacher/attendance-marker">Mark Attendance</Link>}
+          {(user?.role === "student" || user?.role === "teacher" || user?.role === "admin") && (
+            <Link to="/exams">Exams</Link>
+          )}
           {user && <span className="text-slate-500 dark:text-slate-400">{user.email}</span>}
           <button
             type="button"

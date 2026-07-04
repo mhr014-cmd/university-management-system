@@ -14,6 +14,10 @@ import UserManagementPage from "../pages/Admin/UserManagement";
 import TimetablePage from "../pages/Timetable";
 import AttendancePage from "../pages/Attendance";
 import AttendanceMarkerPage from "../pages/Teacher/AttendanceMarker";
+import ExamListPage from "../pages/ExamList";
+import ExamRoomPage from "../pages/ExamRoom";
+import ExamBuilderPage from "../pages/Teacher/ExamBuilder";
+import GradingInterfacePage from "../pages/Teacher/GradingInterface";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -54,6 +58,26 @@ export const router = createBrowserRouter([
           {
             path: "/teacher/attendance-marker",
             element: <AttendanceMarkerPage />,
+          },
+          {
+            path: "/exams",
+            element: <ExamListPage />,
+          },
+          {
+            path: "/exams/:examId/room",
+            element: <ExamRoomPage />,
+          },
+          {
+            path: "/teacher/exam-builder",
+            element: <ExamBuilderPage />,
+          },
+          {
+            path: "/teacher/exam-builder/:examId",
+            element: <ExamBuilderPage />,
+          },
+          {
+            path: "/teacher/grading/:examId",
+            element: <GradingInterfacePage />,
           },
         ],
       },
