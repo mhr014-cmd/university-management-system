@@ -6,13 +6,19 @@ not yet implemented (still placeholder modules) are not imported.
 """
 
 from app.models.admin import Admin  # noqa: F401
+from app.models.answer import Answer  # noqa: F401
 from app.models.attendance_record import AttendanceRecord  # noqa: F401
 from app.models.class_session import ClassSession  # noqa: F401
 from app.models.course import Course  # noqa: F401
 from app.models.department import Department  # noqa: F401
 from app.models.enrollment import Enrollment  # noqa: F401
+from app.models.exam import Exam  # noqa: F401
+from app.models.exam_submission import ExamSubmission  # noqa: F401
 from app.models.parent import Parent  # noqa: F401
 from app.models.parent_student_link import ParentStudentLink  # noqa: F401
+from app.models.question import Question  # noqa: F401
+from app.models.question_grade import QuestionGrade  # noqa: F401
+from app.models.question_option import QuestionOption  # noqa: F401
 from app.models.room import Room  # noqa: F401
 from app.models.schedule_change_request import ScheduleChangeRequest  # noqa: F401
 from app.models.schedule_entry import ScheduleEntry  # noqa: F401
