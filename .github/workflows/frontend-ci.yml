@@ -1,6 +1,6 @@
-# Frontend CI — placeholder workflow.
-# Intended to run lint + build + tests for frontend/ on push/PR.
-# To be implemented during Milestone 11 (see docs/Implementation_Roadmap.md).
+# Frontend CI (Milestone 11 — replaces the Milestone 0 placeholder).
+# Type-checks, lints, runs the Vitest component suite, and confirms the
+# production build succeeds.
 
 name: Frontend CI
 
@@ -8,24 +8,41 @@ on:
   push:
     paths:
       - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
   pull_request:
     paths:
       - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # - name: Set up Node
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: "20"
-      # - name: Install dependencies
-      #   run: npm install --prefix frontend
-      # - name: Lint
-      #   run: npm run lint --prefix frontend
-      # - name: Build
-      #   run: npm run build --prefix frontend
-      - name: Placeholder
-        run: echo "Frontend CI not yet implemented — see docs/Implementation_Roadmap.md Milestone 11."
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run component tests
+        working-directory: frontend
+        run: npx vitest run
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
