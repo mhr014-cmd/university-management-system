@@ -6,6 +6,36 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 7 — Results & Transcripts)
+- `result` table (Alembic revision `0008_results`), matching `Database_Design.md` §6.21 column-for-column, including the Milestone 7 `exam_id` addition (nullable FK, for Admin queue display/traceability — `(student_id, course_id, semester_id)` remains the authoritative business key), with `index=True`/`UniqueConstraint` declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `GET /results/me`: Student's own results (Parent-scoped via a required `student_id` query param, verified against `parent_student_link`), with a credit-hour-weighted GPA per semester (resolves `Requirement_Analysis.md` §14 item 6)
+- `POST /results/{examId}/submit`: Teacher submits a course's final results, gated on the exam being `published` and fully graded, with all 15 Milestone 7 mandatory Domain Rules enforced before any write, and resubmission-in-place allowed only for previously `rejected` rows
+- `GET /results/pending` (Derived Engineering Addition, confirmed with the user): Admin-only queue of pending results grouped by exam, matching the Admin: Result Approval wireframe — no other endpoint could list/retrieve pending results
+- `POST /results/{id}/approve`: Admin approves (publishes) or rejects a submitted result; a comment is required for reject (closes the contract's own previously-flagged "policy TBD", resolved from wireframe evidence)
+- `GET /results/{studentId}/transcript`: PDF transcript via `reportlab`, ownership-checked (Student: own only; Admin: any), returns a valid (possibly empty-results) PDF rather than a 409 when no results are published yet
+- Frontend: `features/results/index.ts`, `pages/ResultsView/index.tsx` (semester selector, GPA summary, results table, transcript download — Student-facing only, see Known Issues), `pages/Admin/ResultApproval/index.tsx` (pending queue, expandable review panel, approve/reject)
+- Backend test suite: `tests/unit/test_result_service.py`, `tests/integration/test_results_router.py` — 42 new tests, 253 total passing
+- `reportlab==5.0.0` (+ `pillow`, `charset-normalizer` transitive deps) added to `backend/requirements.txt`/`pyproject.toml`, finalizing `System_Architecture.md` §12's "PDF library TBD"
+
+### Fixed (Milestone 7)
+- `GET /results/me`'s documented response had no `student_id`, so the frontend had no way to construct the `GET /results/{studentId}/transcript` URL for a "download my own transcript" action — added `student_id` to the response in the same change (same class of fix as Milestone 5's `GET /attendance/{classId}` `id`-field addition)
+
+### Changed (Milestone 7 — Documentation)
+- `docs/Database_Design.md` §6.21: added the `exam_id` column and a design note explaining the schema decision and the resubmission-after-reject policy, both confirmed with the user during pre-implementation review
+- `docs/API_Contract.md`: added Section 5.3 `GET /results/pending` (renumbering approve/transcript to §5.4/§5.5); documented the resolved GPA formula, Parent `student_id` scoping, mandatory reject comment, empty-transcript-is-200 policy, and the `student_id` response-field fix, all in §5.1/§5.2/§5.4/§5.5
+- `docs/Requirement_Traceability_Matrix.md`: FR-033-FR-037 updated to Verified; FR-037 honestly annotated as backend-only (no frontend page yet); added notes for both Derived additions and the resolved workflow policies
+- `docs/Proposal_vs_Engineering_Additions.md`: classified `result.exam_id` and `GET /results/pending` as Derived, documenting why each is required
+- `docs/Requirement_Analysis.md` §14 item 6 (GPA formula) marked resolved, per that document's own A-004 assumption
+- `docs/Implementation_Roadmap.md`: added two Milestone 7 scope notes recording both Derived additions and their rationale
+- `PROJECT_PROGRESS.md`: Milestone 6's Review Status updated to Approved (user sign-off, git tag `v0.7-milestone6`); Milestone 7 row and full Milestone Detail Log entry added; Summary section updated (67% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 7)
+- Parent-facing frontend UI for Results is not built — the backend fully implements and tests FR-037, but no endpoint anywhere enumerates a Parent's linked children, and the full Parent Portal page isn't scheduled for this milestone.
+- `POST /results/{id}/approve`'s reject `comment` is validated but not persisted — the `result` table has no comment/rejection-reason column (a pre-existing schema limitation, not introduced this milestone), and the documented response doesn't echo one back either.
+- Migration `0008_results` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+- Result-publication notifications (FR-052) are not implemented — depends on the Milestone 9 notification module.
+
 ### Added (Milestone 6 — Exams & Grading)
 - `exam`, `question`, `question_option`, `exam_submission`, `answer`, `question_grade` tables (Alembic revision `0007_exams`), matching `Database_Design.md` §6.14-6.19 column-for-column, with `index=True`/`UniqueConstraint`/`CheckConstraint` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `GET /exams`, `POST /exams`, `GET /exams/{id}`, `PUT /exams/{id}`, `DELETE /exams/{id}`: exam CRUD with BR-003 (published exams immutable, forward-only status transitions via `PUT`'s optional `status` field) and BR-001 (correct-answer/grading data hidden from Students until `exam.status = published`, always visible to the creating Teacher)
