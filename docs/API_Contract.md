@@ -536,11 +536,13 @@
 ```json
 {
   "overall_percentage": "number",
+  "low_attendance_warning": "boolean",
   "by_class_session": [
     {
       "class_session_id": "uuid",
       "course_name": "string",
       "percentage": "number",
+      "low_attendance_warning": "boolean",
       "records": [
         { "date": "date", "status": "present | absent | late | excused" }
       ]
@@ -552,7 +554,7 @@
 - **Possible Errors:** invalid date range (422).
 - **Status Codes:** 200 OK, 401 Unauthorized, 422 Unprocessable Entity.
 - **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`.
-- **Business Rules:** percentage computed on demand, never cached (NFR-016).
+- **Business Rules:** percentage computed on demand, never cached (NFR-016). `low_attendance_warning` is `true` when the corresponding percentage is below 80% (BR-008/FR-031, threshold resolved during the Milestone 5 pre-implementation review — see `Requirement_Analysis.md` §14 item 4); this is a computed indicator only, not a dispatched notification (Milestone 9 scope).
 
 ### 4.2 `POST /attendance`
 
@@ -574,7 +576,7 @@
 - **Possible Errors:** Duplicate attendance for a student/date (409); invalid `class_session_id` (404); student not enrolled in the class (422); caller is not the class's assigned Teacher (403).
 - **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
 - **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`.
-- **Business Rules:** VR-005; triggers low-attendance warning evaluation (FR-031/BR-008).
+- **Business Rules:** VR-005; triggers low-attendance warning evaluation (FR-031/BR-008, threshold 80% — resolved during the Milestone 5 pre-implementation review, see `Requirement_Analysis.md` §14 item 4). Evaluation surfaces the crossed-threshold state in `GET /attendance/me`'s response; actual notification dispatch is Milestone 9 scope.
 
 ### 4.3 `GET /attendance/{classId}`
 
@@ -1079,6 +1081,28 @@
 - **Database Tables Used:** `enrollment`, `student`, `class_session`.
 - **Business Rules:** none beyond uniqueness and referential validity.
 - **Note:** Same gap-fill/Derived status as 7.8 — `enrollment` has no creation endpoint anywhere in the source documents despite being required by `GET /schedule/me`'s own documented response shape (§7.1).
+
+### 7.10 `GET /schedule/class-sessions/{class_session_id}/roster` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** List students enrolled in a class session, so a Teacher can see a pre-populated roster before marking attendance. Added during the Milestone 5 pre-implementation review — `UI_Wireframes.md` §15 (Teacher: Attendance Marker) requires the roster to load with enrolled students shown before marking begins, but no endpoint anywhere returned this.
+- **Authentication Required:** Yes
+- **User Roles:** Teacher (only for a class session they are assigned to — ownership check, same pattern as `POST /schedule/change-requests`), Admin
+- **Request Body:** none.
+- **Response Body (200):**
+```json
+{
+  "class_session_id": "uuid",
+  "students": [
+    { "student_id": "uuid", "first_name": "string", "last_name": "string" }
+  ]
+}
+```
+- **Validation:** `{class_session_id}` must reference an existing class session.
+- **Possible Errors:** class session not found (404); caller is a Teacher not assigned to this class session (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found.
+- **Database Tables Used:** `enrollment`, `student`, `class_session`.
+- **Business Rules:** none beyond the ownership check.
+- **Note:** Classified Derived (unavoidable plumbing for the Milestone 5 Attendance Marker workflow, per `Proposal_vs_Engineering_Additions.md`), not Required — no proposal sentence names a roster-listing capability. Implemented via the schedule router/service (not the attendance domain) since it operates on `enrollment`/`class_session`, both owned by Scheduling.
 
 ---
 

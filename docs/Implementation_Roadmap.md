@@ -192,16 +192,21 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement attendance marking, correction, per-student summaries, and the low-attendance warning trigger.
 
+**Milestone 5 scope note (added during M5 pre-implementation review):** two items resolved before coding, confirmed with the user:
+1. **BR-008's threshold** (previously undefined, `Requirement_Analysis.md` §14 item 4) is **80%**, resolved from two independent "Below 80%" mockups in `UI_Wireframes.md`. `GET /attendance/me` surfaces a computed `low_attendance_warning` boolean; actual notification dispatch is Milestone 9 scope (the `notification` module doesn't exist yet — same pattern as M3's FR-008 and M4's FR-051).
+2. **`GET /schedule/class-sessions/{class_session_id}/roster`** (Derived Engineering Addition) — `UI_Wireframes.md` §15 requires the Attendance Marker's roster to load with enrolled students pre-populated, but no endpoint anywhere provided this. Implemented via the schedule router/service (operates on `enrollment`/`class_session`, both Scheduling-owned), not the attendance domain, even though it's needed by this milestone.
+
 **Files to create:**
 - `backend/app/models/attendance_record.py`
 - `backend/app/schemas/attendance.py`
 - `backend/app/routers/attendance.py`
 - `backend/app/services/attendance_service.py` (percentage calculation, warning trigger — BR-008)
 - `backend/app/repositories/attendance_repository.py`
-- `backend/alembic/versions/0006_attendance.py` (corrected from `0005_attendance.py` — revision `0005` is Milestone 4's; corrected during the M4 pre-implementation review's roadmap-wide migration numbering fix, per the same off-by-one pattern already fixed for M2/M3/M4)
+- `backend/alembic/versions/0006_attendance.py` (already correctly numbered — the M4 pre-implementation review's roadmap-wide migration numbering fix was applied proactively)
 - `frontend/src/pages/Attendance/` (student view)
 - `frontend/src/pages/Teacher/AttendanceMarker/`
 - `frontend/src/features/attendance/`
+- `backend/app/repositories/schedule_repository.py`, `backend/app/services/schedule_service.py`, `backend/app/routers/schedule.py`, `backend/app/schemas/schedule.py` (extended, not new files — the roster endpoint above)
 
 **APIs:**
 - `GET /attendance/me`
@@ -209,6 +214,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `GET /attendance/{classId}`
 - `PUT /attendance/{id}`
 - `GET /attendance/reports`
+- `GET /schedule/class-sessions/{class_session_id}/roster` *(Derived addition, confirmed with the user during the Milestone 5 pre-implementation review — see the scope note above; `API_Contract.md` §7.10)*
 
 **Database tables:** `attendance_record`
 

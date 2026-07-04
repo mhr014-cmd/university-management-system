@@ -169,6 +169,7 @@ The same Dashboard/Profile/Notifications shell is shared across roles, but role-
    - `GET /attendance/me`, `GET /results/me`, `GET /fees/me`, `GET /schedule/me` — scoped to the authenticated user's own ID.
    - `GET /fees/payments/{studentId}` (Parent access) — the API must verify a `ParentStudentLink` exists between the authenticated parent and `{studentId}` before returning data (satisfies NFR-003).
    - `GET /results/{studentId}/transcript` (Student access) — student may only request their own `{studentId}`.
+   - `POST /attendance`, `PUT /attendance/{id}`, `GET /attendance/{classId}`, `GET /schedule/class-sessions/{class_session_id}/roster` (added during Milestone 5) — a Teacher may only act on a `class_session`/`schedule_entry` they are assigned to (`class_session.teacher_id` / `schedule_entry.teacher_id` matches the caller's own Teacher profile); `GET /attendance/{classId}` additionally allows Parent access scoped via `ParentStudentLink` to the requested `student_id` (satisfies NFR-003/BR-007), consistent with the ownership pattern already established for `POST /schedule/change-requests` (Milestone 4).
 4. **Workflow-state checks** — some actions are gated not just by role but by object state:
    - A Student can view question marks only if the Exam's results are published (BR-001).
    - A Result can only be approved by Admin if it is in "submitted" state (BR-002).
