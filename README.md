@@ -2,7 +2,7 @@
 
 A web platform consolidating university operations — attendance, exams, results, fees, and scheduling — into a single system, replacing spreadsheets, email-based results, and siloed finance tools.
 
-**Status:** Milestones 0–10 complete and approved — authentication, user management, scheduling, attendance, exams/grading, results/transcripts, fees, notifications, and role-specific dashboards/reporting are all implemented. Milestone 11 (Hardening, Testing & Deployment) is the final milestone — see [`docs/Implementation_Roadmap.md`](docs/Implementation_Roadmap.md) and [`PROJECT_PROGRESS.md`](PROJECT_PROGRESS.md) for current status.
+**Status:** All 12 milestones (0–11) complete and approved — authentication, user management, scheduling, attendance, exams/grading, results/transcripts, fees, notifications, role-specific dashboards/reporting, and final hardening/testing/deployment prep are all implemented. This is the project's final release — see [`docs/Implementation_Roadmap.md`](docs/Implementation_Roadmap.md) and [`PROJECT_PROGRESS.md`](PROJECT_PROGRESS.md) for the full milestone history.
 
 ## Documentation
 

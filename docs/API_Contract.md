@@ -553,7 +553,8 @@
 }
 ```
 - **Validation:** VR-006 — `awarded_marks` for each answer must not exceed that question's defined `marks`.
-- **Possible Errors:** Submission not found (404); `awarded_marks` exceeds question's max marks (422); caller is not the exam's creating Teacher (403); submission already graded (409, if re-grading is disallowed — policy TBD).
+- **Possible Errors:** Submission not found (404); `awarded_marks` exceeds question's max marks (422); caller is not the exam's creating Teacher (403).
+- **Re-grading policy (resolved during the Milestone 6 pre-implementation review, from `UI_Wireframes.md` §14's "Save Grades" wording):** grading is an upsert-per-answer, re-saveable action — a submission already in `graded` status may be graded again (e.g. correcting a mistake before publishing), not rejected with a conflict.
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found, 422 Unprocessable Entity.
 - **Database Tables Used:** `exam_submission`, `answer`, `question_grade`, `question`.
 - **Business Rules:** VR-006.

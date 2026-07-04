@@ -1,10 +1,12 @@
 # Changelog
 
-All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) — grouped under `### Added` / `### Changed` / `### Fixed` per release. This project is pre-release throughout implementation, so all entries accumulate under `[Unreleased]` until a milestone is judged ready to tag (see `PROJECT_PROGRESS.md` for milestone-level status).
+All notable changes to this project are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/) — grouped under `### Added` / `### Changed` / `### Fixed` per release. Entries accumulated under `[Unreleased]` throughout implementation (Milestones 0–11) and were rolled into `[2.0.0]` at final release (see `PROJECT_PROGRESS.md` for full milestone-level status).
 
 ---
 
-## [Unreleased]
+## [2.0.0] — 2026-07-24
+
+All 12 milestones (0–11) approved. This is the project's final release, tagged `v2.0.0`.
 
 ### Added (Milestone 11 — Hardening, Testing & Deployment)
 - `POST /auth/login` rate limiting (`app/middleware/rate_limit.py`): 5 attempts per 60-second window, per client IP, in-memory fixed window — resolves `Requirement_Analysis.md` §14 item 13
