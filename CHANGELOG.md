@@ -6,6 +6,29 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 6 — Exams & Grading)
+- `exam`, `question`, `question_option`, `exam_submission`, `answer`, `question_grade` tables (Alembic revision `0007_exams`), matching `Database_Design.md` §6.14-6.19 column-for-column, with `index=True`/`UniqueConstraint`/`CheckConstraint` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `GET /exams`, `POST /exams`, `GET /exams/{id}`, `PUT /exams/{id}`, `DELETE /exams/{id}`: exam CRUD with BR-003 (published exams immutable, forward-only status transitions via `PUT`'s optional `status` field) and BR-001 (correct-answer/grading data hidden from Students until `exam.status = published`, always visible to the creating Teacher)
+- `POST /exams/{id}/start` (Derived Engineering Addition, confirmed with the user): Student begins an exam attempt, recording `started_at` from the server clock only — idempotent (returns the existing `in_progress` submission unchanged on a second call), required for VR-004 to be genuinely enforceable server-side
+- `POST /exams/{id}/submit`: Student submits answers; VR-004 (time limit) computed entirely server-side from the stored `started_at`, never a client timestamp
+- `POST /exams/{id}/grade`: Teacher grades a submission; VR-006 (`awarded_marks` cannot exceed a question's max marks) validated for the whole batch before any write; grading is re-saveable (upsert per answer), `exam_submission.status` becomes `graded` only once every answer has a `question_grade`
+- `GET /exams/{id}/submissions/{submission_id}` (Derived Engineering Addition, confirmed with the user): Teacher(creator)/Admin-only endpoint returning a submission's questions in order with each answer and any existing grading — added because `POST /exams/{id}/grade` needs `answer_id` values but nothing else exposed a submission's actual answer content, and `GET /exams/{id}/results` is deliberately aggregate-only reporting
+- `GET /exams/{id}/results`: Teacher/Admin aggregate per-submission totals
+- Frontend: `features/exams/index.ts` (React Query hooks for all 9 endpoints), `pages/ExamList/index.tsx` (role-scoped table with Class/Status filters), `pages/ExamRoom/index.tsx` (timed exam-taking interface — server-recorded countdown, question navigator, MCQ/free-text inputs, confirmation-gated submit, timer-expiry auto-submit), `pages/Teacher/ExamBuilder/index.tsx` (question/option editor, Save Draft vs. Publish Exam), `pages/Teacher/GradingInterface/index.tsx` (per-question marks/feedback, Save Grades, Publish Exam once fully graded)
+- Backend test suite: `tests/unit/test_exam_service.py`, `tests/unit/test_grading_service.py`, `tests/integration/test_exams_router.py` — 77 new tests, 211 total passing
+
+### Changed (Milestone 6 — Documentation)
+- `docs/API_Contract.md`: added Section 3.6 `POST /exams/{id}/start` and Section 3.8 `GET /exams/{id}/submissions/{submission_id}` (both Derived Engineering Additions), renumbering `POST /exams/{id}/submit` → 3.7, `POST /exams/{id}/grade` → 3.9, `GET /exams/{id}/results` → 3.10
+- `docs/Requirement_Traceability_Matrix.md`: FR-017-FR-025 updated to Verified; corrected FR-025's endpoint/table mapping (was incorrectly pointing at `GET /exams/{id}/results`/the Milestone 7 `result` table; corrected to `GET /exams/{id}` with `exam.status = published` as the BR-001 gate); added notes for both Derived additions and the exam-status-transition/grading-re-save-policy resolutions
+- `docs/Proposal_vs_Engineering_Additions.md`: classified both new endpoints as Derived, documenting why each is required and why `GET /exams/{id}/results` was deliberately not extended instead
+- `docs/Implementation_Roadmap.md`: added two Milestone 6 scope notes recording both Derived additions and their rationale
+- `PROJECT_PROGRESS.md`: Milestone 5's Review Status updated to Approved (user sign-off, git tag `v0.6-milestone5`); Milestone 6 row and full Milestone Detail Log entry added; Summary section updated (58% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 6)
+- Migration `0007_exams` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+- Milestone 6 deliberately does not calculate or persist final course results (GPA, transcripts, aggregated per-course marks) — that is explicitly Milestone 7 scope, per this milestone's own kickoff instructions.
+
 ### Added (Milestone 5 — Attendance)
 - `attendance_record` table (Alembic revision `0006_attendance`), matching `Database_Design.md` §6.22 column-for-column (deliberately no `created_at`/`updated_at` — the schema doesn't call for them), with `UniqueConstraint`/`Index` declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `POST /attendance`: Teacher marks attendance, enforcing all 10 mandatory Attendance Domain Rules explicitly at the service layer before any write — student exists and is active, class session exists, a schedule entry exists for it, Teacher is assigned to it, student has a valid enrollment, no duplicate record, and the whole batch is validated before any record is created
