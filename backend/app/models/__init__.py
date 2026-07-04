@@ -16,6 +16,7 @@ from app.models.exam import Exam  # noqa: F401
 from app.models.exam_submission import ExamSubmission  # noqa: F401
 from app.models.fee_structure import FeeStructure  # noqa: F401
 from app.models.invoice import Invoice  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
 from app.models.parent import Parent  # noqa: F401
 from app.models.parent_student_link import ParentStudentLink  # noqa: F401
 from app.models.payment import Payment  # noqa: F401

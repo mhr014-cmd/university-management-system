@@ -167,3 +167,14 @@ class UserRepository:
             )
             is not None
         )
+
+    def list_parent_user_ids_for_student(self, session: Session, student_id: uuid.UUID) -> list[uuid.UUID]:
+        # Reverse of parent_has_linked_student — used by Milestone 9's
+        # notification dispatcher to fan out a fee_due notification to
+        # every Parent linked to the invoiced student.
+        stmt = (
+            select(Parent.user_id)
+            .join(ParentStudentLink, ParentStudentLink.parent_id == Parent.id)
+            .where(ParentStudentLink.student_id == student_id)
+        )
+        return list(session.scalars(stmt))

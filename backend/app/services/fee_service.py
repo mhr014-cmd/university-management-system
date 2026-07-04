@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.models.fee_structure import FeeStructure
 from app.models.invoice import Invoice
 from app.models.user import User
+from app.notifications import dispatcher
 from app.repositories.fee_repository import FeeRepository
 from app.repositories.reference_data_repository import DepartmentRepository, SemesterRepository
 from app.repositories.user_repository import UserRepository
@@ -104,6 +105,7 @@ class FeeService:
         )
         now = datetime.now(timezone.utc)
         invoices_created = 0
+        newly_invoiced_students = []
         for student in eligible_students:
             # Defensive duplicate check (Domain Rule 5) — practically
             # unreachable since fee_structure.id is brand new, but cheap
@@ -112,8 +114,22 @@ class FeeService:
                 continue
             fee_repo.create_invoice(session, student_id=student.id, fee_structure_id=fee_structure.id, issued_at=now)
             invoices_created += 1
+            newly_invoiced_students.append(student)
         session.commit()
         session.refresh(fee_structure)
+
+        # Domain Rule 4: dispatch only after the invoice-generation batch
+        # above has committed. Domain Rule 15: recipients (student.user_id,
+        # linked parents) are already resolved from FK-backed queries, so
+        # there is no per-recipient validation step that can fail.
+        for student in newly_invoiced_students:
+            dispatcher.notify_fee_due(
+                session,
+                student_id=student.id,
+                student_user_id=student.user_id,
+                amount=float(fee_structure.amount),
+                due_date=fee_structure.due_date,
+            )
 
         return FeeStructureRead(
             id=fee_structure.id,

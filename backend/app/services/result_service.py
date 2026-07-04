@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.models.result import Result
 from app.models.user import User
+from app.notifications import dispatcher
 from app.repositories.exam_repository import ExamRepository
 from app.repositories.reference_data_repository import CourseRepository, SemesterRepository
 from app.repositories.result_repository import ResultRepository
@@ -310,6 +311,21 @@ class ResultService:
             result_repo.mark_rejected(session, result, admin_id=admin.id, approved_at=now)
         session.commit()
         session.refresh(result)
+
+        # Domain Rule 4: dispatch only after the originating transaction
+        # (the approve/reject commit above) has already succeeded.
+        if payload.decision == "approve":
+            student_with_user = user_repo.get_student_with_user(session, result.student_id)
+            course = course_repo.get(session, result.course_id)
+            semester = semester_repo.get(session, result.semester_id)
+            if student_with_user is not None and course is not None and semester is not None:
+                _student, student_user = student_with_user
+                dispatcher.notify_result_published(
+                    session,
+                    student_user_id=student_user.id,
+                    course_name=course.name,
+                    semester_name=semester.name,
+                )
 
         return ResultApprovalResponse(id=result.id, status=result.status, approved_at=result.approved_at)
 

@@ -18,8 +18,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.notifications import dispatcher
 from app.repositories.attendance_repository import AttendanceRepository
-from app.repositories.reference_data_repository import DepartmentRepository, SemesterRepository
+from app.repositories.reference_data_repository import CourseRepository, DepartmentRepository, SemesterRepository
 from app.repositories.schedule_repository import ScheduleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.attendance import (
@@ -42,6 +43,7 @@ schedule_repo = ScheduleRepository()
 user_repo = UserRepository()
 department_repo = DepartmentRepository()
 semester_repo = SemesterRepository()
+course_repo = CourseRepository()
 
 # Statuses that count as "attended" for percentage purposes. "excused" is
 # treated as neutral (excluded from both numerator and denominator) since
@@ -108,6 +110,7 @@ class AttendanceService:
         # Validate every record BEFORE any database write (Rule 10) — a
         # single invalid row must reject the whole batch, not partially
         # commit some students' attendance and reject others silently.
+        student_users: dict[uuid.UUID, User] = {}
         for record_input in payload.records:
             # Rule 1: student exists and is active.
             student_row = user_repo.get_student_with_user(session, record_input.student_id)
@@ -116,6 +119,7 @@ class AttendanceService:
             _student, student_user = student_row
             if not student_user.is_active:
                 raise _invalid(f"student_id {record_input.student_id} refers to a deactivated account")
+            student_users[record_input.student_id] = student_user
 
             # Rule 4/Rule 6: student must be enrolled in this exact class
             # session — this is what prevents marking attendance for
@@ -138,6 +142,20 @@ class AttendanceService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Attendance already recorded for student_id {record_input.student_id} on this date.",
                 )
+
+        # Milestone 9 attendance_warning dispatch: capture each student's
+        # per-class-session percentage BEFORE this batch is written, so it
+        # can be compared against the percentage AFTER, to detect a genuine
+        # threshold crossing (resolved during the M9 pre-implementation
+        # review, confirmed with the user) rather than repeating the
+        # notification on every marking while chronically below 80%.
+        percentages_before: dict[uuid.UUID, float] = {}
+        course_name: str | None = None
+        for student_id in student_users:
+            rows = attendance_repo.list_for_student(session, student_id, class_session_id=payload.class_session_id)
+            percentages_before[student_id] = _percentage([r for r, _course in rows])
+            if course_name is None and rows:
+                course_name = rows[0][1].name
 
         created: list[AttendanceRecordRead] = []
         try:
@@ -162,6 +180,28 @@ class AttendanceService:
 
         for record in created:
             session.refresh(record)
+
+        # Course name wasn't known pre-write if this is the student's very
+        # first record for this class session — resolve it post-write if so.
+        if course_name is None and created:
+            class_session = schedule_repo.get_class_session(session, payload.class_session_id)
+            if class_session is not None:
+                course = course_repo.get(session, class_session.course_id)
+                course_name = course.name if course is not None else None
+
+        # Domain Rule 4: dispatch only after the batch commit above has
+        # succeeded.
+        if course_name is not None:
+            for student_id in student_users:
+                rows_after = attendance_repo.list_for_student(
+                    session, student_id, class_session_id=payload.class_session_id
+                )
+                percentage_after = _percentage([r for r, _course in rows_after])
+                if percentages_before[student_id] >= LOW_ATTENDANCE_THRESHOLD > percentage_after:
+                    dispatcher.notify_attendance_warning(
+                        session, student_user_id=student_users[student_id].id, course_name=course_name
+                    )
+
         return [AttendanceRecordRead.model_validate(record) for record in created]
 
     # --- PUT /attendance/{id} (FR-029) -----------------------------------

@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.notifications import dispatcher
 from app.repositories.reference_data_repository import CourseRepository, RoomRepository, SemesterRepository
 from app.repositories.schedule_repository import ScheduleRepository
 from app.repositories.user_repository import UserRepository
@@ -218,14 +219,65 @@ class ScheduleService:
         session.add(entry)
         session.commit()
         session.refresh(entry)
+
+        # Domain Rule 4: dispatch only after the update above has committed.
+        self._notify_schedule_change(
+            session, class_session_id=entry.class_session_id, teacher_id=entry.teacher_id, room_id=entry.room_id
+        )
+
         return ScheduleEntryRead.model_validate(entry)
 
     def delete_entry(self, session: Session, schedule_entry_id: uuid.UUID) -> None:
         entry = schedule_repo.get_schedule_entry(session, schedule_entry_id)
         if entry is None:
             raise _not_found(_ENTRY_NOT_FOUND)
+        # Captured before delete/commit — the ORM object is expired after
+        # commit and its underlying row no longer exists to re-fetch from.
+        class_session_id = entry.class_session_id
+        teacher_id = entry.teacher_id
         schedule_repo.delete_schedule_entry(session, entry)
         session.commit()
+
+        # Domain Rule 4: dispatch only after the deletion above has committed.
+        self._notify_schedule_change(
+            session, class_session_id=class_session_id, teacher_id=teacher_id, room_id=None, cancelled=True
+        )
+
+    def _notify_schedule_change(
+        self,
+        session: Session,
+        *,
+        class_session_id: uuid.UUID,
+        teacher_id: uuid.UUID,
+        room_id: uuid.UUID | None,
+        cancelled: bool = False,
+    ) -> None:
+        class_session = schedule_repo.get_class_session(session, class_session_id)
+        teacher_with_user = user_repo.get_teacher_with_user(session, teacher_id)
+        if class_session is None or teacher_with_user is None:
+            return
+        course = course_repo.get(session, class_session.course_id)
+        if course is None:
+            return
+        room_name = None
+        if room_id is not None:
+            room = room_repo.get(session, room_id)
+            room_name = room.name if room is not None else None
+
+        student_user_ids = []
+        for student in schedule_repo.list_enrolled_students(session, class_session_id):
+            student_with_user = user_repo.get_student_with_user(session, student.id)
+            if student_with_user is not None:
+                student_user_ids.append(student_with_user[1].id)
+
+        dispatcher.notify_schedule_change(
+            session,
+            student_user_ids=student_user_ids,
+            teacher_user_id=teacher_with_user[1].id,
+            course_name=course.name,
+            room_name=room_name,
+            cancelled=cancelled,
+        )
 
     def get_conflicts(self, session: Session, semester_id: uuid.UUID | None = None) -> ScheduleConflictsResponse:
         if semester_id is not None and semester_repo.get(session, semester_id) is None:
