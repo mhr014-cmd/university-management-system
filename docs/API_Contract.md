@@ -432,7 +432,30 @@
 - **Database Tables Used:** `exam`, `question`, `question_option` (cascade delete on unpublished draft children, per `Database_Design.md` §10).
 - **Business Rules:** BR-003.
 
-### 3.6 `POST /exams/{id}/submit`
+### 3.6 `POST /exams/{id}/start` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** Student begins an exam attempt, establishing the server-recorded start time VR-004's time-limit enforcement depends on. Added during the Milestone 6 pre-implementation review — `UI_Wireframes.md` §5 (Exam Room) describes zero server round-trips during the exam except the final `POST /exams/{id}/submit` (answers autosave client-side only), but nothing anywhere created the `exam_submission` row or recorded `started_at` before that final call. Without a server-side start time recorded independently of the client, VR-004 cannot be genuinely enforced — a student could submit any elapsed-time claim. The frontend calls this once, when the Student enters the Exam Room.
+- **Authentication Required:** Yes
+- **User Roles:** Student
+- **Request Body:** none.
+- **Response Body (200 or 201):**
+```json
+{
+  "submission_id": "uuid",
+  "exam_id": "uuid",
+  "status": "in_progress",
+  "started_at": "timestamp"
+}
+```
+- 201 if a new `exam_submission` was created; 200 if an in-progress submission already existed for this student and exam, in which case the *existing* row (and its original `started_at`) is returned unchanged — this endpoint is idempotent, not a re-start.
+- **Validation:** exam must exist and be in `open` status; caller (Student) must be enrolled in the exam's `class_session`; if a submission for this student/exam already has `status = submitted` or `status = graded`, starting again is rejected (one attempt per student per exam, per `exam_submission`'s own uniqueness constraint).
+- **Possible Errors:** Exam not found (404); exam not `open` (409); caller not enrolled in the exam's class (403); an already-submitted/graded attempt exists for this student and exam (409).
+- **Status Codes:** 200 OK, 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
+- **Database Tables Used:** `exam_submission`, `exam`, `enrollment`.
+- **Business Rules:** `started_at` is set from the server clock only (`datetime.now(timezone.utc)`), never a client-supplied value, and is immutable once the row is created — no endpoint ever updates it. `POST /exams/{id}/submit` (3.7 below) reads this same stored value to compute elapsed time; it never accepts or trusts a client-provided start time.
+- **Note:** Classified **Derived** (unavoidable prerequisite for genuine server-side VR-004 enforcement), not Design Enhancement — confirmed with the user during the Milestone 6 pre-implementation review. See `Proposal_vs_Engineering_Additions.md`.
+
+### 3.7 `POST /exams/{id}/submit`
 
 - **Purpose:** Student submits answers to an exam. (FR-022)
 - **Authentication Required:** Yes
@@ -458,13 +481,13 @@
   "submitted_at": "timestamp"
 }
 ```
-- **Validation:** exam must be in `open` status and within `time_limit_minutes` of the student's `started_at`; one submission per student per exam (`exam_submission` uniqueness); one answer per question (`answer` uniqueness).
-- **Possible Errors:** Exam not open (409); time limit exceeded (409); duplicate submission (409); exam/question not found (404); caller not enrolled in the exam's class (403).
+- **Validation:** an `in_progress` `exam_submission` must already exist for this student/exam (created via `POST /exams/{id}/start`, 3.6 above) — submitting without first starting is rejected; exam must be in `open` status; the elapsed time between the stored server-side `started_at` and the current server time must not exceed `time_limit_minutes` (VR-004 — computed entirely server-side, never from a client-supplied timestamp); one submission per student per exam (`exam_submission` uniqueness); one answer per question (`answer` uniqueness).
+- **Possible Errors:** No `in_progress` submission exists to submit against (404 or 409 — must be decided consistently at implementation); exam not open (409); time limit exceeded (409); duplicate submission (409); exam/question not found (404); caller not enrolled in the exam's class (403).
 - **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
 - **Database Tables Used:** `exam_submission`, `answer`, `exam`.
-- **Business Rules:** VR-004 (time limit enforcement); one submission per student per exam.
+- **Business Rules:** VR-004 (time limit enforcement, using the stored server-side `started_at` from 3.6 — never a client timestamp); one submission per student per exam.
 
-### 3.7 `POST /exams/{id}/grade`
+### 3.8 `POST /exams/{id}/grade`
 
 - **Purpose:** Teacher grades a submitted exam. (FR-023)
 - **Authentication Required:** Yes
@@ -496,7 +519,7 @@
 - **Database Tables Used:** `exam_submission`, `answer`, `question_grade`, `question`.
 - **Business Rules:** VR-006.
 
-### 3.8 `GET /exams/{id}/results`
+### 3.9 `GET /exams/{id}/results`
 
 - **Purpose:** Retrieve all graded results for a given exam. (FR-024)
 - **Authentication Required:** Yes

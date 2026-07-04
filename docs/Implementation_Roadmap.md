@@ -230,6 +230,8 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement the exam builder, exam-taking flow, submission, and grading — the largest single feature area.
 
+**Milestone 6 scope note (added during M6 pre-implementation review):** `POST /exams/{id}/start` (Derived Engineering Addition, confirmed with the user) is required to satisfy VR-004 with genuine server-side time-limit enforcement — `UI_Wireframes.md` §5 (Exam Room) describes zero server round-trips during an exam attempt except the final submit, but nothing anywhere recorded a server-side start time before that final call, and trusting a client-supplied elapsed time would let a student falsify it. The Student calls this once when entering the Exam Room; `started_at` is set from the server clock only and is immutable once recorded. See `API_Contract.md` §3.6 and `Proposal_vs_Engineering_Additions.md`.
+
 **Files to create:**
 - `backend/app/models/exam.py`, `question.py`, `question_option.py`, `exam_submission.py`, `answer.py`, `question_grade.py`
 - `backend/app/schemas/exam.py`, `submission.py`, `grading.py`
@@ -249,6 +251,7 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 - `GET /exams/{id}`
 - `PUT /exams/{id}`
 - `DELETE /exams/{id}`
+- `POST /exams/{id}/start` *(Derived addition, confirmed with the user during the M6 pre-implementation review — see the scope note above; `API_Contract.md` §3.6)*
 - `POST /exams/{id}/submit`
 - `POST /exams/{id}/grade`
 - `GET /exams/{id}/results`
