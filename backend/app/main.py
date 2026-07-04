@@ -17,7 +17,7 @@ from app.core.logging_config import configure_logging
 from app.db.session import engine
 from app.middleware.error_handlers import register_exception_handlers
 from app.middleware.logging import RequestLoggingMiddleware
-from app.routers import attendance, auth, exams, health, reference_data, results, schedule, users
+from app.routers import attendance, auth, exams, fees, health, reference_data, results, schedule, users
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -65,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(attendance.router, prefix=settings.api_v1_prefix)
     app.include_router(exams.router, prefix=settings.api_v1_prefix)
     app.include_router(results.router, prefix=settings.api_v1_prefix)
+    app.include_router(fees.router, prefix=settings.api_v1_prefix)
 
     return app
 
