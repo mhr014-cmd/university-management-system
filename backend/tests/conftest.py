@@ -247,3 +247,77 @@ def make_class_session(db_session, make_course, make_semester):
         return class_session
 
     return _make_class_session
+
+
+@pytest.fixture
+def make_parent_user(db_session, make_user):
+    from app.models.parent import Parent
+
+    def _make_parent_user(email: str, password: str) -> tuple:
+        user = make_user(email, password, "parent")
+        parent = Parent(user_id=user.id, first_name="Test", last_name="Parent")
+        db_session.add(parent)
+        db_session.commit()
+        db_session.refresh(parent)
+        return user, parent
+
+    return _make_parent_user
+
+
+@pytest.fixture
+def link_parent_student(db_session):
+    from app.models.parent_student_link import ParentStudentLink
+
+    def _link_parent_student(parent, student) -> ParentStudentLink:
+        link = ParentStudentLink(parent_id=parent.id, student_id=student.id)
+        db_session.add(link)
+        db_session.commit()
+        db_session.refresh(link)
+        return link
+
+    return _link_parent_student
+
+
+@pytest.fixture
+def make_enrollment(db_session):
+    from app.models.enrollment import Enrollment
+
+    def _make_enrollment(student, class_session) -> Enrollment:
+        enrollment = Enrollment(student_id=student.id, class_session_id=class_session.id)
+        db_session.add(enrollment)
+        db_session.commit()
+        db_session.refresh(enrollment)
+        return enrollment
+
+    return _make_enrollment
+
+
+@pytest.fixture
+def make_schedule_entry(db_session, make_room):
+    from datetime import time
+
+    from app.models.schedule_entry import ScheduleEntry
+
+    def _make_schedule_entry(
+        class_session,
+        teacher,
+        room=None,
+        day_of_week: str = "Mon",
+        start_time: time = time(9, 0),
+        end_time: time = time(10, 0),
+    ) -> ScheduleEntry:
+        room = room or make_room()
+        entry = ScheduleEntry(
+            class_session_id=class_session.id,
+            room_id=room.id,
+            teacher_id=teacher.id,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        db_session.add(entry)
+        db_session.commit()
+        db_session.refresh(entry)
+        return entry
+
+    return _make_schedule_entry
