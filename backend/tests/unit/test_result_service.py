@@ -411,6 +411,11 @@ class TestApproveOrReject:
         result = make_result(status="submitted")
         result_repo.get.return_value = result
         user_repo.get_admin_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        # Milestone 9: approve_or_reject also dispatches a result_published
+        # notification; None here means the dispatch is skipped cleanly
+        # (dispatcher.notify_result_published's own behavior is covered by
+        # tests/unit/test_notification_dispatcher.py).
+        user_repo.get_student_with_user.return_value = None
 
         def mark_approved_side_effect(_session, r, *, admin_id, approved_at):
             r.status = "published"

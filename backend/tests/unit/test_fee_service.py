@@ -150,7 +150,12 @@ class TestCreateFeeStructure:
 
         assert result.invoices_created == 2
         assert fee_repo.create_invoice.call_count == 2
-        session.commit.assert_called_once()
+        # 1 commit for the invoice-generation batch itself, plus 1 more per
+        # eligible student for the Milestone 9 fee_due dispatch (each
+        # dispatch commits independently — see
+        # tests/unit/test_notification_dispatcher.py for dispatch-specific
+        # coverage).
+        assert session.commit.call_count == 3
 
     def test_rule5_defensive_duplicate_skip(self, service, stub_repos, session):
         fee_repo, _user_repo, _department_repo, semester_repo = stub_repos
