@@ -125,9 +125,15 @@ Not applicable (no user input beyond navigation clicks).
 
 ### Role Visibility
 - **Student:** Upcoming Exams, Attendance %, Fee Status, Recent Results widgets.
-- **Teacher:** Classes Today, Pending Grading count, Schedule-change-request status — no Fee Status widget.
+- **Teacher:** Classes Today, Pending Grading count — no Fee Status widget. Schedule-change-request status is **not implemented** (see Milestone 10 Known Limitation note below).
 - **Admin:** Pending Result Approvals count, Overdue Fees count, Recent User Signups — links to Admin screens.
-- **Parent:** Same widget types as Student, but scoped to the linked child (with a child-selector if multiple children are linked, per `Requirement_Analysis.md` §14 item 2).
+- **Parent:** Fee Status and Recent Results widgets only, scoped to the linked child (with a child-selector if multiple children are linked, per `Requirement_Analysis.md` §14 item 2). Upcoming Exams and Attendance % render an honest **"Not available"** state (see Milestone 10 Known Limitation note below) rather than fabricated data.
+
+### Known Limitations (Milestone 10)
+- **Teacher Schedule-change-request status widget — omitted.** No endpoint exists (or was added) to query "my pending schedule-change-request status" for the calling Teacher; `schedule_change_request` rows are only ever read via the Admin-facing resolve flow (`API_Contract.md` §1/§2). Resolved as approved Finding C during Milestone 10 pre-implementation review: rather than inventing an undocumented endpoint, this widget is omitted from the Teacher Dashboard. A Teacher's own pending requests remain visible via the Schedule page itself.
+- **Teacher Pending Grading widget — computed client-side.** No dedicated backend aggregate endpoint was added for this count (approved Finding B); the frontend derives it from the existing per-exam submission/grading endpoints already used by the Exam Room / grading pages, so no backend scope was expanded for a single dashboard number.
+- **Parent Dashboard — Attendance % and Upcoming Exams unavailable.** No endpoint exists exposing a linked child's attendance percentage or upcoming-exam schedule to the Parent role (`GET /attendance/reports` is Admin-only per `API_Contract.md` §4.5; Student's own `/attendance/me`-equivalent and exam-list endpoints are Student/Teacher-scoped, not Parent-linked). Resolved as approved Finding E: the Parent Dashboard implements only Fee Status and Recent Results (both already Parent-accessible via `GET /fees/me` and `GET /results/me` with `student_id`), and renders an honest "Not available" state for the two widgets it cannot back with real data, rather than fabricating figures or adding an undocumented Parent-scoped endpoint.
+- **Admin Dashboard — Recent User Signups now backed by `created_at`.** Approved Finding D added an additive `created_at` field to the existing `GET /users/students` and `GET /users/teachers` response DTOs (see `API_Contract.md` §2.3) so this widget can be populated from real data without a new endpoint or schema change.
 
 ### Responsive Behaviour
 - **Desktop:** widgets in a 3-column grid.
@@ -1066,7 +1072,7 @@ Generate attendance, result, and fee reports by department, semester, or individ
 
 ### Tables
 - **Attendance tab**: columns Student, Percentage (from `GET /attendance/reports`).
-- **Results tab**: grade distribution table (Grade Letter, Count) plus a Pass/Fail summary (from `GET /results/reports`).
+- **Results tab**: grade distribution table (Grade Letter, Count), a Pass/Fail summary, and an Average GPA figure (`average_gpa`, added Milestone 10 — reuses the same credit-hour-weighted formula as the Student Results view, see `Proposal_vs_Engineering_Additions.md` §6) (from `GET /results/reports`).
 - **Fees tab**: summary cards (Collected, Outstanding, Overdue) rather than a row-per-student table (from `GET /fees/reports`).
 
 ### Forms

@@ -183,7 +183,8 @@
       "first_name": "string",
       "last_name": "string",
       "department_id": "uuid",
-      "is_active": "boolean"
+      "is_active": "boolean",
+      "created_at": "timestamp"
     }
   ],
   "total": "integer",
@@ -196,6 +197,7 @@
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden.
 - **Database Tables Used:** `student`, `user`, `department`.
 - **Business Rules:** none.
+- **Note (Milestone 10, Finding D):** `created_at` (sourced from `user.created_at`, which already existed) is an additive field added to support the Admin Dashboard's Recent User Signups widget (`UI_Wireframes.md`) — no business logic or schema change, no new endpoint. Also present on every other student/teacher response in this section (2.4–2.10) that shares this same object shape.
 
 ### 2.4 `POST /users/students`
 
@@ -1290,14 +1292,15 @@ No other automatic triggers exist (Domain Rule 19 — automatic notifications ar
     { "grade_letter": "string", "count": "integer" }
   ],
   "pass_count": "integer",
-  "fail_count": "integer"
+  "fail_count": "integer",
+  "average_gpa": "number"
 }
 ```
 - **Validation:** `department_id`/`semester_id`/`student_id` if provided must reference existing rows.
 - **Possible Errors:** invalid filter IDs (422); caller is not Admin (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
-- **Database Tables Used:** `result`, `department`, `semester`, `student`.
-- **Business Rules:** BR-002 — only `published` results are included in report aggregates.
+- **Database Tables Used:** `result`, `course`, `department`, `semester`, `student`.
+- **Business Rules:** BR-002 — only `published` results are included in report aggregates. `pass_count`/`fail_count` is determined by `grade_point > 0` (pass) vs. `grade_point == 0` (fail), since `grade_letter` is Teacher-supplied free text with no fixed enum (Milestone 10 engineering decision — see `Proposal_vs_Engineering_Additions.md`). `average_gpa` (Milestone 10, additive field, Finding A) is the same credit-hour-weighted GPA formula already implemented for `GET /results/me` (§5.x) — computed once in `result_service.compute_credit_weighted_gpa` and reused here, never duplicated, per this milestone's approved Finding A.
 
 ### 9.2 `GET /fees/reports`
 

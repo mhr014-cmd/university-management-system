@@ -96,6 +96,8 @@ Every endpoint below is **Required** at the capability level (all seven trace to
 
 **Design Enhancement within this endpoint:** The specific response shape (`grade_distribution` array, `pass_count`/`fail_count` fields) is an engineering interpretation of "generate result reports" — the proposal does not specify what a result report contains, only that one must exist.
 
+**Design Enhancement, implemented Milestone 10:** An additive `average_gpa` field (approved Milestone 10 pre-implementation Finding A) reuses the existing credit-hour-weighted GPA formula already implemented for `GET /results/me` (`result_service.compute_credit_weighted_gpa`, extracted to a shared public function so neither endpoint duplicates the calculation) — no new business logic was written. `pass_count`/`fail_count` are determined by `grade_point > 0` (pass) / `grade_point == 0` (fail) rather than pattern-matching `grade_letter`, since `grade_letter` is Teacher-supplied free text with no fixed enum (`API_Contract.md` §5.2) — a further engineering interpretation of the same undefined "result report" content noted above.
+
 ---
 
 ## 7. `GET /fees/reports`

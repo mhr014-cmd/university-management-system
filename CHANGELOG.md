@@ -6,6 +6,31 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 10 — Dashboards & Reporting)
+- `GET /results/reports`: Admin result reports (grade distribution, pass/fail counts, additive `average_gpa` — Finding A) by department/semester/student, `published` results only; pass/fail determined by `grade_point > 0`/`== 0` since `grade_letter` is Teacher-supplied free text
+- `GET /fees/reports`: Admin fee reports (`total_collected`/`total_outstanding`/`total_overdue`) by department/semester/student; `total_overdue` is a subset of `total_outstanding`, matching the Admin: Fee Dashboard's existing (M8) semantics
+- `POST /fees/overdue/notify`: Admin manually triggers an overdue fee notice, individually (`scope: "selected"`, whole batch validated before any write) or in bulk (`scope: "all_overdue"`) — reuses the existing `dispatcher.notify_fee_due` unchanged, no second notification system
+- Additive `created_at` field on `GET /users/students`/`GET /users/teachers` response DTOs (Finding D) — no business-logic, schema, or new-endpoint change
+- Frontend: Student/Teacher/Parent/Admin Dashboard widgets (`pages/Dashboard/{Student,Teacher,Parent,Admin}Dashboard.tsx`), replacing the Milestone 0 placeholder's "Backend connectivity" health-check widget; Admin: Reports page (Attendance/Results/Fees tabs, `pages/Admin/Reports/index.tsx`); Admin: Fee Dashboard gained the wireframe's Notify/Send Bulk Overdue Notice actions, deferred since Milestone 8
+- New feature hooks: `features/attendance/index.ts` (`useAttendanceReports`), `features/results/index.ts` (`useResultsReport`), `features/fees/index.ts` (`useFeesReport`, `useNotifyOverdueAccounts`)
+- Backend test suite: `tests/unit/test_report_service.py`, additions to `tests/unit/test_fee_service.py`, `tests/integration/test_reports_router.py` — 23 new tests, 341 total passing
+
+### Changed (Milestone 10)
+- `result_service.py`: extracted `compute_credit_weighted_gpa` as a shared public function (previously private inline logic in `_build_semester_entries`) so `GET /results/me` and the new `GET /results/reports` reuse one GPA implementation, per Finding A
+
+### Changed (Milestone 10 — Documentation)
+- `docs/API_Contract.md`: added the additive `average_gpa` field to §9.1 and `created_at` to §2.3 (both noted as Milestone 10 additions); §9.1/§9.2/§6.7 (the report/notify endpoints themselves) were already fully documented pre-implementation during the Project Readiness Audit
+- `docs/Proposal_vs_Engineering_Additions.md` §6: added a note on the `average_gpa`/pass-fail-threshold engineering decisions
+- `docs/UI_Wireframes.md` Section 2: added a Known Limitations subsection documenting Findings B/C/D/E's resolutions (Teacher Pending Grading computed client-side, Teacher Schedule-change-request widget omitted, Admin Recent Signups backed by `created_at`, Parent Dashboard's partial widget availability); Section 18's Results tab description updated for `average_gpa`
+- `docs/Requirement_Traceability_Matrix.md`: FR-054, FR-055, FR-056 updated to Verified (M10)
+- `PROJECT_PROGRESS.md`: Milestone 9's Review Status updated to Approved (user sign-off, git tag `v1.0-milestone9`); Milestone 10 row and full Milestone Detail Log entry added; Summary section updated (92% overall progress, current/last/next milestone)
+
+### Known Issues (Milestone 10)
+- Frontend UI not visually exercised in an interactive browser this milestone — per this session's established preview-tooling restriction (a prior `.claude/launch.json` `env`-field incident), verification relied on `tsc`/`npm run build`/a live API-contract smoke test/code review instead.
+- Teacher Dashboard's Pending Grading count issues one HTTP request per not-yet-published exam (Finding B's "compute client-side" resolution) — acceptable at this system's scale, not a single aggregate call.
+- Parent Dashboard has no linked-children selector, only a manual Student ID field — the underlying gap (no endpoint anywhere enumerates a Parent's linked children) predates this milestone (M7-M8) and remains open.
+- Teacher Schedule-change-request status widget is not implemented (Finding C) — no endpoint exists for a Teacher to query their own pending change-request status.
+
 ### Added (Milestone 9 — Notifications)
 - `notification` table (Alembic revision `0010_notifications`), matching `Database_Design.md` §6.26 column-for-column, with `Index`/`is_read` default declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `GET /notifications`: authenticated user's own feed (newest first), with `is_read` filter and pagination, plus `unread_count`
