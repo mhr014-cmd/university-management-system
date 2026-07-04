@@ -51,6 +51,7 @@ def _student_to_read(student: Student, user: User) -> StudentRead:
         last_name=student.last_name,
         department_id=student.department_id,
         is_active=user.is_active,
+        created_at=user.created_at,
     )
 
 
@@ -63,6 +64,7 @@ def _teacher_to_read(teacher: Teacher, user: User) -> TeacherRead:
         last_name=teacher.last_name,
         department_id=teacher.department_id,
         is_active=user.is_active,
+        created_at=user.created_at,
     )
 
 

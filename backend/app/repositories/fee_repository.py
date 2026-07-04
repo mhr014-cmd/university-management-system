@@ -112,6 +112,26 @@ class FeeRepository:
             stmt = stmt.where(FeeStructure.semester_id == semester_id)
         return [(row[0], row[1]) for row in session.execute(stmt).all()]
 
+    def list_invoices_for_report(
+        self,
+        session: Session,
+        *,
+        department_id: uuid.UUID | None = None,
+        semester_id: uuid.UUID | None = None,
+        student_id: uuid.UUID | None = None,
+    ) -> list[tuple[Invoice, FeeStructure]]:
+        """Milestone 10: GET /fees/reports — every invoice (any status)
+        matching the given optional filters. `department_id` filters via
+        the invoiced student's own department_id."""
+        stmt = select(Invoice, FeeStructure).join(FeeStructure, FeeStructure.id == Invoice.fee_structure_id)
+        if department_id is not None:
+            stmt = stmt.join(Student, Student.id == Invoice.student_id).where(Student.department_id == department_id)
+        if semester_id is not None:
+            stmt = stmt.where(FeeStructure.semester_id == semester_id)
+        if student_id is not None:
+            stmt = stmt.where(Invoice.student_id == student_id)
+        return [(row[0], row[1]) for row in session.execute(stmt).all()]
+
     # --- payment ---------------------------------------------------------------
 
     def create_payment(

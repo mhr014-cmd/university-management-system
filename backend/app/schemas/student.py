@@ -3,7 +3,7 @@ Pydantic request/response schemas: student (see docs/API_Contract.md §2.3-2.7).
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -41,3 +41,6 @@ class StudentRead(BaseModel):
     last_name: str
     department_id: uuid.UUID
     is_active: bool
+    # Milestone 10, Admin Dashboard Recent User Signups widget (additive;
+    # no business logic or schema change — `user.created_at` already existed).
+    created_at: datetime

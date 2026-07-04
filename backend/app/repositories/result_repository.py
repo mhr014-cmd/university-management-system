@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.result import Result
+from app.models.student import Student
 
 
 class ResultRepository:
@@ -111,3 +112,24 @@ class ResultRepository:
 
     def list_by_status(self, session: Session, status: str) -> list[Result]:
         return list(session.scalars(select(Result).where(Result.status == status).order_by(Result.submitted_at.desc())))
+
+    def list_published_for_report(
+        self,
+        session: Session,
+        *,
+        department_id: uuid.UUID | None = None,
+        semester_id: uuid.UUID | None = None,
+        student_id: uuid.UUID | None = None,
+    ) -> list[Result]:
+        """Milestone 10: GET /results/reports — published results matching
+        the given optional filters. `department_id` filters via the
+        result's student's own department_id (Database_Design.md §6.2),
+        since `result` has no department column of its own."""
+        stmt = select(Result).where(Result.status == "published")
+        if department_id is not None:
+            stmt = stmt.join(Student, Student.id == Result.student_id).where(Student.department_id == department_id)
+        if semester_id is not None:
+            stmt = stmt.where(Result.semester_id == semester_id)
+        if student_id is not None:
+            stmt = stmt.where(Result.student_id == student_id)
+        return list(session.scalars(stmt))

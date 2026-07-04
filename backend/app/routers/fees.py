@@ -17,6 +17,8 @@ from app.schemas.fee import (
     FeesMeResponse,
     FeeStructureCreate,
     FeeStructureRead,
+    OverdueNotifyRequest,
+    OverdueNotifyResponse,
     OverdueResponse,
     PaymentCreate,
     PaymentHistoryResponse,
@@ -74,6 +76,11 @@ def get_overdue_accounts(
     db: Session = Depends(get_db),
 ):
     return fee_service.get_overdue_accounts(db, department_id, semester_id)
+
+
+@router.post("/overdue/notify", response_model=OverdueNotifyResponse, dependencies=[_require_admin])
+def notify_overdue_accounts(payload: OverdueNotifyRequest, db: Session = Depends(get_db)):
+    return fee_service.notify_overdue_accounts(db, payload)
 
 
 @router.get("/invoices/{invoice_id}", dependencies=[_require_student_or_admin])

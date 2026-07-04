@@ -10,7 +10,7 @@ uniqueness handling (409) for Admin-driven account creation.
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -31,7 +31,13 @@ from app.services.user_service import UserService
 
 
 def make_user(**overrides) -> User:
-    defaults = dict(id=uuid.uuid4(), email="user@example.com", role="student", is_active=True)
+    defaults = dict(
+        id=uuid.uuid4(),
+        email="user@example.com",
+        role="student",
+        is_active=True,
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
     defaults.update(overrides)
     return User(**defaults)
 

@@ -80,3 +80,15 @@ class OverdueAccountEntry(BaseModel):
 
 class OverdueResponse(BaseModel):
     overdue_accounts: list[OverdueAccountEntry]
+
+
+OverdueNotifyScope = Literal["selected", "all_overdue"]
+
+
+class OverdueNotifyRequest(BaseModel):
+    student_ids: list[uuid.UUID] = Field(default_factory=list)
+    scope: OverdueNotifyScope
+
+
+class OverdueNotifyResponse(BaseModel):
+    notified_count: int

@@ -39,6 +39,8 @@ from app.schemas.fee import (
     FeeStructureRead,
     InvoiceEntry,
     OverdueAccountEntry,
+    OverdueNotifyRequest,
+    OverdueNotifyResponse,
     OverdueResponse,
     PaymentCreate,
     PaymentEntry,
@@ -345,3 +347,44 @@ class FeeService:
                 )
             )
         return OverdueResponse(overdue_accounts=accounts)
+
+    # --- POST /fees/overdue/notify (Milestone 10 — reuses the existing --------
+    # Notification Dispatcher; no second notification system is introduced.
+
+    def notify_overdue_accounts(self, session: Session, payload: OverdueNotifyRequest) -> OverdueNotifyResponse:
+        today = date.today()
+        candidates = fee_repo.list_unpaid_or_partial_invoices(session, department_id=None, semester_id=None)
+        overdue_by_student: dict[uuid.UUID, list[tuple[Invoice, FeeStructure]]] = {}
+        for invoice, fee_structure in candidates:
+            if fee_structure.due_date < today:
+                overdue_by_student.setdefault(invoice.student_id, []).append((invoice, fee_structure))
+
+        if payload.scope == "all_overdue":
+            targets = [pair for pairs in overdue_by_student.values() for pair in pairs]
+        else:
+            if not payload.student_ids:
+                raise _invalid("student_ids must be provided when scope is 'selected'.")
+            # Domain Rule 15 pattern: validate the whole batch before any write.
+            missing = [sid for sid in payload.student_ids if sid not in overdue_by_student]
+            if missing:
+                raise _invalid("All student_ids must currently have an overdue invoice.")
+            targets = [pair for sid in payload.student_ids for pair in overdue_by_student[sid]]
+
+        notified_count = 0
+        for invoice, fee_structure in targets:
+            student_with_user = user_repo.get_student_with_user(session, invoice.student_id)
+            if student_with_user is None:
+                continue
+            student, _user = student_with_user
+            # Reused unchanged — notifies the student and every linked
+            # parent in one call, per the dispatcher's own Domain Rule 15.
+            dispatcher.notify_fee_due(
+                session,
+                student_id=invoice.student_id,
+                student_user_id=student.user_id,
+                amount=float(fee_structure.amount),
+                due_date=fee_structure.due_date,
+            )
+            notified_count += 1
+
+        return OverdueNotifyResponse(notified_count=notified_count)

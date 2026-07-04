@@ -76,6 +76,28 @@ def _conflict(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
+def compute_credit_weighted_gpa(session: Session, results: list[Result]) -> float:
+    """Credit-hour-weighted average of `grade_point` across the given
+    `result` rows — the single implementation of the GPA formula (see
+    this module's docstring). Shared by `_build_semester_entries` (per
+    semester, for GET /results/me) and `ReportService.get_results_report`
+    (Milestone 10, across a department/semester/student-filtered set) so
+    neither duplicates the calculation, per CLAUDE.md's "no duplicated
+    business logic" rule.
+    """
+    weighted_sum = 0.0
+    credit_total = 0
+    for row in results:
+        if row.grade_point is None:
+            continue
+        course = course_repo.get(session, row.course_id)
+        if course is None:
+            continue
+        weighted_sum += float(row.grade_point) * course.credit_hours
+        credit_total += course.credit_hours
+    return round(weighted_sum / credit_total, 2) if credit_total > 0 else 0.0
+
+
 def _build_semester_entries(session: Session, results: list[Result]) -> list[ResultSemesterEntry]:
     by_semester: dict[uuid.UUID, list[Result]] = {}
     for r in results:
@@ -85,8 +107,6 @@ def _build_semester_entries(session: Session, results: list[Result]) -> list[Res
     for semester_id, rows in by_semester.items():
         semester = semester_repo.get(session, semester_id)
         courses = []
-        weighted_sum = 0.0
-        credit_total = 0
         for row in rows:
             course = course_repo.get(session, row.course_id)
             if course is None or row.grade_point is None:
@@ -99,9 +119,7 @@ def _build_semester_entries(session: Session, results: list[Result]) -> list[Res
                     grade_point=float(row.grade_point),
                 )
             )
-            weighted_sum += float(row.grade_point) * course.credit_hours
-            credit_total += course.credit_hours
-        gpa = round(weighted_sum / credit_total, 2) if credit_total > 0 else 0.0
+        gpa = compute_credit_weighted_gpa(session, rows)
         entries.append(
             ResultSemesterEntry(
                 semester_id=semester_id,

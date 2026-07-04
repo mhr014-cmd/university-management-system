@@ -30,7 +30,7 @@ from app.models.payment import Payment
 from app.models.semester import Semester
 from app.models.student import Student
 from app.models.user import User
-from app.schemas.fee import FeeStructureCreate, PaymentCreate
+from app.schemas.fee import FeeStructureCreate, OverdueNotifyRequest, PaymentCreate
 from app.services import fee_service as fee_service_module
 from app.services.fee_service import FeeService
 
@@ -394,3 +394,75 @@ class TestGetOverdueAccounts:
         assert len(result.overdue_accounts) == 1
         assert result.overdue_accounts[0].amount_due == 5000.0
         assert result.overdue_accounts[0].days_overdue > 0
+
+
+class TestNotifyOverdueAccounts:
+    """Milestone 10: POST /fees/overdue/notify. Verifies this reuses the
+    existing Notification Dispatcher (`dispatcher.notify_fee_due`) rather
+    than introducing a second notification system, and that the
+    scope="selected" path validates the whole batch before any dispatch
+    (Domain Rule 15 pattern)."""
+
+    def test_scope_all_overdue_notifies_every_overdue_student(self, service, stub_repos, session, monkeypatch):
+        fee_repo, user_repo, *_ = stub_repos
+        notify_mock = MagicMock()
+        monkeypatch.setattr(fee_service_module.dispatcher, "notify_fee_due", notify_mock)
+
+        fee_structure_past = make_fee_structure(due_date=date(2020, 1, 1), amount=5000)
+        fee_structure_future = make_fee_structure(due_date=date(2030, 1, 1), amount=3000)
+        invoice_past = make_invoice(fee_structure_id=fee_structure_past.id, status="unpaid")
+        invoice_future = make_invoice(fee_structure_id=fee_structure_future.id, status="unpaid")
+        fee_repo.list_unpaid_or_partial_invoices.return_value = [
+            (invoice_past, fee_structure_past),
+            (invoice_future, fee_structure_future),
+        ]
+        student = make_student(id=invoice_past.student_id)
+        user_repo.get_student_with_user.return_value = (student, User(id=uuid.uuid4(), email="s@x.com", role="student"))
+
+        payload = OverdueNotifyRequest(student_ids=[], scope="all_overdue")
+        result = service.notify_overdue_accounts(session, payload)
+
+        assert result.notified_count == 1
+        notify_mock.assert_called_once()
+        _args, kwargs = notify_mock.call_args
+        assert kwargs["student_id"] == invoice_past.student_id
+        assert kwargs["amount"] == 5000.0
+
+    def test_scope_selected_rejects_student_without_overdue_invoice(self, service, stub_repos, session, monkeypatch):
+        fee_repo, user_repo, *_ = stub_repos
+        notify_mock = MagicMock()
+        monkeypatch.setattr(fee_service_module.dispatcher, "notify_fee_due", notify_mock)
+        fee_repo.list_unpaid_or_partial_invoices.return_value = []
+
+        payload = OverdueNotifyRequest(student_ids=[uuid.uuid4()], scope="selected")
+        with pytest.raises(HTTPException) as exc:
+            service.notify_overdue_accounts(session, payload)
+        assert exc.value.status_code == 422
+        notify_mock.assert_not_called()
+
+    def test_scope_selected_empty_student_ids_rejected(self, service, stub_repos, session):
+        payload = OverdueNotifyRequest(student_ids=[], scope="selected")
+        with pytest.raises(HTTPException) as exc:
+            service.notify_overdue_accounts(session, payload)
+        assert exc.value.status_code == 422
+
+    def test_scope_selected_notifies_only_named_students(self, service, stub_repos, session, monkeypatch):
+        fee_repo, user_repo, *_ = stub_repos
+        notify_mock = MagicMock()
+        monkeypatch.setattr(fee_service_module.dispatcher, "notify_fee_due", notify_mock)
+
+        fee_structure = make_fee_structure(due_date=date(2020, 1, 1), amount=1000)
+        invoice_selected = make_invoice(fee_structure_id=fee_structure.id, status="unpaid")
+        invoice_other = make_invoice(fee_structure_id=fee_structure.id, status="unpaid")
+        fee_repo.list_unpaid_or_partial_invoices.return_value = [
+            (invoice_selected, fee_structure),
+            (invoice_other, fee_structure),
+        ]
+        student = make_student(id=invoice_selected.student_id)
+        user_repo.get_student_with_user.return_value = (student, User(id=uuid.uuid4(), email="s@x.com", role="student"))
+
+        payload = OverdueNotifyRequest(student_ids=[invoice_selected.student_id], scope="selected")
+        result = service.notify_overdue_accounts(session, payload)
+
+        assert result.notified_count == 1
+        notify_mock.assert_called_once()
