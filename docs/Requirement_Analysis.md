@@ -88,7 +88,7 @@ This document translates the proposal's narrative and tables into a structured, 
 - **FR-048**: An Admin shall be able to remove a class from the schedule via `DELETE /schedule/{id}`.
 - **FR-049**: An Admin shall be able to detect scheduling conflicts (double-booked rooms or teachers) via `GET /schedule/conflicts` before publishing a timetable.
 - **FR-050**: A Teacher shall be able to request a change to their timetable; the request shall be routed to Admin for confirmation before taking effect.
-- **FR-051**: The system shall send instant notifications to students when their schedule changes.
+- **FR-051**: The system shall send instant notifications to students when their schedule changes. ~~students~~ **Corrected during the Milestone 9 pre-implementation review:** `UI_Wireframes.md` §16's own Role Visibility line explicitly lists "schedule changes for Student/**Teacher**" — the wireframe is more specific than this FR's wording and reflects the practical reality that a Teacher whose class is rescheduled needs to know too. Notifications are sent to both the affected students (via `enrollment`) and the assigned Teacher (via `schedule_entry.teacher_id`) on `PUT /schedule/{id}` and `DELETE /schedule/{id}`.
 
 ### Notifications
 - **FR-052**: The system shall generate real-time notifications for: result publication, schedule changes, low-attendance warnings, and fee due dates.

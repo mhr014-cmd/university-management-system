@@ -346,6 +346,8 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement the cross-cutting notification module — generation, storage, and the notification feed UI. This milestone closes the endpoint gap flagged in `Requirement_Analysis.md` §14 (item 3), so notification API endpoints must first be defined even though the proposal's §6 omits them.
 
+**Milestone 9 scope note (added during the M9 pre-implementation review, confirmed with the user):** three ambiguities were resolved before implementation. (1) FR-051's schedule-change notification recipients corrected to Student **and** Teacher, per `UI_Wireframes.md` §16's own Role Visibility line (`Requirement_Analysis.md` FR-051). (2) Attendance-warning notifications dispatch only on a genuine threshold crossing (`>=80%` before, `<80%` after a new attendance record) — not repeated while the student stays below 80%. (3) No new `notification.type` value was added for exam-domain events — Milestone 7's `result_published` is the sole notification for the exam-grading-to-result pipeline. `fee_due` notifications dispatch at invoice-issuance time (`POST /fees`), not as a scheduled reminder — no scheduler/cron exists anywhere in this project. See `API_Contract.md` §8.3 for the full trigger/recipient/template table.
+
 **Files to create:**
 - `backend/app/models/notification.py`
 - `backend/app/schemas/notification.py`

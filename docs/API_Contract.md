@@ -634,8 +634,8 @@
 - **Validation:** VR-005 — class session must exist, date must be valid (not arbitrarily future-dated beyond current session), no duplicate record for the same student/class_session/date.
 - **Possible Errors:** Duplicate attendance for a student/date (409); invalid `class_session_id` (404); student not enrolled in the class (422); caller is not the class's assigned Teacher (403).
 - **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
-- **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`.
-- **Business Rules:** VR-005; triggers low-attendance warning evaluation (FR-031/BR-008, threshold 80% — resolved during the Milestone 5 pre-implementation review, see `Requirement_Analysis.md` §14 item 4). Evaluation surfaces the crossed-threshold state in `GET /attendance/me`'s response; actual notification dispatch is Milestone 9 scope.
+- **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`, `notification` (Milestone 9 dispatch).
+- **Business Rules:** VR-005; triggers low-attendance warning evaluation (FR-031/BR-008, threshold 80% — resolved during the Milestone 5 pre-implementation review, see `Requirement_Analysis.md` §14 item 4). Evaluation surfaces the crossed-threshold state in `GET /attendance/me`'s response. **Notification dispatch (resolved during the Milestone 9 pre-implementation review, confirmed with the user):** an `attendance_warning` notification is created only on a genuine threshold *crossing* — the student's overall percentage was `>= 80%` immediately before this record was written and is `< 80%` immediately after. Marking additional records while the student remains below 80% does not repeat the notification (Domain Rule 5); if the student later recovers to `>= 80%` and falls below again, a new notification is generated for that new crossing.
 
 ### 4.3 `GET /attendance/{classId}`
 
@@ -805,7 +805,7 @@
 - **Possible Errors:** Result not found (404); result not in `submitted` status (409); caller is not Admin (403); `reject` decision missing a comment (422).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
 - **Database Tables Used:** `result`.
-- **Business Rules:** BR-002 — enforces the `submitted → published` (or `→ rejected`) state transition. Publication triggering a notification (FR-052) is **not implemented in Milestone 7** — the `notification` table/dispatch mechanism doesn't exist until Milestone 9, same pattern as Milestone 4/5's schedule-change/attendance-warning notification gaps.
+- **Business Rules:** BR-002 — enforces the `submitted → published` (or `→ rejected`) state transition. Publication triggers a `result_published` notification to the affected Student (FR-052) once the transition commits — implemented in Milestone 9. **Note (resolved during the Milestone 9 pre-implementation review, confirmed with the user):** this is also the sole notification for the exam-grading pipeline — Milestone 6's `exam.status = published` transition (revealing marks/correct answers) is a UI-visibility change only, not a separate documented notification event; no new notification type was added for it.
 
 ### 5.5 `GET /results/{studentId}/transcript`
 
@@ -871,8 +871,8 @@
 - **Invoice auto-generation** (resolved during the Milestone 8 pre-implementation review — see `Database_Design.md` §6.25's design note, confirmed with the user): creating a `fee_structure` immediately creates one `unpaid` `invoice` for every currently-**active** student with **≥1 `Enrollment`** in a `class_session` for `semester_id`, whose own `student.department_id` matches `department_id` (or every such student, if `department_id` is null). This is the only place `invoice` rows are created — no separate invoice-creation endpoint exists.
 - **Possible Errors:** invalid `amount` (422); invalid `semester_id`/`department_id` (422); caller is not Admin (403).
 - **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
-- **Database Tables Used:** `fee_structure`, `department`, `semester`, `student`, `enrollment`, `class_session`, `invoice` (auto-generated).
-- **Business Rules:** VR-008.
+- **Database Tables Used:** `fee_structure`, `department`, `semester`, `student`, `enrollment`, `class_session`, `invoice` (auto-generated), `notification` (Milestone 9 dispatch).
+- **Business Rules:** VR-008. **Notification dispatch (resolved during the Milestone 9 pre-implementation review, confirmed with the user):** once invoice auto-generation commits, a `fee_due` notification is created for each newly-invoiced Student and any Parent linked to them (FR-044/FR-052) reporting the amount and due date. This is an event-driven notification tied to invoice issuance — a scheduled day-before-due-date reminder is not implemented, since no scheduler/cron mechanism exists anywhere in this project and `BR-010` leaves the exact timing undefined.
 
 ### 6.3 `POST /fees/payments`
 
@@ -1039,8 +1039,8 @@
 - **Validation:** VR-007; conflict re-check against the new time/room/teacher combination.
 - **Possible Errors:** Entry not found (404); new time creates a conflict (409); invalid time range (422); caller is not Admin (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
-- **Database Tables Used:** `schedule_entry`.
-- **Business Rules:** BR-005, VR-007; triggers a schedule-change notification to affected students (FR-051).
+- **Database Tables Used:** `schedule_entry`, `notification` (Milestone 9 dispatch).
+- **Business Rules:** BR-005, VR-007; triggers a `schedule_change` notification to affected students (via `enrollment`) **and the assigned Teacher** (via `schedule_entry.teacher_id`) once the update commits (FR-051, corrected during the Milestone 9 pre-implementation review to include Teacher, per `UI_Wireframes.md` §16's Role Visibility line — see `Requirement_Analysis.md`'s FR-051 correction).
 
 ### 7.4 `DELETE /schedule/{id}`
 
@@ -1052,8 +1052,8 @@
 - **Validation:** `{id}` must reference an existing schedule entry.
 - **Possible Errors:** Entry not found (404); caller is not Admin (403).
 - **Status Codes:** 204 No Content, 401 Unauthorized, 403 Forbidden, 404 Not Found.
-- **Database Tables Used:** `schedule_entry`.
-- **Business Rules:** triggers a schedule-change notification to affected students (FR-051).
+- **Database Tables Used:** `schedule_entry`, `notification` (Milestone 9 dispatch).
+- **Business Rules:** triggers a `schedule_change` notification to affected students and the assigned Teacher once the deletion commits (FR-051, same recipients correction as §7.3 above).
 
 ### 7.5 `GET /schedule/conflicts`
 
@@ -1256,6 +1256,19 @@
 - **Status Codes:** 200 OK, 401 Unauthorized, 404 Not Found.
 - **Database Tables Used:** `notification`.
 - **Business Rules:** ownership check (ownership, not role, governs access here).
+
+### 8.3 Notification Triggers, Recipients, and Message Templates (Milestone 9)
+
+Per the Milestone 9 mandatory Domain Rules (`message` must originate from a server-side template, never a frontend-generated string; dispatch must occur only after the originating transaction commits), the four automatic notification triggers are:
+
+| Trigger | Originating Endpoint | `type` | Recipients | Message Template |
+|---|---|---|---|---|
+| Result published | `POST /results/{id}/approve` (`decision: approve`) | `result_published` | Student (the result's own student) | `"Result published: {course_name} {semester_name}"` |
+| Schedule change | `PUT /schedule/{id}`, `DELETE /schedule/{id}` | `schedule_change` | Students enrolled in the entry's `class_session`, and the entry's assigned Teacher (corrected during this milestone's review — see `Requirement_Analysis.md` FR-051) | `"Schedule change: {course_name} moved to {room_name}"` (update) / `"Schedule change: {course_name} class cancelled"` (delete) |
+| Low attendance warning | `POST /attendance` | `attendance_warning` | The marked Student, only on a threshold crossing from `>= 80%` to `< 80%` (resolved during this milestone's pre-implementation review, confirmed with the user — not repeated while the student remains below 80%) | `"Attendance warning: {course_name} below 80%"` |
+| Fee due | `POST /fees` (invoice auto-generation) | `fee_due` | Each newly-invoiced Student, and any Parent linked to them | `"Fee due: {amount} due {due_date}"` |
+
+No other automatic triggers exist (Domain Rule 19 — automatic notifications are only triggered by these four documented business events). Exam-domain events (Milestone 6) do not have a separate notification — `result_published` above is the sole notification for the exam-grading-to-result pipeline (resolved during this milestone's pre-implementation review, confirmed with the user; no new `notification.type` value was added).
 
 ---
 
