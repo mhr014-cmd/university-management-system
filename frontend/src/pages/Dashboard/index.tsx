@@ -1,32 +1,30 @@
-// Dashboard page — presentational shell only.
-// Role-specific summary widgets land starting Milestone 10 (see
-// docs/Implementation_Roadmap.md). This milestone only verifies the routed
-// shell renders and can reach the backend (health check).
+// Dashboard page — role-specific summary widgets (Milestone 10), per
+// docs/UI_Wireframes.md Section 2. Each role variant is a separate
+// component so per-role widget logic and data hooks stay isolated
+// (shared shell composition per CLAUDE.md Section 7, not four separate
+// app trees).
 
-import { useHealthCheck } from "../../lib/useHealthCheck";
+import { useAuth } from "../../auth/AuthContext";
+import { useMe } from "../../features/users";
+import { StudentDashboard } from "./StudentDashboard";
+import { TeacherDashboard } from "./TeacherDashboard";
+import { ParentDashboard } from "./ParentDashboard";
+import { AdminDashboard } from "./AdminDashboard";
 
 export default function DashboardPage() {
-  const { data, isLoading, isError } = useHealthCheck();
+  const { user } = useAuth();
+  const { data: me } = useMe();
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">Dashboard</h1>
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
-        Role-specific widgets are implemented starting Milestone 10.
-      </p>
+      <h1 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+        Welcome back{me ? `, ${me.profile.first_name}` : ""}
+      </h1>
 
-      <div className="rounded border border-slate-200 p-4 text-sm dark:border-slate-700">
-        <h2 className="mb-2 font-medium">Backend connectivity</h2>
-        {isLoading && <p>Checking...</p>}
-        {isError && <p className="text-red-600 dark:text-red-400">Cannot reach backend API.</p>}
-        {data && (
-          <ul className="space-y-1">
-            <li>Status: {data.status}</li>
-            <li>Environment: {data.environment}</li>
-            <li>Database: {data.database}</li>
-          </ul>
-        )}
-      </div>
+      {user?.role === "student" && <StudentDashboard />}
+      {user?.role === "teacher" && <TeacherDashboard />}
+      {user?.role === "parent" && <ParentDashboard />}
+      {user?.role === "admin" && <AdminDashboard />}
     </div>
   );
 }

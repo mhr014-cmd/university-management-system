@@ -68,6 +68,19 @@ export interface ResultApprovalResponse {
   approved_at: string | null;
 }
 
+export interface GradeDistributionEntry {
+  grade_letter: string;
+  count: number;
+}
+
+export interface ResultsReportResponse {
+  scope: { department_id: string | null; semester_id: string | null; student_id: string | null };
+  grade_distribution: GradeDistributionEntry[];
+  pass_count: number;
+  fail_count: number;
+  average_gpa: number;
+}
+
 export function useMyResults(params?: { semesterId?: string; studentId?: string }) {
   return useQuery({
     queryKey: ["results", "me", params],
@@ -120,6 +133,22 @@ export function useApproveOrRejectResult() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["results"] });
     },
+  });
+}
+
+export function useResultsReport(params?: { departmentId?: string; semesterId?: string; studentId?: string }) {
+  return useQuery({
+    queryKey: ["results", "reports", params],
+    queryFn: async () =>
+      (
+        await apiClient.get<ResultsReportResponse>("/results/reports", {
+          params: {
+            department_id: params?.departmentId,
+            semester_id: params?.semesterId,
+            student_id: params?.studentId,
+          },
+        })
+      ).data,
   });
 }
 

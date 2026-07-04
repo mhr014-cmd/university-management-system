@@ -1,13 +1,14 @@
-// Admin: Fee Dashboard page (FR-039, FR-040, FR-043). Layout matches
-// docs/UI_Wireframes.md Section 12: summary stat cards, New Fee
-// Structure / Record Payment forms, overdue accounts table.
+// Admin: Fee Dashboard page (FR-039, FR-040, FR-043, FR-056). Layout
+// matches docs/UI_Wireframes.md Section 12: summary stat cards, New Fee
+// Structure / Record Payment forms, overdue accounts table with per-row
+// Notify and a Send Bulk Overdue Notice action.
 //
-// Known simplification: the wireframe's "Notify"/"Send Bulk Overdue
-// Notice" actions (FR-056, POST /fees/overdue/notify) are explicitly
-// deferred to Milestone 9 per Implementation_Roadmap.md's own Milestone 8
-// note — that endpoint writes to the `notification` table, which doesn't
-// exist until Milestone 9. Not built here, same pattern as Milestone 6's
-// Grading Interface deliberately omitting "Submit Results for Approval".
+// The "Notify"/"Send Bulk Overdue Notice" actions (FR-056,
+// POST /fees/overdue/notify) were deferred past Milestone 8 since that
+// endpoint writes to the `notification` table, which didn't exist until
+// Milestone 9 — implemented now in Milestone 10 alongside the rest of the
+// Reporting module. Reuses the existing Notification Dispatcher; no
+// second notification system.
 
 import { useState } from "react";
 import { isAxiosError } from "axios";
@@ -16,6 +17,7 @@ import { useSemesters } from "../../../features/semesters";
 import { useStudents } from "../../../features/users";
 import {
   useCreateFeeStructure,
+  useNotifyOverdueAccounts,
   useOverdueAccounts,
   useRecordPayment,
 } from "../../../features/fees";
@@ -27,6 +29,7 @@ export default function FeeDashboardPage() {
   const { data: overdue, isLoading: isOverdueLoading } = useOverdueAccounts();
   const createFeeStructure = useCreateFeeStructure();
   const recordPayment = useRecordPayment();
+  const notifyOverdue = useNotifyOverdueAccounts();
 
   const [fsDepartmentId, setFsDepartmentId] = useState("");
   const [fsSemesterId, setFsSemesterId] = useState("");
@@ -88,6 +91,29 @@ export default function FeeDashboardPage() {
   };
 
   const totalOutstanding = (overdue?.overdue_accounts ?? []).reduce((sum, a) => sum + a.amount_due, 0);
+
+  const handleNotify = async (studentId: string) => {
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await notifyOverdue.mutateAsync({ student_ids: [studentId], scope: "selected" });
+      setMessage(`Notified ${result.notified_count} account(s).`);
+    } catch {
+      setError("Could not send the overdue notice. Please try again.");
+    }
+  };
+
+  const handleBulkNotify = async () => {
+    if (!window.confirm("Send an overdue notice to every currently overdue account?")) return;
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await notifyOverdue.mutateAsync({ student_ids: [], scope: "all_overdue" });
+      setMessage(`Notified ${result.notified_count} account(s).`);
+    } catch {
+      setError("Could not send bulk overdue notices. Please try again.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -231,7 +257,17 @@ export default function FeeDashboardPage() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Overdue Accounts</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Overdue Accounts</h2>
+          <button
+            type="button"
+            onClick={handleBulkNotify}
+            disabled={!overdue?.overdue_accounts.length || notifyOverdue.isPending}
+            className="rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-slate-600"
+          >
+            Send Bulk Overdue Notice
+          </button>
+        </div>
         {isOverdueLoading || !overdue ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>
         ) : (
@@ -241,6 +277,7 @@ export default function FeeDashboardPage() {
                 <th className="py-2">Student ID</th>
                 <th className="py-2">Amount Due</th>
                 <th className="py-2">Days Overdue</th>
+                <th className="py-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -249,6 +286,16 @@ export default function FeeDashboardPage() {
                   <td className="py-2">{account.student_id}</td>
                   <td className="py-2">{account.amount_due.toFixed(2)}</td>
                   <td className="py-2">{account.days_overdue}</td>
+                  <td className="py-2">
+                    <button
+                      type="button"
+                      onClick={() => handleNotify(account.student_id)}
+                      disabled={notifyOverdue.isPending}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
+                    >
+                      Notify
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

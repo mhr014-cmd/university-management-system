@@ -57,6 +57,16 @@ export interface ClassAttendanceResponse {
   records: ClassAttendanceEntry[];
 }
 
+export interface AttendanceReportEntry {
+  student_id: string;
+  percentage: number;
+}
+
+export interface AttendanceReportResponse {
+  scope: { department_id: string | null; semester_id: string | null };
+  summary: AttendanceReportEntry[];
+}
+
 export function useMyAttendance(params?: { classSessionId?: string; dateFrom?: string; dateTo?: string }) {
   return useQuery({
     queryKey: ["attendance", "me", params],
@@ -105,5 +115,17 @@ export function useClassAttendance(classId?: string, params?: { dateFrom?: strin
         })
       ).data,
     enabled: Boolean(classId),
+  });
+}
+
+export function useAttendanceReports(params?: { departmentId?: string; semesterId?: string }) {
+  return useQuery({
+    queryKey: ["attendance", "reports", params],
+    queryFn: async () =>
+      (
+        await apiClient.get<AttendanceReportResponse>("/attendance/reports", {
+          params: { department_id: params?.departmentId, semester_id: params?.semesterId },
+        })
+      ).data,
   });
 }

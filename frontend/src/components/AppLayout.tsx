@@ -51,6 +51,7 @@ export function AppLayout() {
           {user?.role === "admin" && <Link to="/admin/result-approval">Result Approval</Link>}
           {user?.role === "student" && <Link to="/fees">Fee Centre</Link>}
           {user?.role === "admin" && <Link to="/admin/fee-dashboard">Fee Dashboard</Link>}
+          {user?.role === "admin" && <Link to="/admin/reports">Reports</Link>}
           <Link to="/notifications" aria-label="Notifications" className="relative">
             🔔
             {(notifications?.unread_count ?? 0) > 0 && (

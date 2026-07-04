@@ -77,6 +77,24 @@ export interface OverdueResponse {
   overdue_accounts: OverdueAccountEntry[];
 }
 
+export interface FeesReportResponse {
+  scope: { department_id: string | null; semester_id: string | null; student_id: string | null };
+  total_collected: number;
+  total_outstanding: number;
+  total_overdue: number;
+}
+
+export type OverdueNotifyScope = "selected" | "all_overdue";
+
+export interface OverdueNotifyInput {
+  student_ids: string[];
+  scope: OverdueNotifyScope;
+}
+
+export interface OverdueNotifyResponse {
+  notified_count: number;
+}
+
 export function useMyFees(params?: { semesterId?: string; studentId?: string }) {
   return useQuery({
     queryKey: ["fees", "me", params],
@@ -128,6 +146,33 @@ export function useOverdueAccounts(params?: { departmentId?: string; semesterId?
           params: { department_id: params?.departmentId, semester_id: params?.semesterId },
         })
       ).data,
+  });
+}
+
+export function useFeesReport(params?: { departmentId?: string; semesterId?: string; studentId?: string }) {
+  return useQuery({
+    queryKey: ["fees", "reports", params],
+    queryFn: async () =>
+      (
+        await apiClient.get<FeesReportResponse>("/fees/reports", {
+          params: {
+            department_id: params?.departmentId,
+            semester_id: params?.semesterId,
+            student_id: params?.studentId,
+          },
+        })
+      ).data,
+  });
+}
+
+export function useNotifyOverdueAccounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: OverdueNotifyInput) =>
+      (await apiClient.post<OverdueNotifyResponse>("/fees/overdue/notify", payload)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fees"] });
+    },
   });
 }
 

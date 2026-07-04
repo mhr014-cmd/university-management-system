@@ -22,6 +22,7 @@ import ResultsViewPage from "../pages/ResultsView";
 import ResultApprovalPage from "../pages/Admin/ResultApproval";
 import FeeCentrePage from "../pages/FeeCentre";
 import FeeDashboardPage from "../pages/Admin/FeeDashboard";
+import AdminReportsPage from "../pages/Admin/Reports";
 import NotificationsPage from "../pages/Notifications";
 import NotFoundPage from "../pages/NotFound";
 
@@ -99,6 +100,10 @@ export const router = createBrowserRouter([
           {
             path: "/admin/fee-dashboard",
             element: <FeeDashboardPage />,
+          },
+          {
+            path: "/admin/reports",
+            element: <AdminReportsPage />,
           },
           {
             path: "/notifications",

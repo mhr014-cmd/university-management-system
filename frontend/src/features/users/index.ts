@@ -33,6 +33,7 @@ export interface StudentOrTeacher {
   last_name: string;
   department_id: string;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface PaginatedResponse<T> {
