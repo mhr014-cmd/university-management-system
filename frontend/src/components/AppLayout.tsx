@@ -1,19 +1,24 @@
 // Global app layout — shared header/nav shell used by all authenticated
 // pages (per docs/UI_Wireframes.md "Cross-Page Conventions": top nav bar
-// present on all pages except Login). The notification bell and full
-// role-composed nav (beyond the single Dashboard link) are added starting
-// Milestone 9/10 once those domains exist — this milestone adds the
-// logged-in user's email and a logout action.
+// present on all pages except Login).
+//
+// Known simplification (Milestone 9): the notification bell links
+// directly to the full Notifications page with an unread-count badge,
+// rather than also offering the wireframe's optional desktop dropdown
+// panel — same class of documented simplification as Milestone 5's
+// Attendance Calendar view. See PROJECT_PROGRESS.md's Milestone 9 entry.
 
 import { useNavigate } from "react-router-dom";
 import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme } from "../app/ThemeProvider";
+import { useNotifications } from "../features/notifications";
 
 export function AppLayout() {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { data: notifications } = useNotifications({ isRead: false, pageSize: 1 });
 
   const handleLogout = async () => {
     await logout();
@@ -46,6 +51,14 @@ export function AppLayout() {
           {user?.role === "admin" && <Link to="/admin/result-approval">Result Approval</Link>}
           {user?.role === "student" && <Link to="/fees">Fee Centre</Link>}
           {user?.role === "admin" && <Link to="/admin/fee-dashboard">Fee Dashboard</Link>}
+          <Link to="/notifications" aria-label="Notifications" className="relative">
+            🔔
+            {(notifications?.unread_count ?? 0) > 0 && (
+              <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-1 text-[10px] leading-tight text-white">
+                {notifications!.unread_count}
+              </span>
+            )}
+          </Link>
           {user && <span className="text-slate-500 dark:text-slate-400">{user.email}</span>}
           <button
             type="button"
