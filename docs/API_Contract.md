@@ -702,10 +702,10 @@
 
 ### 5.1 `GET /results/me`
 
-- **Purpose:** Student's own results across all semesters, incl. GPA. (FR-033)
+- **Purpose:** Student's own results across all semesters, incl. GPA. (FR-033) Also used, parent-scoped, for FR-037.
 - **Authentication Required:** Yes
-- **User Roles:** Student (also used, parent-scoped, for FR-037)
-- **Request Body:** none. Query params: `semester_id` (optional).
+- **User Roles:** Student (own record only), Parent (linked child only, via `parent_student_link`)
+- **Request Body:** none. Query params: `semester_id` (optional); `student_id` (**required for Parent callers** — resolved during the Milestone 7 pre-implementation review, same pattern as `GET /attendance/{classId}`'s Parent scoping in Milestone 5: a Parent must specify which linked child, verified against `parent_student_link` server-side, per BR-007/NFR-003; ignored/not required for a Student caller, who always sees their own record).
 - **Response Body (200):**
 ```json
 {
@@ -721,17 +721,18 @@
   ]
 }
 ```
-- **Validation:** `semester_id` if provided must reference an existing semester.
-- **Possible Errors:** invalid `semester_id` (422).
-- **Status Codes:** 200 OK, 401 Unauthorized, 422 Unprocessable Entity.
+- `gpa` is a **credit-hour-weighted average** of `grade_point` across the semester's `published` results (`sum(grade_point * course.credit_hours) / sum(course.credit_hours)`) — resolves `Requirement_Analysis.md` §14 item 6 per that document's own A-004 assumption ("a conventional university GPA scheme," credit-hour-weighted). Not hard-coded elsewhere; this is the single implementation of the formula.
+- **Validation:** `semester_id` if provided must reference an existing semester; `student_id` required and must reference a linked student for a Parent caller (403 otherwise, per the ownership-hiding convention — no confirmation of the student's existence is leaked to an unlinked Parent).
+- **Possible Errors:** invalid `semester_id` (422); Parent caller missing/unlinked `student_id` (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
 - **Database Tables Used:** `result`, `semester`, `course`.
 - **Business Rules:** BR-001/BR-002 — only `published` results are returned to Student/Parent callers.
 
 ### 5.2 `POST /results/{examId}/submit`
 
-- **Purpose:** Teacher submits graded results for admin approval. (FR-034)
+- **Purpose:** Teacher submits a course's final results for admin approval, gated on one exam of that course being fully graded and published. (FR-034)
 - **Authentication Required:** Yes
-- **User Roles:** Teacher
+- **User Roles:** Teacher (must be the exam's creator)
 - **Request Body:**
 ```json
 {
@@ -744,11 +745,12 @@
 ```json
 { "exam_id": "uuid", "status": "submitted", "submitted_at": "timestamp" }
 ```
-- **Validation:** exam must be fully graded (all submissions have `question_grade` entries) before results can be submitted.
-- **Possible Errors:** Exam not fully graded (409); exam not found (404); caller is not the exam's Teacher (403); results already submitted for this exam (409).
-- **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict.
-- **Database Tables Used:** `result`, `exam`, `exam_submission`, `question_grade`.
-- **Business Rules:** BR-002 — enters `submitted` status, not visible to Student/Parent yet.
+- **Validation:** `exam.status` must be `published` (Milestone 7 mandatory Domain Rule 4 — resolved during the Milestone 7 pre-implementation review: `exam.status = published` is the same server-side transition the Milestone 6 Grading Interface's own "Publish Exam" action already performs, so this rule requires no new exam-side mechanism); the exam must be fully graded (every `exam_submission` for it has `question_grade` entries for all its answers — Domain Rule 5); for every `student_id` in the payload, that student must have a `submitted`/`graded` `exam_submission` for this exam with `question_grade` entries (Domain Rule 6 — a Teacher cannot submit a result for a student never graded on this exam); `student_id` must have a valid `enrollment` for the exam's `class_session` (Domain Rule 2).
+- **Resubmission policy** (resolved during the Milestone 7 pre-implementation review, confirmed with the user): a `result` row already exists for a given (student, course, semester) if that student has a prior result for this exam's course/semester from any earlier exam. If that row's status is `submitted` or `published`, this call is rejected with 409 for that student. If that row's status is `rejected`, it is updated in place instead of erroring (new `exam_id`, new grade values, status reset to `submitted`) — see `Database_Design.md` §6.21's Milestone 7 design note.
+- **Possible Errors:** Exam not published (409); exam not fully graded (409); a target student was never graded on this exam (422); exam not found (404); caller is not the exam's creating Teacher (403); an existing `submitted`/`published` result already exists for a target student's course/semester (409).
+- **Status Codes:** 201 Created, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
+- **Database Tables Used:** `result`, `exam`, `exam_submission`, `question_grade`, `enrollment`.
+- **Business Rules:** BR-002 — enters `submitted` status, not visible to Student/Parent yet. Per Milestone 7's Domain Rule 9, this endpoint only *reads* `exam`/`exam_submission`/`answer`/`question_grade` — it never modifies them.
 
 ### 5.3 `POST /results/{id}/approve`
 
@@ -757,17 +759,17 @@
 - **User Roles:** Admin
 - **Request Body:**
 ```json
-{ "decision": "approve | reject", "comment": "string (optional, required if reject)" }
+{ "decision": "approve | reject", "comment": "string (required if reject)" }
 ```
 - **Response Body (200):**
 ```json
 { "id": "uuid", "status": "published | rejected", "approved_at": "timestamp | null" }
 ```
-- **Validation:** result must currently be in `submitted` status.
-- **Possible Errors:** Result not found (404); result not in `submitted` status (409); caller is not Admin (403); `reject` decision missing a comment (422, if required by policy).
+- **Validation:** result must currently be in `submitted` status; `comment` is **required** when `decision = reject` (resolved during the Milestone 7 pre-implementation review from `UI_Wireframes.md` §11's own wireframe/Validation text, which already shows and requires the comment field for reject — closing this contract's own previously-flagged "policy TBD").
+- **Possible Errors:** Result not found (404); result not in `submitted` status (409); caller is not Admin (403); `reject` decision missing a comment (422).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable Entity.
 - **Database Tables Used:** `result`.
-- **Business Rules:** BR-002 — enforces the `submitted → approved/published` (or `→ rejected`) state transition; publication triggers a notification (FR-052).
+- **Business Rules:** BR-002 — enforces the `submitted → published` (or `→ rejected`) state transition. Publication triggering a notification (FR-052) is **not implemented in Milestone 7** — the `notification` table/dispatch mechanism doesn't exist until Milestone 9, same pattern as Milestone 4/5's schedule-change/attendance-warning notification gaps.
 
 ### 5.4 `GET /results/{studentId}/transcript`
 
@@ -777,7 +779,7 @@
 - **Request Body:** none.
 - **Response Body (200):** binary PDF stream, `Content-Type: application/pdf`.
 - **Validation:** `{studentId}` must reference an existing, active student; only `published` results are included.
-- **Possible Errors:** Student not found (404); caller is a Student requesting another student's transcript (403); no published results available yet (409, or an empty transcript — policy TBD).
+- **Possible Errors:** Student not found (404); caller is a Student requesting another student's transcript (403); no published results available yet — resolved during the Milestone 7 pre-implementation review: returns **200 with an empty-results PDF** (a valid, generated transcript document stating no published results exist yet), not a 409, since a transcript is a document about a student's current state, and "no results yet" is a legitimate, displayable state rather than an error condition.
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found.
 - **Database Tables Used:** `result`, `student`, `semester`, `course`.
 - **Business Rules:** BR-002 — only published results appear on the transcript.

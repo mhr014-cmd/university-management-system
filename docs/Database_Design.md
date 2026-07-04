@@ -538,6 +538,7 @@ Parent ──M:N── Student  (via ParentStudentLink, R5)
 | student_id | UUID | **FK → student.id** |
 | course_id | UUID | **FK → course.id** |
 | semester_id | UUID | **FK → semester.id** |
+| exam_id | UUID | **FK → exam.id**, nullable, `ON DELETE RESTRICT` — see Milestone 7 design note below |
 | submitted_by_teacher_id | UUID | **FK → teacher.id** |
 | approved_by_admin_id | UUID | **FK → admin.id**, nullable until approved |
 | grade_letter | string | nullable until finalized |
@@ -545,9 +546,11 @@ Parent ──M:N── Student  (via ParentStudentLink, R5)
 | status | enum(submitted, published, rejected) | not null, default submitted — supports BR-002 |
 | submitted_at | timestamp | not null |
 | approved_at | timestamp | nullable |
-| Unique constraint | (student_id, course_id, semester_id) | one result per student per course per semester |
+| Unique constraint | (student_id, course_id, semester_id) | one **final** result per student per course per semester — this is the authoritative business key, not `exam_id` |
 
 **Design note (added during Project Readiness Audit):** An earlier draft of this table included a standalone `approved` status value between `submitted` and `published`. It was removed because FR-035 / `POST /results/{id}/approve` (see `API_Contract.md` §5.3) performs approval and publication as a single atomic action — there is no proposal-defined endpoint that transitions a result to "approved" without simultaneously publishing it, so `approved` was an unreachable state. `approved_by_admin_id` and `approved_at` are retained as columns (they record who/when the single approve-and-publish action occurred) even though the status enum itself no longer has a separate `approved` value.
+
+**Design note (added during the Milestone 7 pre-implementation review — `exam_id` column):** the original draft of this table had no `exam_id`, but `POST /results/{examId}/submit` (`API_Contract.md` §5.2) submits results per-exam and the Admin: Result Approval wireframe (`UI_Wireframes.md` §11) groups the pending queue by Exam name — without a stored `exam_id`, neither the queue display nor the Milestone 7 mandatory Domain Rule 6 ("verify every QuestionGrade used in a Result belongs to the correct Examination and Student") could be satisfied after the fact. Presented to the user via `AskUserQuestion`; the user approved adding a nullable `exam_id` FK. `(student_id, course_id, semester_id)` remains the authoritative one-final-grade-per-course-per-semester business key (a course may have multiple exams across a semester — midterm, final, etc. — but only one `result` row per student/course/semester); `exam_id` records which exam most recently triggered/updated that row, for display and traceability only, and is deliberately nullable so a future correction mechanism that isn't exam-triggered isn't structurally blocked. **Resubmission policy** (also confirmed with the user): if a `result` row already exists for the target (student, course, semester) when `POST /results/{examId}/submit` is called, the request is rejected with 409 if that row's status is `submitted` or `published` (matches `API_Contract.md` §5.2's documented 409 exactly); if the existing row's status is `rejected`, it is updated in place (new `exam_id`, new grade values, status reset to `submitted`) rather than erroring — otherwise a rejected result could never be corrected, making the reject workflow a dead end.
 
 ### 6.22 `attendance_record`
 | Column | Type | Notes |
@@ -631,6 +634,7 @@ Beyond the automatic indexes on every primary key:
 | `attendance_record` | index on `(class_session_id, attendance_date)` | teacher marking/report queries |
 | `result` | composite unique index on `(student_id, course_id, semester_id)` | duplicate prevention + `GET /results/me` |
 | `result` | index on `status` | admin approval queue (`GET` pending results) |
+| `result` | index on `exam_id` | Admin: Result Approval queue grouping by exam (Milestone 7 addition) |
 | `payment` | index on `student_id` | `GET /fees/payments/{studentId}` |
 | `payment` | index on `fee_structure_id` | revenue/overdue reporting |
 | `invoice` | index on `(student_id, status)` | `GET /fees/overdue`, fee centre queries |
