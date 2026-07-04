@@ -6,6 +6,34 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 8 — Fees, Optional)
+- `fee_structure`, `invoice`, `payment` tables (Alembic revision `0009_fees`), matching `Database_Design.md` §6.23-6.25 column-for-column, including the Milestone 8 addition of a unique `(student_id, fee_structure_id)` constraint on `invoice`, with `index=True`/`UniqueConstraint`/`CheckConstraint` declared on the models themselves so `alembic revision --autogenerate` produced an empty diff on the first attempt
+- `POST /fees`: Admin defines a fee structure (department/semester-scoped or university-wide); automatically generates one `unpaid` invoice for every currently-active, enrolled-that-semester, department-matching student — the only place `invoice` rows are created (resolved during pre-implementation review, confirmed with the user)
+- `GET /fees/me`: Student's own fee status (Parent-scoped via a required `student_id` query param, verified against `parent_student_link`), with `outstanding_balance` and per-invoice `status` computed server-side from persisted `payment` rows; `overdue` is derived at read time from `due_date`, never stored
+- `POST /fees/payments`: Admin records a payment; strictly rejects overpayment beyond the invoice's remaining balance and any payment against an already fully-`paid` invoice (both 409) — resolves VR-008's previously "unresolved" overpayment policy per this milestone's own Fees Domain Requirements
+- `GET /fees/payments/{studentId}`: Admin/Parent payment history, Parent ownership-checked via `parent_student_link`
+- `GET /fees/invoices/{id}`: PDF invoice via `reportlab`, ownership-checked (Student: own only; Admin: any)
+- `GET /fees/overdue`: Admin list of accounts with an unpaid/partially-paid invoice past its `due_date`, with `amount_due` computed from persisted payments
+- Frontend: `features/fees/index.ts`, `features/semesters/index.ts` (Derived, same precedent as `features/departments`), `pages/FeeCentre/index.tsx` (balance card, payment history, invoice download — Student-facing only, see Known Issues), `pages/Admin/FeeDashboard/index.tsx` (stat cards, New Fee Structure / Record Payment forms, overdue accounts table)
+- Backend test suite: `tests/unit/test_fee_service.py`, `tests/integration/test_fees_router.py` — 40 new tests, 293 total passing
+
+### Changed (Milestone 8 — Documentation)
+- `docs/Database_Design.md` §6.25: added the invoice-creation design note (auto-generation eligibility, confirmed with the user), the `status`-recalculation/derived-`overdue` note, and the `pdf_url`-stays-null note; added a unique constraint row for `(student_id, fee_structure_id)`
+- `docs/API_Contract.md`: documented invoice auto-generation on `POST /fees` (§6.2), the resolved strict-overpayment policy and invoice-must-exist requirement on `POST /fees/payments` (§6.3), Parent `student_id` scoping and the derived-`overdue`/`student_id`-response-field additions on `GET /fees/me` (§6.1), and the no-grace-period overdue determination on `GET /fees/overdue` (§6.6)
+- `docs/Requirement_Traceability_Matrix.md`: FR-038-FR-043 updated to Verified; FR-044 left honestly Pending (depends on the Milestone 9 `notification` module)
+- `docs/Requirement_Analysis.md`: VR-008's overpayment ambiguity marked resolved (strictly disallowed)
+- `docs/Implementation_Roadmap.md`: added a Milestone 8 scope note recording the invoice-creation resolution
+- `docs/Proposal_vs_Engineering_Additions.md`: logged `frontend/src/features/semesters/index.ts` as a Derived addition (same precedent as `features/departments`)
+- `PROJECT_PROGRESS.md`: Milestone 7's Review Status updated to Approved (user sign-off, git tag `v0.8-milestone7`); Milestone 8 row and full Milestone Detail Log entry added; Summary section updated (75% overall progress, current/last/next milestone, HEAD commit)
+
+### Known Issues (Milestone 8)
+- Parent-facing frontend UI for Fees is not built — the backend fully implements and tests FR-038/FR-041 Parent access, but no endpoint anywhere enumerates a Parent's linked children, and the full Parent Portal page isn't scheduled for this milestone (same known gap as Milestone 7's Results View).
+- The Admin: Fee Dashboard's "Notify"/"Send Bulk Overdue Notice" actions (FR-056, `POST /fees/overdue/notify`) are not implemented — explicitly deferred to Milestone 9 per `Implementation_Roadmap.md`'s own Milestone 8 note, since that endpoint writes to the `notification` table.
+- The Record Payment form's Fee Structure field is a raw UUID text input, not a dropdown — no `GET /fees` list endpoint exists in the documented API contract (same class of known limitation as Milestone 4's Admin schedule panel).
+- Migration `0009_fees` is hand-authored, not `alembic revision --autogenerate`'d, though its upgrade/downgrade cycle and an autogenerate diff-check are both confirmed clean.
+- Frontend UI not visually exercised in a browser this milestone — per the standing instruction not to rely on preview tooling, verification was `tsc`/`npm run build`/code review only.
+- FR-044 (automatic due-date reminders/overdue notices) is not implemented — depends on the Milestone 9 notification module.
+
 ### Added (Milestone 7 — Results & Transcripts)
 - `result` table (Alembic revision `0008_results`), matching `Database_Design.md` §6.21 column-for-column, including the Milestone 7 `exam_id` addition (nullable FK, for Admin queue display/traceability — `(student_id, course_id, semester_id)` remains the authoritative business key), with `index=True`/`UniqueConstraint` declared on the model itself so `alembic revision --autogenerate` produced an empty diff on the first attempt
 - `GET /results/me`: Student's own results (Parent-scoped via a required `student_id` query param, verified against `parent_student_link`), with a credit-hour-weighted GPA per semester (resolves `Requirement_Analysis.md` §14 item 6)
