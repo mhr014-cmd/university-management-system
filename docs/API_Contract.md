@@ -487,7 +487,43 @@
 - **Database Tables Used:** `exam_submission`, `answer`, `exam`.
 - **Business Rules:** VR-004 (time limit enforcement, using the stored server-side `started_at` from 3.6 — never a client timestamp); one submission per student per exam.
 
-### 3.8 `POST /exams/{id}/grade`
+### 3.8 `GET /exams/{id}/submissions/{submission_id}` *(Derived Engineering Addition — not in proposal §6)*
+
+- **Purpose:** Retrieve a single student's submission in full detail — the exam's questions in order, each with the student's submitted answer and any existing grading already recorded for it — so a Teacher can actually grade it. (Supports FR-023.) Added during Milestone 6 frontend implementation: `POST /exams/{id}/grade` (3.9 below) requires `answer_id` values but nothing returned an `answer_id` alongside the student's actual answer text/selection, and `GET /exams/{id}/results` (3.10 below) deliberately stays aggregate-only (reporting, not grading) — see `Proposal_vs_Engineering_Additions.md` for why the two responsibilities are not merged into one endpoint.
+- **Authentication Required:** Yes
+- **User Roles:** Teacher (must be the exam's creator), Admin
+- **Request Body:** none.
+- **Response Body (200):**
+```json
+{
+  "submission_id": "uuid",
+  "exam_id": "uuid",
+  "student_id": "uuid",
+  "status": "submitted | graded",
+  "questions": [
+    {
+      "question_id": "uuid",
+      "question_text": "string",
+      "question_type": "mcq | short_answer | descriptive | coding",
+      "marks": "number",
+      "order_index": "integer",
+      "answer_id": "uuid",
+      "answer_text": "string | null",
+      "selected_option_id": "uuid | null",
+      "awarded_marks": "number | null",
+      "feedback": "string | null"
+    }
+  ]
+}
+```
+- **Validation:** `{id}` and `{submission_id}` valid UUIDs; the submission must belong to the specified exam.
+- **Possible Errors:** Exam not found (404); submission not found or does not belong to this exam (404); caller is a Teacher who did not create this exam (403); caller is neither Teacher nor Admin (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found.
+- **Database Tables Used:** `exam`, `question`, `exam_submission`, `answer`, `question_grade`.
+- **Business Rules:** none beyond the ownership check above; questions are returned in `order_index` order.
+- **Note:** Classified **Derived** — required to make the documented Grading Interface (`UI_Wireframes.md` §14) functional at all, not a new feature beyond what §14 already describes. Confirmed with the user during Milestone 6 frontend implementation. See `Proposal_vs_Engineering_Additions.md`.
+
+### 3.9 `POST /exams/{id}/grade`
 
 - **Purpose:** Teacher grades a submitted exam. (FR-023)
 - **Authentication Required:** Yes
@@ -519,7 +555,7 @@
 - **Database Tables Used:** `exam_submission`, `answer`, `question_grade`, `question`.
 - **Business Rules:** VR-006.
 
-### 3.9 `GET /exams/{id}/results`
+### 3.10 `GET /exams/{id}/results`
 
 - **Purpose:** Retrieve all graded results for a given exam. (FR-024)
 - **Authentication Required:** Yes
