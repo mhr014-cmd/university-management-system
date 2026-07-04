@@ -143,7 +143,7 @@ class ResultService:
         results = result_repo.list_for_student(
             session, target_student_id, semester_id=semester_id, status="published"
         )
-        return ResultsMeResponse(semesters=_build_semester_entries(session, results))
+        return ResultsMeResponse(student_id=target_student_id, semesters=_build_semester_entries(session, results))
 
     # --- POST /results/{examId}/submit (FR-034) ----------------------------
 

@@ -18,6 +18,8 @@ import ExamListPage from "../pages/ExamList";
 import ExamRoomPage from "../pages/ExamRoom";
 import ExamBuilderPage from "../pages/Teacher/ExamBuilder";
 import GradingInterfacePage from "../pages/Teacher/GradingInterface";
+import ResultsViewPage from "../pages/ResultsView";
+import ResultApprovalPage from "../pages/Admin/ResultApproval";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -78,6 +80,14 @@ export const router = createBrowserRouter([
           {
             path: "/teacher/grading/:examId",
             element: <GradingInterfacePage />,
+          },
+          {
+            path: "/results",
+            element: <ResultsViewPage />,
+          },
+          {
+            path: "/admin/result-approval",
+            element: <ResultApprovalPage />,
           },
         ],
       },

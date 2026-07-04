@@ -709,6 +709,7 @@
 - **Response Body (200):**
 ```json
 {
+  "student_id": "uuid",
   "semesters": [
     {
       "semester_id": "uuid",
@@ -722,6 +723,7 @@
 }
 ```
 - `gpa` is a **credit-hour-weighted average** of `grade_point` across the semester's `published` results (`sum(grade_point * course.credit_hours) / sum(course.credit_hours)`) — resolves `Requirement_Analysis.md` §14 item 6 per that document's own A-004 assumption ("a conventional university GPA scheme," credit-hour-weighted). Not hard-coded elsewhere; this is the single implementation of the formula.
+- `student_id` (added during Milestone 7 frontend implementation, same class of fix as Milestone 5's `GET /attendance/{classId}` `id`-field addition): the resolved target student — the caller's own id for a Student, the queried child's id for a Parent. Added because `GET /results/{studentId}/transcript` needs a `student_id` and nothing else returns a Student caller's own `student.id` anywhere.
 - **Validation:** `semester_id` if provided must reference an existing semester; `student_id` required and must reference a linked student for a Parent caller (403 otherwise, per the ownership-hiding convention — no confirmation of the student's existence is leaked to an unlinked Parent).
 - **Possible Errors:** invalid `semester_id` (422); Parent caller missing/unlinked `student_id` (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.

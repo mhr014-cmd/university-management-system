@@ -28,6 +28,14 @@ class ResultSemesterEntry(BaseModel):
 
 
 class ResultsMeResponse(BaseModel):
+    # student_id (the resolved target student — the caller's own id for a
+    # Student, the queried child's id for a Parent) was added during
+    # Milestone 7 frontend implementation: GET /results/{studentId}/transcript
+    # needs a student_id, but nothing returned the calling Student's own
+    # student.id anywhere, so the frontend had no way to construct that
+    # URL for a "download my own transcript" action. Same class of fix as
+    # Milestone 5's GET /attendance/{classId} `id` field addition.
+    student_id: uuid.UUID
     semesters: list[ResultSemesterEntry]
 
 

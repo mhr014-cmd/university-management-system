@@ -42,6 +42,8 @@ export function AppLayout() {
           {(user?.role === "student" || user?.role === "teacher" || user?.role === "admin") && (
             <Link to="/exams">Exams</Link>
           )}
+          {user?.role === "student" && <Link to="/results">Results</Link>}
+          {user?.role === "admin" && <Link to="/admin/result-approval">Result Approval</Link>}
           {user && <span className="text-slate-500 dark:text-slate-400">{user.email}</span>}
           <button
             type="button"
