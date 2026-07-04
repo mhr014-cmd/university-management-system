@@ -2,7 +2,7 @@
 
 A web platform consolidating university operations — attendance, exams, results, fees, and scheduling — into a single system, replacing spreadsheets, email-based results, and siloed finance tools.
 
-**Status:** Milestone 0 (Project Foundation) complete — FastAPI backend and React frontend boot, connect to PostgreSQL, and pass a health check. No business modules or authentication yet — see [`docs/Implementation_Roadmap.md`](docs/Implementation_Roadmap.md) for the build plan.
+**Status:** Milestones 0–10 complete and approved — authentication, user management, scheduling, attendance, exams/grading, results/transcripts, fees, notifications, and role-specific dashboards/reporting are all implemented. Milestone 11 (Hardening, Testing & Deployment) is the final milestone — see [`docs/Implementation_Roadmap.md`](docs/Implementation_Roadmap.md) and [`PROJECT_PROGRESS.md`](PROJECT_PROGRESS.md) for current status.
 
 ## Documentation
 
@@ -76,7 +76,7 @@ npm install
 cp .env.example .env
 npm run dev
 ```
-Open `http://localhost:5173` — it redirects to `/login`, and the Dashboard page (`/dashboard`) shows live backend connectivity status.
+Open `http://localhost:5173` — it redirects to `/login`, and the Dashboard page (`/dashboard`) shows role-specific widgets after signing in.
 
 ## Deadline
 

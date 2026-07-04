@@ -51,10 +51,11 @@
 }
 ```
 - **Validation:** VR-001 — email must be syntactically valid, password non-empty.
-- **Possible Errors:** Invalid email format (422); missing fields (422); incorrect credentials (401); account deactivated (`user.is_active = false`) (403).
-- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
+- **Possible Errors:** Invalid email format (422); missing fields (422); incorrect credentials (401); account deactivated (`user.is_active = false`) (403); rate limit exceeded (429).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity, 429 Too Many Requests.
 - **Database Tables Used:** `user`.
 - **Business Rules:** Deactivated accounts (BR-006) must fail login even with correct credentials.
+- **Rate limiting (Milestone 11, resolving `Requirement_Analysis.md` §14 item 13):** at most 5 attempts per 60-second window, per client IP (in-memory, single-process — see `System_Architecture.md` §11 and `PROJECT_PROGRESS.md`'s Milestone 11 entry for the documented scaling limitation). Beyond that, returns `429` with a generic message, regardless of whether the attempted credentials would otherwise have succeeded.
 
 ### 1.2 `POST /auth/refresh`
 

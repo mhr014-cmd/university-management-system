@@ -6,6 +6,35 @@ All notable changes to this project are documented here. Format loosely follows 
 
 ## [Unreleased]
 
+### Added (Milestone 11 — Hardening, Testing & Deployment)
+- `POST /auth/login` rate limiting (`app/middleware/rate_limit.py`): 5 attempts per 60-second window, per client IP, in-memory fixed window — resolves `Requirement_Analysis.md` §14 item 13
+- `/docs`, `/redoc`, `/openapi.json` disabled when `ENVIRONMENT=production` (via the existing `Settings.is_production` property) — unaffected in every other environment
+- Frontend root error boundary (`components/ErrorBoundary.tsx`, `lib/reportClientError.ts`) — implements `System_Architecture.md` §10's client-side error capture requirement, never built in any prior milestone
+- Minimal ESLint flat config (`frontend/eslint.config.js`) completing the `lint` script/`eslint` devDependency that existed unconfigured since Milestone 0
+- Frontend component tests (`frontend/tests/pages/{ExamRoom,GradingInterface,ResultApproval}.test.tsx`) — covers the three flows `CLAUDE.md` §10 names explicitly: exam timer/auto-submit, grading form entry + VR-006 error path, result approval/reject-requires-comment workflow
+- `backend/scripts/seed_demo_data.py` fully implemented per `Database_Design.md` §11 (2 departments, 2 semesters, 4 rooms, 1 admin, 3 teachers, 8 students, 2 parents, 5 courses, 6 class sessions, exams in every lifecycle state, attendance/results/fees/notifications data) — idempotent, same precedent as `seed_admin.py`
+- `.github/workflows/backend-ci.yml`/`frontend-ci.yml` wired to real pipelines (disposable Postgres service + pytest/alembic for backend; tsc/lint/vitest/build for frontend), replacing the Milestone 0 placeholders
+
+### Removed (Milestone 11)
+- `frontend/src/pages/Parent/ChildView/index.tsx` — orphaned placeholder, never routed, never built across Milestones 7–10 (no endpoint anywhere enumerates a Parent's linked children). The underlying FR-032/FR-037 requirement is recorded as a final, permanent, tracked limitation in `docs/UI_Wireframes.md` §17 and `docs/Requirement_Traceability_Matrix.md`, not silently dropped.
+
+### Changed (Milestone 11 — Documentation)
+- `docs/API_Contract.md` §1.1: documents the new rate-limit policy and `429` status code
+- `docs/UI_Wireframes.md` §17: final Known Limitation note for the Parent: Child View screen
+- `docs/Requirement_Traceability_Matrix.md`: FR-032/FR-037 updated to reflect the screen's final (not "deferred") status
+- `docs/Proposal_vs_Engineering_Additions.md`: six new entries (rate limiting, docs-gating, ESLint config, error boundary, component tests, and the Parent: Child View removal), each added in the same change as the item it documents
+- `docs/Implementation_Roadmap.md`: corrected stale Milestone 11 file paths (`infra/docker/` → `docker/`, `infra/ci/pipeline.yml` → `.github/workflows/*.yml`)
+- `docs/Database_Design.md` §11: removed a stale note about the attendance-warning threshold "needing confirmation" (resolved in Milestone 5)
+- `backend/.env.example`: removed a duplicate `ENVIRONMENT` line
+- `README.md`: updated from its Milestone-0-era status line to reflect Milestones 0–10 complete
+- `PROJECT_PROGRESS.md`: Milestone 10's Review Status updated to Approved (user sign-off, git tag `v1.1-milestone10`); Milestone 11 row and full Milestone Detail Log entry added; Summary section updated (100% overall progress — all 12 milestones complete)
+
+### Known Issues (Milestone 11)
+- The GitHub Actions CI runner itself was not exercised (both workflows are valid YAML with steps verified locally, but a real Actions run requires pushing to GitHub).
+- The login rate limiter is in-memory/single-process — would need a shared store (e.g. Redis) for a horizontally-scaled deployment.
+- The Parent: Child View dedicated screen is now a permanent, accepted limitation, not a deferred one — see the Removed section above.
+- Frontend component test coverage is scoped to the three flows `CLAUDE.md` §10 names explicitly, not exhaustive coverage of every page.
+
 ### Added (Milestone 10 — Dashboards & Reporting)
 - `GET /results/reports`: Admin result reports (grade distribution, pass/fail counts, additive `average_gpa` — Finding A) by department/semester/student, `published` results only; pass/fail determined by `grade_point > 0`/`== 0` since `grade_letter` is Teacher-supplied free text
 - `GET /fees/reports`: Admin fee reports (`total_collected`/`total_outstanding`/`total_overdue`) by department/semester/student; `total_overdue` is a subset of `total_outstanding`, matching the Admin: Fee Dashboard's existing (M8) semantics

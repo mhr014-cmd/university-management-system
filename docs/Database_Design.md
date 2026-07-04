@@ -709,7 +709,7 @@ To support development, testing, and demoing the full feature set, the following
 12. **Exams** — at least one exam per class session in each state: `draft`, `scheduled`, `open/closed`, and `published`, to exercise every status transition and the `DELETE` restriction on published exams.
 13. **Questions/QuestionOptions** — a mix of MCQ (with options), short-answer, descriptive, and coding questions across the seeded exams.
 14. **ExamSubmissions/Answers/QuestionGrades** — at least one fully graded submission (to populate a published result and demonstrate transcript generation) and one ungraded/pending submission.
-15. **AttendanceRecords** — a history of records across multiple dates per seeded enrollment, including enough absences for at least one seeded student to cross the low-attendance warning threshold (see Requirement_Analysis.md §14, item 4 — exact threshold value still needs confirmation before this seed can be made precise).
+15. **AttendanceRecords** — a history of records across multiple dates per seeded enrollment, including enough absences for at least one seeded student to cross the low-attendance warning threshold (80%, resolved in Milestone 5 — see Requirement_Analysis.md §14, item 4).
 16. **Results** — seeded in each workflow state: `submitted` (pending admin review), `approved`, and `published`, to exercise the full approval workflow end-to-end.
 17. **FeeStructures** — at least one per seeded department/semester combination.
 18. **Payments/Invoices** — a mix of fully paid, partially paid, and overdue invoices per seeded student, to populate the Admin fee dashboard and `GET /fees/overdue`.

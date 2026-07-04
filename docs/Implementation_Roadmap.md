@@ -402,12 +402,12 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 **Goal:** Close out non-functional requirements: error handling consistency, logging, security review, test coverage, and deployment to the target environments described in `System_Architecture.md` §8.
 
 **Files to create:**
-- `backend/app/middleware/error_handlers.py`
-- `backend/app/middleware/logging.py`
-- `backend/tests/` (unit + integration tests per domain module)
-- `frontend/tests/`
-- `infra/docker/Dockerfile.backend`, `Dockerfile.frontend`
-- `infra/ci/pipeline.yml`
+- `backend/app/middleware/error_handlers.py` (already exists — built in Milestone 0)
+- `backend/app/middleware/logging.py` (already exists — built in Milestone 0)
+- `backend/tests/` (already exists and populated through Milestone 10 — 341 tests; M11 adds hardening-specific coverage)
+- `frontend/tests/` (scaffolded but empty since Milestone 0 — M11 adds real component tests)
+- `docker/Dockerfile.backend`, `Dockerfile.frontend` (corrected path — already exist, built in Milestone 0; not `infra/docker/`)
+- `.github/workflows/backend-ci.yml`, `frontend-ci.yml` (corrected path — already existed as placeholders since Milestone 0, not `infra/ci/pipeline.yml`; wired up to real pipelines in Milestone 11)
 - `backend/scripts/seed_demo_data.py` (per `Database_Design.md` §11 seed data requirements)
 
 **APIs:** none new — hardening of existing endpoints only (consistent error shapes, rate limiting on `/auth/login` per `System_Architecture.md` §11)

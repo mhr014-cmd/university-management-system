@@ -295,7 +295,8 @@ This mirrors the domain modules from Section 2.2 and the screen list from Requir
 - **File/PDF handling**: Generated transcripts/invoices are produced server-side from validated data (not user-supplied templates), avoiding injection into generated documents.
 - **Least privilege for deactivated accounts**: A deactivated User must fail authentication (or have all authorization checks fail) immediately, even if a still-valid token exists for that account — token validation should re-check `is_active` status, not rely solely on token claims issued at login time.
 - **Secrets management**: JWT signing keys and database credentials are stored in environment configuration/secret managers, never committed to source control.
-- **Rate limiting** (gap noted in Requirement_Analysis.md §14, item 13): Not specified in the proposal; recommended as a defensive addition on `/auth/login` and other public endpoints to mitigate brute-force attempts, to be confirmed with stakeholders.
+- **Rate limiting** (gap noted in Requirement_Analysis.md §14, item 13): implemented in Milestone 11 on `POST /auth/login` (see that milestone's entry in `PROJECT_PROGRESS.md` for the specific policy chosen).
+- **API docs exposure** (Milestone 11): `/docs`, `/redoc`, and `/openapi.json` are disabled when `ENVIRONMENT=production` (via the existing `is_production` config property), and enabled in every other environment — closing off the full endpoint surface/schema from public discovery in production while keeping it available for development/grading/demo use.
 
 ---
 

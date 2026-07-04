@@ -219,6 +219,35 @@ Found during the Milestone 0 proposal-traceability review: two frontend elements
 **Disposition:** Keep. It's inert with respect to every other requirement (doesn't touch data, auth, or any FR-mapped flow) and low-risk to carry forward. If a future UI pass wants pixel-exact parity with `UI_Wireframes.md`'s ASCII layouts, note that none of those wireframes depict a theme toggle in the header — reconcile at that time rather than removing a working, harmless feature now.
 
 ### Dashboard "Backend connectivity" health widget
-**Where:** `frontend/src/pages/Dashboard/index.tsx`, calls `useHealthCheck()` (`frontend/src/lib/useHealthCheck.ts`).
+**Where:** was `frontend/src/pages/Dashboard/index.tsx`, called `useHealthCheck()` (`frontend/src/lib/useHealthCheck.ts`).
 **Classification: Design Enhancement**, paired with the already-logged `GET /health` endpoint above (same rationale: verifies deployment wiring, zero proposal linkage).
-**Disposition:** Temporary, not permanent. `docs/UI_Wireframes.md`'s Dashboard wireframe (page 2) specifies Upcoming Exams / Attendance % / Fee Status / Recent Results widgets — none of which is a connectivity debug panel. This widget exists only because Milestone 0 has no business data yet to populate the real widgets. **Action:** remove the health-check widget from `Dashboard/index.tsx` when Milestone 10 (Dashboards & Reporting) implements the real widgets from `UI_Wireframes.md`, so the page converges on the approved wireframe rather than accumulating debug UI permanently. Track this removal in `PROJECT_PROGRESS.md`'s M10 Notes.
+**Disposition: Removed in Milestone 10**, as planned above — `Dashboard/index.tsx` now renders the real role-specific widgets (Upcoming Exams/Attendance %/Fee Status/Recent Results for Student, etc.) per `docs/UI_Wireframes.md` page 2, converging on the approved wireframe. `useHealthCheck()` itself (`frontend/src/lib/useHealthCheck.ts`) remains unused after this removal — retained only as a candidate for a future ops/status page, not currently referenced by any route.
+
+---
+
+## Milestone 11 Additions: Rate limiting, API-docs gating
+
+### `POST /auth/login` rate limiting
+**Where:** `backend/app/middleware/rate_limit.py`, wired into `backend/app/routers/auth.py`'s `login` route via a FastAPI dependency.
+**Classification: Derived.** Not a proposal feature — the proposal never mentions rate limiting. `Requirement_Analysis.md` §14 item 13 and `System_Architecture.md` §11 both flag this as an unspecified gap with a recommendation to add a reasonable default, which Milestone 11 (Hardening) now does: 5 attempts per 60-second window, per client IP, in-memory (single-process — see `PROJECT_PROGRESS.md`'s Milestone 11 Known Issues for the horizontal-scaling caveat).
+**Disposition:** Permanent. A production deployment that scales the API tier horizontally (`System_Architecture.md` §8) would need to swap the in-memory store for a shared one (e.g. Redis) — noted as a known limitation, not implemented, since introducing a new external dependency wasn't part of the approved Milestone 11 scope.
+
+### API docs (`/docs`, `/redoc`, `/openapi.json`) disabled in production
+**Where:** `backend/app/main.py`'s `create_app()`, gated on the existing `Settings.is_production` property.
+**Classification: Derived.** `System_Architecture.md` §11's Security Strategy doesn't name this specifically, but "closing off unnecessary attack surface" is the section's own stated intent, and `is_production` already existed (unused) precisely for environment-conditional behavior like this.
+**Disposition:** Permanent. Development/staging/test environments are unaffected — docs remain available whenever `ENVIRONMENT` is not `production`.
+
+### Frontend ESLint flat config
+**Where:** `frontend/eslint.config.js`; new devDependencies `@eslint/js`, `typescript-eslint`, `globals`, `eslint-plugin-react-hooks`.
+**Classification: Derived.** `CLAUDE.md`'s tech stack (Section 2) doesn't mandate a linter, but `frontend/package.json` already had an `eslint` devDependency and a `"lint": "eslint ."` script since Milestone 0, with no config file to back either — `npm run lint` would have failed outright. Milestone 11 completes what was already committed to rather than leaving it dangling. Kept deliberately minimal: ESLint's own recommended rules, `typescript-eslint`'s recommended rules, and only the two long-standing `eslint-plugin-react-hooks` rules (`rules-of-hooks`, `exhaustive-deps`) — not that plugin's full "recommended" set, which as of v7 also bundles a newer `set-state-in-effect` rule that would flag an idiomatic, already-tested pattern used throughout Milestones 0-10 (syncing local state from a React Query result inside `useEffect`). Enabling it would have meant refactoring frozen, working code purely to satisfy a new rule — out of scope for a hardening milestone that explicitly must not redesign or refactor for preference.
+**Disposition:** Permanent. `npm run lint` now runs clean against the entire existing `src/` tree with zero errors/warnings — confirming no rule violations were introduced by keeping the scope minimal.
+
+### Root error boundary
+**Where:** `frontend/src/components/ErrorBoundary.tsx`, `frontend/src/lib/reportClientError.ts`, wrapping `<AppProviders>`/`<RouterProvider>` in `frontend/src/app/App.tsx`.
+**Classification: Derived.** `System_Architecture.md` §10 (Logging Strategy) explicitly states client-side errors "are captured via an error boundary and reported to a central location distinct from routine console output" — this had never been implemented in any prior milestone. No backend endpoint exists to receive client error reports, and adding one would be new business functionality outside Milestone 11's hardening-only scope, so `reportClientError` is a single, distinctly-tagged local choke point (not a remote-logging integration) — a real deployment would only need to change that one function's body.
+**Disposition:** Permanent.
+
+### Frontend component tests
+**Where:** `frontend/tests/pages/{ExamRoom,GradingInterface,ResultApproval}.test.tsx`, `frontend/tests/setup.ts`; new devDependencies `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`; `test` block added to `vite.config.ts`.
+**Classification: Derived.** `CLAUDE.md` §10 explicitly names "exam timer, grading form, approval workflow" as the frontend's critical interaction logic requiring component tests, and `Implementation_Roadmap.md`'s own Milestone 11 file list names `frontend/tests/` — scaffolded empty since Milestone 0, never populated until now. Covers exactly those three named flows: the Exam Room countdown/auto-submit (`ExamRoomPage`), the Teacher Grading Interface's mark-entry/save and VR-006 max-marks error path (`GradingInterfacePage`), and the Admin Result Approval workflow's approve/reject-requires-comment behavior (`ResultApprovalPage`).
+**Disposition:** Permanent — establishes the pattern (mock the relevant `features/*` hook module, render with a `MemoryRouter`, assert on the mutation call and rendered outcome) for any future frontend test in this project.
