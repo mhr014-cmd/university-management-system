@@ -316,7 +316,7 @@ See Section 14 — Unclear Items for the full discussion of each gap.
 - **VR-005**: Attendance can only be marked for a valid, existing class/session and date (no future-dated attendance beyond the current session, no duplicate marking for the same student/class/date).
 - **VR-006**: Grading (partial marks) cannot exceed the maximum marks defined for a question.
 - **VR-007**: Schedule entries must have a valid start/end time where start precedes end, and must reference an existing room/teacher/class.
-- **VR-008**: Fee payment amounts must be positive and should not push a student's paid total beyond the defined fee structure amount (unless overpayment is explicitly permitted — unclear, see Section 14).
+- **VR-008**: Fee payment amounts must be positive and must not push a student's paid total beyond the defined fee structure amount. ~~unless overpayment is explicitly permitted — unclear~~ **Resolved during Milestone 8 implementation:** overpayment is strictly disallowed — a payment that would exceed the invoice's remaining outstanding balance, or any payment against an already-fully-`paid` invoice, is rejected with 409. Per the Milestone 8 kickoff's explicit Fees Domain Requirements.
 - **VR-009**: Role-restricted fields (e.g., account role, deactivation status) must not be editable via `PUT /users/me` (self-service profile update) — only via Admin-scoped endpoints.
 
 ---

@@ -309,6 +309,8 @@ User/Auth  →  Department/Course/Room/Semester (reference data)
 
 **Goal:** Implement fee structure definition, payment recording, invoicing, and overdue tracking. Marked Optional in the proposal — see the schedule-risk note at the top of this document regarding cut priority.
 
+**Milestone 8 scope note (added during the M8 pre-implementation review, confirmed with the user):** neither `Database_Design.md` nor `API_Contract.md` documented how an `invoice` row gets created — `POST /fees` (fee_structure creation) now auto-generates one `unpaid` invoice per eligible student (active, enrolled that semester, department-matching) at creation time; this is documented behavior of the existing endpoint, not a new one. VR-008's overpayment policy is resolved as strictly disallowed, per this milestone's own Fees Domain Requirements. Invoice `overdue` status is computed at read time, never stored. See `Database_Design.md` §6.25 and `API_Contract.md` §6.2/§6.3/§6.6.
+
 **Files to create:**
 - `backend/app/models/fee_structure.py`, `payment.py`, `invoice.py`
 - `backend/app/schemas/fee.py`
