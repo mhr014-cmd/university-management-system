@@ -12,6 +12,8 @@ import DashboardPage from "../pages/Dashboard";
 import ProfilePage from "../pages/Profile";
 import UserManagementPage from "../pages/Admin/UserManagement";
 import TimetablePage from "../pages/Timetable";
+import AttendancePage from "../pages/Attendance";
+import AttendanceMarkerPage from "../pages/Teacher/AttendanceMarker";
 import NotFoundPage from "../pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -44,6 +46,14 @@ export const router = createBrowserRouter([
           {
             path: "/timetable",
             element: <TimetablePage />,
+          },
+          {
+            path: "/attendance",
+            element: <AttendancePage />,
+          },
+          {
+            path: "/teacher/attendance-marker",
+            element: <AttendanceMarkerPage />,
           },
         ],
       },

@@ -267,7 +267,7 @@ class AttendanceService:
         return ClassAttendanceResponse(
             class_session_id=class_session_id,
             records=[
-                ClassAttendanceEntry(student_id=r.student_id, date=r.attendance_date, status=r.status)
+                ClassAttendanceEntry(id=r.id, student_id=r.student_id, date=r.attendance_date, status=r.status)
                 for r in records
             ],
         )

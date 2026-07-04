@@ -30,11 +30,15 @@ export function AppLayout() {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/profile">Profile</Link>
           <Link to="/timetable">Timetable</Link>
-          {/* Admin-only nav link, per docs/UI_Wireframes.md Section 10
-              Role Visibility — server-side RBAC (require_roles("admin"))
-              is the actual enforcement; this is UX only, per CLAUDE.md
+          {/* Role-scoped nav links, per docs/UI_Wireframes.md Sections 7,
+              10, 15 Role Visibility notes — server-side RBAC is the
+              actual enforcement; this is UX only, per CLAUDE.md
               Section 7. */}
           {user?.role === "admin" && <Link to="/admin/users">User Management</Link>}
+          {(user?.role === "student" || user?.role === "parent") && (
+            <Link to="/attendance">Attendance</Link>
+          )}
+          {user?.role === "teacher" && <Link to="/teacher/attendance-marker">Mark Attendance</Link>}
           {user && <span className="text-slate-500 dark:text-slate-400">{user.email}</span>}
           <button
             type="button"

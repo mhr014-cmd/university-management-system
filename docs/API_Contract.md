@@ -589,10 +589,11 @@
 {
   "class_session_id": "uuid",
   "records": [
-    { "student_id": "uuid", "date": "date", "status": "present | absent | late | excused" }
+    { "id": "uuid", "student_id": "uuid", "date": "date", "status": "present | absent | late | excused" }
   ]
 }
 ```
+- **Note:** `id` added during Milestone 5 implementation, beyond this document's original shape — `PUT /attendance/{id}` (the correction workflow, FR-029) needs the record's own id, which `student_id`/`date`/`status` alone can't resolve. Found while implementing the Teacher: Attendance Marker page's correction mode; fixed here in the same change per `CLAUDE.md` Section 9.
 - **Validation:** `{classId}` valid UUID.
 - **Possible Errors:** Class not found (404); caller is not Teacher of that class/Admin, and not a Parent linked to the requested `student_id` (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 404 Not Found.

@@ -103,3 +103,22 @@ export function useCreateChangeRequest() {
       (await apiClient.post("/schedule/change-requests", payload)).data,
   });
 }
+
+export interface RosterEntry {
+  student_id: string;
+  first_name: string;
+  last_name: string;
+}
+
+export function useClassSessionRoster(classSessionId?: string) {
+  return useQuery({
+    queryKey: ["schedule", "class-sessions", classSessionId, "roster"],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ class_session_id: string; students: RosterEntry[] }>(
+          `/schedule/class-sessions/${classSessionId}/roster`,
+        )
+      ).data,
+    enabled: Boolean(classSessionId),
+  });
+}
