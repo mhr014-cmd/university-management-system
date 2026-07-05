@@ -591,10 +591,10 @@
 
 ### 4.1 `GET /attendance/me`
 
-- **Purpose:** Student's own attendance summary, filterable by subject/date, with current percentage. (FR-026)
+- **Purpose:** Student's own attendance summary, filterable by subject/date, with current percentage. (FR-026) **Post-M11 gap closure (2026-07-05):** also serves Parent access to a linked child's attendance (FR-032), closing a proposal-promised feature that had no API support before this pass — see `Proposal_vs_Engineering_Additions.md`.
 - **Authentication Required:** Yes
-- **User Roles:** Student
-- **Request Body:** none. Query params: `class_session_id` (optional), `date_from`, `date_to` (optional).
+- **User Roles:** Student, Parent (Parent requires `student_id`, ownership-checked via `parent_student_link` — same convention as `GET /fees/me`/`GET /results/me`)
+- **Request Body:** none. Query params: `class_session_id` (optional), `date_from`, `date_to` (optional), `student_id` (required for Parent, ignored for Student).
 - **Response Body (200):**
 ```json
 {
@@ -613,11 +613,11 @@
   ]
 }
 ```
-- **Validation:** date range params must be valid dates, `date_from <= date_to`.
-- **Possible Errors:** invalid date range (422).
-- **Status Codes:** 200 OK, 401 Unauthorized, 422 Unprocessable Entity.
-- **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`.
-- **Business Rules:** percentage computed on demand, never cached (NFR-016). `low_attendance_warning` is `true` when the corresponding percentage is below 80% (BR-008/FR-031, threshold resolved during the Milestone 5 pre-implementation review — see `Requirement_Analysis.md` §14 item 4); this is a computed indicator only, not a dispatched notification (Milestone 9 scope).
+- **Validation:** date range params must be valid dates, `date_from <= date_to`. Parent callers must supply `student_id` for a student they are linked to via `parent_student_link`.
+- **Possible Errors:** invalid date range (422); Parent missing `student_id` or not linked to the given student (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
+- **Database Tables Used:** `attendance_record`, `class_session`, `enrollment`, `parent_student_link` (Parent ownership check only).
+- **Business Rules:** percentage computed on demand, never cached (NFR-016). `low_attendance_warning` is `true` when the corresponding percentage is below 80% (BR-008/FR-031, threshold resolved during the Milestone 5 pre-implementation review — see `Requirement_Analysis.md` §14 item 4); this is a computed indicator only, not a dispatched notification (Milestone 9 scope). **Post-M11 gap closure:** `notify_attendance_warning` now also notifies every linked Parent (previously Student-only), closing the proposal's Section 5 "automatic alerts for absences" promise.
 
 ### 4.2 `POST /attendance`
 
@@ -828,6 +828,36 @@
 
 ## 6. Fees (Optional Module)
 
+### 6.0a `GET /fees/structures` *(gap-fill endpoint — not listed in proposal §6, added 2026-07-05)*
+
+- **Purpose:** List existing fee structures, for the Admin Fee Dashboard's Record Payment form to select from (previously a raw, hand-typed `fee_structure_id` UUID field — the same class of known limitation as Milestone 4's Admin schedule panel). **Classification: Derived** — see `Proposal_vs_Engineering_Additions.md`.
+- **Authentication Required:** Yes
+- **User Roles:** Admin
+- **Request Body:** none. Query params: `page` (default 1), `page_size` (default 20, max 100) — paginated per `CLAUDE.md` §11's list-endpoint convention.
+- **Response Body (200):**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "amount": "number",
+      "due_date": "date",
+      "semester_id": "uuid",
+      "department_id": "uuid | null"
+    }
+  ],
+  "total": "number",
+  "page": "number",
+  "page_size": "number"
+}
+```
+- **Validation:** none beyond authentication/RBAC.
+- **Possible Errors:** none beyond standard auth/RBAC failures.
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden.
+- **Database Tables Used:** `fee_structure`.
+- **Business Rules:** none — a read-only listing, ordered by `due_date` descending.
+
 ### 6.1 `GET /fees/me`
 
 - **Purpose:** Student or Parent retrieves fee status and payment history. (FR-038)
@@ -984,10 +1014,10 @@
 
 ### 7.1 `GET /schedule/me`
 
-- **Purpose:** Student or Teacher views own timetable. (FR-045)
+- **Purpose:** Student or Teacher views own timetable. (FR-045) **Post-M11 gap closure (2026-07-05):** also serves Parent access to a linked child's timetable — the proposal (Section 5, "Results & schedule") explicitly promises this, but this endpoint previously excluded Parent from its allowed roles entirely (a Parent request 403'd before any ownership check ran). See `Proposal_vs_Engineering_Additions.md`.
 - **Authentication Required:** Yes
-- **User Roles:** Student, Teacher
-- **Request Body:** none.
+- **User Roles:** Student, Teacher, Parent (Parent requires `student_id`, ownership-checked via `parent_student_link`)
+- **Request Body:** none. Query params: `student_id` (required for Parent, ignored for Student/Teacher).
 - **Response Body (200):**
 ```json
 {
@@ -1004,11 +1034,11 @@
   ]
 }
 ```
-- **Validation:** none beyond authentication.
-- **Possible Errors:** none beyond standard auth failures.
-- **Status Codes:** 200 OK, 401 Unauthorized.
-- **Database Tables Used:** `schedule_entry`, `class_session`, `room`, `enrollment` (Student) / `teacher` (Teacher).
-- **Business Rules:** result scoped to caller's own enrollments/assignments (NFR-002).
+- **Validation:** Parent callers must supply `student_id` for a student they are linked to via `parent_student_link`.
+- **Possible Errors:** Parent missing `student_id` or not linked to the given student (403).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden.
+- **Database Tables Used:** `schedule_entry`, `class_session`, `room`, `enrollment` (Student) / `teacher` (Teacher), `parent_student_link` (Parent ownership check only).
+- **Business Rules:** result scoped to caller's own enrollments/assignments (NFR-002); for Parent, scoped to the specified linked child's enrollments.
 
 ### 7.2 `POST /schedule`
 
