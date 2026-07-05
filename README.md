@@ -287,8 +287,8 @@ The following are realistic, scoped improvements, explicitly not implemented in 
 
 **Author:** Mahabbat Hossain
 
-**GitHub:** [https://github.com/mhr014-cmd/university-management-system](https://github.com/mhr014-cmd/university-management-system)
+**GitHub:** [University Management System Repository](https://github.com/mhr014-cmd/university-management-system)
 
-**Email:** `<add your contact email here>`
+**Email:** [mhr014@gmail.com](mailto:mhr014@gmail.com)
 
-**LinkedIn:** `<add your LinkedIn profile URL here>`
+**LinkedIn:** [LinkedIn Profile](https://www.linkedin.com/in/https://www.linkedin.com/in/mahabbatrh/)
