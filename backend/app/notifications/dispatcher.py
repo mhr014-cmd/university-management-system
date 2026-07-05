@@ -85,14 +85,21 @@ def notify_schedule_change(
     _safe_dispatch(session, "notify_schedule_change", _build)
 
 
-def notify_attendance_warning(session: Session, *, student_user_id: uuid.UUID, course_name: str) -> None:
+def notify_attendance_warning(
+    session: Session, *, student_id: uuid.UUID, student_user_id: uuid.UUID, course_name: str
+) -> None:
+    # Gap closure (post-M11 audit): the proposal (Section 5, Parent —
+    # "Attendance summary") explicitly promises Parents "automatic alerts
+    # for absences" — this previously only notified the Student, matching
+    # every linked Parent onto the same fan-out pattern already used by
+    # notify_fee_due (Domain Rule 15: recipients resolved from
+    # ParentStudentLink, no per-recipient validation step required).
+    message = f"Attendance warning: {course_name} below 80%"
+
     def _build() -> None:
-        notification_repo.create(
-            session,
-            user_id=student_user_id,
-            type="attendance_warning",
-            message=f"Attendance warning: {course_name} below 80%",
-        )
+        notification_repo.create(session, user_id=student_user_id, type="attendance_warning", message=message)
+        for parent_user_id in user_repo.list_parent_user_ids_for_student(session, student_id):
+            notification_repo.create(session, user_id=parent_user_id, type="attendance_warning", message=message)
 
     _safe_dispatch(session, "notify_attendance_warning", _build)
 

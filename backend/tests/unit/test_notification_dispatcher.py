@@ -109,12 +109,42 @@ class TestNotifySchedulteChange:
 
 class TestNotifyAttendanceWarning:
     def test_creates_notification_with_template_message(self, stub_repos, session):
-        notification_repo, _user_repo = stub_repos
+        notification_repo, user_repo = stub_repos
+        user_repo.list_parent_user_ids_for_student.return_value = []
         student_user_id = uuid.uuid4()
-        dispatcher.notify_attendance_warning(session, student_user_id=student_user_id, course_name="Networks")
+        dispatcher.notify_attendance_warning(
+            session, student_id=uuid.uuid4(), student_user_id=student_user_id, course_name="Networks"
+        )
         notification_repo.create.assert_called_once_with(
             session, user_id=student_user_id, type="attendance_warning", message="Attendance warning: Networks below 80%"
         )
+
+    def test_rule15_notifies_student_and_all_linked_parents(self, stub_repos, session):
+        notification_repo, user_repo = stub_repos
+        student_id = uuid.uuid4()
+        student_user_id = uuid.uuid4()
+        parent_user_ids = [uuid.uuid4(), uuid.uuid4()]
+        user_repo.list_parent_user_ids_for_student.return_value = parent_user_ids
+
+        dispatcher.notify_attendance_warning(
+            session, student_id=student_id, student_user_id=student_user_id, course_name="Networks"
+        )
+
+        assert notification_repo.create.call_count == 3
+        recipients = {call.kwargs["user_id"] for call in notification_repo.create.call_args_list}
+        assert recipients == {student_user_id, *parent_user_ids}
+        for call in notification_repo.create.call_args_list:
+            assert call.kwargs["type"] == "attendance_warning"
+
+    def test_rule14_exception_does_not_propagate(self, stub_repos, session):
+        notification_repo, user_repo = stub_repos
+        user_repo.list_parent_user_ids_for_student.return_value = []
+        notification_repo.create.side_effect = RuntimeError("boom")
+        dispatcher.notify_attendance_warning(
+            session, student_id=uuid.uuid4(), student_user_id=uuid.uuid4(), course_name="X"
+        )
+        session.rollback.assert_called_once()
+        session.commit.assert_not_called()
 
 
 class TestNotifyFeeDue:
