@@ -49,7 +49,7 @@ The backend enforces a strict layered discipline without exception: **Routers** 
 - **12 of 12 milestones** delivered sequentially, each reviewed and explicitly approved before the next began.
 - **68 REST endpoints** across 11 domains, all RBAC- and ownership-enforced.
 - **26 database tables**, fully relationally constrained, managed by **10 Alembic migrations** with a single head and an empty `autogenerate` diff (schema and ORM models never drift apart).
-- **349 backend tests** (unit + integration) and **7 frontend component tests**, all passing — every business/validation rule has dedicated coverage, and RBAC/ownership checks have explicit negative tests.
+- **380 backend tests** (unit + integration) and **7 frontend component tests**, all passing — every business/validation rule has dedicated coverage, and RBAC/ownership checks have explicit negative tests.
 - Security hardening: login rate limiting, production-only API-docs gating, a frontend error boundary.
 - A fully idempotent demo-data seed script covering every workflow state across every domain.
 - Complete design documentation (9 governing documents in `docs/`) kept synchronized with implementation at every milestone, including an explicit ledger (`Proposal_vs_Engineering_Additions.md`) of every capability added beyond the original proposal and why.

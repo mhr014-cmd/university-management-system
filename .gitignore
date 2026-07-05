@@ -50,3 +50,8 @@ logs/*.log
 
 # PDF build scratch (generated locally when re-rendering Project_SRS.pdf)
 *.pdf.tmp
+
+# Accidental full-repo archives at the project root (GC-6: a stray
+# university-management-system.zip was previously committed here by
+# mistake — this repo is the source of truth, not a zip snapshot of it).
+/*.zip

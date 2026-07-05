@@ -9,7 +9,7 @@
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![React](https://img.shields.io/badge/frontend-React%2018-61DAFB)
 ![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-4169E1)
-![Backend Tests](https://img.shields.io/badge/backend%20tests-349%20passing-success)
+![Backend Tests](https://img.shields.io/badge/backend%20tests-380%20passing-success)
 ![Frontend Tests](https://img.shields.io/badge/frontend%20tests-7%20passing-success)
 
 </div>
@@ -127,7 +127,7 @@ This layering is enforced without exception across all 11 backend domains: a rou
 
 **Security:** JWT with short-lived access tokens and rotating refresh tokens; bcrypt password hashing; RBAC and ownership enforced server-side on every request, never only in the UI; login rate limiting; API documentation (`/docs`, `/redoc`, `/openapi.json`) automatically disabled when `ENVIRONMENT=production`.
 
-**Maintainability:** one file per domain across models/schemas/repositories/services/routers/features keeps each concern's blast radius small; 349 backend tests and 7 frontend tests mean the layered architecture's contracts are continuously verified, not just documented.
+**Maintainability:** one file per domain across models/schemas/repositories/services/routers/features keeps each concern's blast radius small; 380 backend tests and 7 frontend tests mean the layered architecture's contracts are continuously verified, not just documented.
 
 # Dashboard / Model / Output
 
@@ -256,7 +256,7 @@ Interactive API documentation is available at `http://localhost:8000/docs` (and 
 
 - **68 REST APIs** across 11 domains (auth, users, reference data, scheduling, attendance, exams, results, fees, notifications, reports, health), all versioned under `/api/v1` and returning a consistent JSON error envelope
 - **26 database tables**, fully constrained (foreign keys, unique constraints, check constraints), managed by 10 sequential Alembic migrations with a single head and an empty `autogenerate` diff
-- **349 backend tests** (unit + integration, all passing) and **7 frontend component tests** (all passing), covering every business rule and the three most interaction-critical UI flows
+- **380 backend tests** (unit + integration, all passing) and **7 frontend component tests** (all passing), covering every business rule and the three most interaction-critical UI flows
 - **Role-based dashboards** for all four roles, each showing only the data and actions relevant to that role
 - **Reporting** — attendance, results, and fees, each filterable by department/semester/student
 - **Notifications** — four automatic triggers (result published, schedule change, attendance warning, fee due), dispatched synchronously, plus a manual admin-triggered overdue notice

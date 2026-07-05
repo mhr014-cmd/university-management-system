@@ -681,20 +681,20 @@
 
 ### 4.5 `GET /attendance/reports`
 
-- **Purpose:** Generate attendance reports by department or semester. (FR-030)
+- **Purpose:** Generate attendance reports by department, semester, or student. (FR-030; `student_id` filter parity with `GET /results/reports`/`GET /fees/reports` added GC-5)
 - **Authentication Required:** Yes
 - **User Roles:** Admin
-- **Request Body:** none. Query params: `department_id` (optional), `semester_id` (optional).
+- **Request Body:** none. Query params: `department_id` (optional), `semester_id` (optional), `student_id` (optional).
 - **Response Body (200):**
 ```json
 {
-  "scope": { "department_id": "uuid | null", "semester_id": "uuid | null" },
+  "scope": { "department_id": "uuid | null", "semester_id": "uuid | null", "student_id": "uuid | null" },
   "summary": [
     { "student_id": "uuid", "percentage": "number" }
   ]
 }
 ```
-- **Validation:** `department_id`/`semester_id` if provided must reference existing rows.
+- **Validation:** `department_id`/`semester_id`/`student_id` if provided must reference existing rows.
 - **Possible Errors:** invalid `department_id`/`semester_id` (422); caller is not Admin (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
 - **Database Tables Used:** `attendance_record`, `department`, `semester`, `class_session`.
