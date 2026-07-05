@@ -20,7 +20,7 @@ from app.repositories.reference_data_repository import DepartmentRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.student import StudentCreate, StudentRead, StudentUpdate
 from app.schemas.teacher import TeacherCreate, TeacherRead, TeacherUpdate
-from app.schemas.user import MeRead, MeUpdate, UserProfile
+from app.schemas.user import ChildEntry, MeRead, MeUpdate, MyChildrenResponse, UserProfile
 
 user_repo = UserRepository()
 department_repo = DepartmentRepository()
@@ -106,22 +106,40 @@ class UserService:
         session.refresh(profile_row)
         return self.get_me(session, user)
 
+    # --- GET /users/me/children (Parent-only, production-polish audit) --
+
+    def get_my_children(self, session: Session, user: User) -> MyChildrenResponse:
+        parent = user_repo.get_parent_profile_by_user_id(session, user.id)
+        students = user_repo.list_linked_students(session, parent.id)
+        return MyChildrenResponse(
+            children=[
+                ChildEntry(
+                    id=s.id, first_name=s.first_name, last_name=s.last_name, department_id=s.department_id
+                )
+                for s in students
+            ]
+        )
+
     def _get_own_profile(self, session: Session, user: User) -> UserProfile:
         if user.role == "student":
             student = user_repo.get_student_profile_by_user_id(session, user.id)
+            department = department_repo.get(session, student.department_id)
             return UserProfile(
                 first_name=student.first_name,
                 last_name=student.last_name,
                 profile_photo_url=student.profile_photo_url,
                 department_id=student.department_id,
+                department_name=department.name if department else None,
             )
         if user.role == "teacher":
             teacher = user_repo.get_teacher_profile_by_user_id(session, user.id)
+            department = department_repo.get(session, teacher.department_id)
             return UserProfile(
                 first_name=teacher.first_name,
                 last_name=teacher.last_name,
                 profile_photo_url=teacher.profile_photo_url,
                 department_id=teacher.department_id,
+                department_name=department.name if department else None,
             )
         if user.role == "parent":
             parent = user_repo.get_parent_profile_by_user_id(session, user.id)

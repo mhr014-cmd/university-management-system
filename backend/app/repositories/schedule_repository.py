@@ -46,6 +46,22 @@ class ScheduleRepository:
         session.flush()
         return class_session
 
+    def get_course_names_for_class_sessions(
+        self, session: Session, class_session_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """Batch class_session_id -> course.name lookup — one query
+        regardless of how many IDs are passed, so callers enriching an
+        exam/result list with a display name never fall into a per-row
+        N+1 pattern."""
+        if not class_session_ids:
+            return {}
+        stmt = (
+            select(ClassSession.id, Course.name)
+            .join(Course, ClassSession.course_id == Course.id)
+            .where(ClassSession.id.in_(class_session_ids))
+        )
+        return {row[0]: row[1] for row in session.execute(stmt).all()}
+
     # --- enrollment --------------------------------------------------------
 
     def get_enrollment(

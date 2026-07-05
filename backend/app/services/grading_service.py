@@ -192,6 +192,13 @@ class GradingService:
                 raise _forbidden("You are not the creator of this exam.")
 
         submissions = exam_repo.list_submissions_for_exam(session, exam_id)
+
+        # Single batch lookup for every submission's student display name —
+        # not one query per submission — so this listing never becomes an
+        # N+1 query.
+        students = user_repo.list_students_by_ids(session, [sub.student_id for sub in submissions])
+        name_by_student_id = {s.id: f"{s.first_name} {s.last_name}" for s in students}
+
         summaries = []
         for submission in submissions:
             grades = exam_repo.list_grades_for_submission(session, submission.id)
@@ -199,6 +206,7 @@ class GradingService:
             summaries.append(
                 ExamResultsSubmissionSummary(
                     student_id=submission.student_id,
+                    student_name=name_by_student_id.get(submission.student_id, "Unknown Student"),
                     submission_id=submission.id,
                     total_awarded_marks=total,
                     status=submission.status,

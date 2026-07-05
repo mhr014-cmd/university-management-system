@@ -72,6 +72,9 @@ class PaymentHistoryResponse(BaseModel):
 
 class OverdueAccountEntry(BaseModel):
     student_id: uuid.UUID
+    # Additive display field (final-polish pass): the Admin Fee Dashboard
+    # previously rendered the raw student_id UUID — see student_name below.
+    student_name: str
     invoice_id: uuid.UUID
     amount_due: float
     due_date: date

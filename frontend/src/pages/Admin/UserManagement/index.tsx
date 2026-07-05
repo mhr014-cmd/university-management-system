@@ -102,10 +102,23 @@ export default function UserManagementPage() {
         </thead>
         <tbody>
           {activeQuery.data?.items.map((row) => (
-            <tr key={row.id} className="border-b border-slate-100 dark:border-slate-800">
+            <tr
+              key={row.id}
+              className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+            >
               <td className="py-2">{row.first_name} {row.last_name}</td>
               <td className="py-2">{row.email}</td>
-              <td className="py-2">{row.is_active ? "Active" : "Inactive"}</td>
+              <td className="py-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    row.is_active
+                      ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                >
+                  {row.is_active ? "Active" : "Inactive"}
+                </span>
+              </td>
               <td className="py-2 space-x-2">
                 <button
                   type="button"
@@ -130,6 +143,9 @@ export default function UserManagementPage() {
           ))}
         </tbody>
       </table>
+      {activeQuery.data && activeQuery.data.items.length === 0 && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">No {tab} found for this filter.</p>
+      )}
 
       {showCreateForm && (
         <CreateAccountModal tab={tab} onClose={() => setShowCreateForm(false)} />

@@ -20,6 +20,10 @@ class UserProfile(BaseModel):
     # §6.4/§6.5) — per UI_Wireframes.md §3, the field simply isn't rendered
     # for those roles.
     department_id: uuid.UUID | None = None
+    # Additive display field (production-polish audit): the Profile page's
+    # read-only Department field previously rendered the raw department_id
+    # UUID — see department_name below.
+    department_name: str | None = None
 
 
 class MeRead(BaseModel):
@@ -37,3 +41,19 @@ class MeUpdate(BaseModel):
     first_name: str | None = Field(default=None, min_length=1)
     last_name: str | None = Field(default=None, min_length=1)
     profile_photo_url: str | None = None
+
+
+class ChildEntry(BaseModel):
+    """GET /users/me/children (Parent-only, production-polish audit): closes
+    the long-standing gap where no endpoint enumerated a Parent's linked
+    children, forcing the Parent Dashboard to require a manually-typed
+    student_id instead of a real child selector."""
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    department_id: uuid.UUID
+
+
+class MyChildrenResponse(BaseModel):
+    children: list[ChildEntry]

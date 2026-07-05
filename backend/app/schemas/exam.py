@@ -97,6 +97,11 @@ class ExamListItem(BaseModel):
     id: uuid.UUID
     title: str
     class_session_id: uuid.UUID
+    # Additive display field (final-polish pass): the frontend Exam List and
+    # Student Dashboard previously rendered the raw class_session_id UUID
+    # whenever it fell outside the caller's own current-schedule lookup
+    # (e.g. every exam, for an Admin caller, who has no personal schedule).
+    course_name: str
     exam_type: ExamType
     time_limit_minutes: int
     status: ExamStatus

@@ -127,8 +127,7 @@ export default function GradingInterfacePage() {
           >
             {results.submissions.map((submission) => (
               <option key={submission.submission_id} value={submission.submission_id}>
-                Student {submission.student_id.slice(0, 8)} — {submission.status} ({submission.total_awarded_marks}{" "}
-                marks)
+                {submission.student_name} — {submission.status} ({submission.total_awarded_marks} marks)
               </option>
             ))}
           </select>

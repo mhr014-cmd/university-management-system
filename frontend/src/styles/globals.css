@@ -1,4 +1,25 @@
-/* Global styles — Tailwind entry point (placeholder). */
+/* Global styles — Tailwind entry point. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Production-polish accessibility fix: no component anywhere in this
+   codebase set an explicit focus style, so keyboard focus fell back to
+   whatever the browser's own default happens to be — inconsistent across
+   browsers and not guaranteed to have sufficient contrast against the
+   dark-mode slate backgrounds used throughout this app. A single,
+   theme-consistent focus-visible ring applied globally (rather than a
+   `focus:` utility repeated across every button/input/link/select in
+   every page) keeps every interactive element keyboard-focusable and
+   visibly so, in both themes, without touching per-component markup. */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid theme("colors.blue.500");
+    outline-offset: 2px;
+  }
+}

@@ -80,7 +80,10 @@ export function AdminDashboard() {
             </thead>
             <tbody>
               {recentSignups.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={u.id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
                   <td className="py-2">
                     {u.first_name} {u.last_name}
                   </td>

@@ -10,6 +10,7 @@ export interface UserProfile {
   last_name: string;
   profile_photo_url: string | null;
   department_id: string | null;
+  department_name: string | null;
 }
 
 export interface Me {
@@ -68,7 +69,19 @@ export interface StudentOrTeacherUpdateInput {
   is_active?: boolean;
 }
 
+export interface ChildEntry {
+  id: string;
+  first_name: string;
+  last_name: string;
+  department_id: string;
+}
+
+export interface MyChildrenResponse {
+  children: ChildEntry[];
+}
+
 const meQueryKey = ["users", "me"] as const;
+const myChildrenQueryKey = ["users", "me", "children"] as const;
 const studentsQueryKey = (departmentId?: string) => ["users", "students", { departmentId }] as const;
 const teachersQueryKey = (departmentId?: string) => ["users", "teachers", { departmentId }] as const;
 
@@ -86,6 +99,13 @@ export function useUpdateMe() {
     onSuccess: (data) => {
       queryClient.setQueryData(meQueryKey, data);
     },
+  });
+}
+
+export function useMyChildren() {
+  return useQuery({
+    queryKey: myChildrenQueryKey,
+    queryFn: async () => (await apiClient.get<MyChildrenResponse>("/users/me/children")).data,
   });
 }
 

@@ -331,15 +331,24 @@ class FeeService:
             session, department_id=department_id, semester_id=semester_id
         )
         today = date.today()
+        overdue_candidates = [(invoice, fs) for invoice, fs in candidates if fs.due_date < today]
+
+        # Single batch lookup for every overdue account's student display
+        # name — not one query per account — so this listing never becomes
+        # an N+1 query.
+        students = user_repo.list_students_by_ids(
+            session, [invoice.student_id for invoice, _fs in overdue_candidates]
+        )
+        name_by_student_id = {s.id: f"{s.first_name} {s.last_name}" for s in students}
+
         accounts = []
-        for invoice, fee_structure in candidates:
-            if fee_structure.due_date >= today:
-                continue
+        for invoice, fee_structure in overdue_candidates:
             paid = fee_repo.sum_payments(session, invoice.student_id, fee_structure.id)
             amount_due = max(0.0, float(fee_structure.amount) - paid)
             accounts.append(
                 OverdueAccountEntry(
                     student_id=invoice.student_id,
+                    student_name=name_by_student_id.get(invoice.student_id, "Unknown Student"),
                     invoice_id=invoice.id,
                     amount_due=round(amount_due, 2),
                     due_date=fee_structure.due_date,

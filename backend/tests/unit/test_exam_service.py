@@ -523,3 +523,36 @@ class TestSubmitExam:
         assert exc.value.status_code == 404
         exam_repo.create_answer.assert_not_called()
         session.commit.assert_not_called()
+
+
+class TestListExams:
+    """Final-polish fix: GET /exams must return a course_name per exam,
+    resolved via a single batch lookup (not one query per exam —
+    CLAUDE.md §11's N+1 guidance)."""
+
+    def test_items_include_course_name_via_single_batch_lookup(self, service, stub_repos, session):
+        exam_repo, _schedule_repo, user_repo = stub_repos
+        exam = make_exam()
+        exam_repo.list_exams.return_value = ([exam], 1)
+        user_repo.get_teacher_profile_by_user_id.return_value = make_teacher()
+        schedule_repo_module_mock = _schedule_repo
+        schedule_repo_module_mock.get_course_names_for_class_sessions.return_value = {
+            exam.class_session_id: "Database Systems"
+        }
+
+        items, total = service.list_exams(session, _teacher_user(), 1, 20)
+
+        assert total == 1
+        assert items[0].course_name == "Database Systems"
+        schedule_repo_module_mock.get_course_names_for_class_sessions.assert_called_once()
+
+    def test_unknown_class_session_falls_back_to_placeholder_name(self, service, stub_repos, session):
+        exam_repo, schedule_repo, user_repo = stub_repos
+        exam = make_exam()
+        exam_repo.list_exams.return_value = ([exam], 1)
+        user_repo.get_teacher_profile_by_user_id.return_value = make_teacher()
+        schedule_repo.get_course_names_for_class_sessions.return_value = {}
+
+        items, _total = service.list_exams(session, _teacher_user(), 1, 20)
+
+        assert items[0].course_name == "Unknown Class"

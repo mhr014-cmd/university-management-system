@@ -31,6 +31,9 @@ class TestGetMe:
         assert body["email"] == "student@example.com"
         assert body["role"] == "student"
         assert body["profile"]["department_id"] == str(student.department_id)
+        # Production-polish fix: the Profile page's read-only Department
+        # field must show a name, not just the raw department_id UUID.
+        assert body["profile"]["department_name"]
 
     def test_admin_profile_has_null_department_id(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")
@@ -40,6 +43,42 @@ class TestGetMe:
 
         assert response.status_code == 200
         assert response.json()["profile"]["department_id"] is None
+
+
+class TestGetMyChildren:
+    def test_requires_authentication(self, client):
+        assert client.get("/api/v1/users/me/children").status_code == 401
+
+    def test_forbidden_for_non_parent_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        response = client.get("/api/v1/users/me/children", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 403
+
+    def test_parent_sees_linked_children_by_name(
+        self, client, make_parent_user, make_student_user, link_parent_student
+    ):
+        _parent_user, parent = make_parent_user("parent@example.com", "correct-password")
+        _student_user, student = make_student_user("child@example.com", "student-password")
+        link_parent_student(parent, student)
+        token = _login(client, "parent@example.com", "correct-password")
+
+        response = client.get("/api/v1/users/me/children", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["children"]) == 1
+        assert body["children"][0]["first_name"] == student.first_name
+        assert body["children"][0]["id"] == str(student.id)
+
+    def test_parent_with_no_linked_children_sees_empty_list(self, client, make_parent_user):
+        make_parent_user("parent@example.com", "correct-password")
+        token = _login(client, "parent@example.com", "correct-password")
+
+        response = client.get("/api/v1/users/me/children", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert response.json()["children"] == []
 
 
 class TestUpdateMe:

@@ -24,6 +24,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
+from app.models.attendance_record import AttendanceRecord
 from app.models.class_session import ClassSession
 from app.models.student import Student
 from app.models.teacher import Teacher
@@ -363,3 +364,39 @@ class TestAttendanceMeQueryValidation:
     def test_date_from_after_date_to_rejected(self):
         with pytest.raises(ValueError):
             AttendanceMeQuery(date_from=date(2026, 2, 1), date_to=date(2026, 1, 1))
+
+
+class TestGetReports:
+    """Final-polish fix: GET /attendance/reports must return a display
+    name per student, resolved via a single batch lookup (not one query
+    per student — CLAUDE.md §11's N+1 guidance)."""
+
+    def test_report_entries_include_student_name_via_single_batch_lookup(self, service, stub_repos, session):
+        attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        student = Student(id=uuid.uuid4(), user_id=uuid.uuid4(), department_id=uuid.uuid4(), first_name="Sam", last_name="Student")
+        attendance_repo.list_for_report.return_value = [
+            AttendanceRecord(
+                id=uuid.uuid4(), student_id=student.id, class_session_id=uuid.uuid4(),
+                marked_by_teacher_id=uuid.uuid4(), attendance_date=date(2026, 1, 5), status="present",
+            )
+        ]
+        user_repo.list_students_by_ids.return_value = [student]
+
+        result = service.get_reports(session, None, None)
+
+        assert result.summary[0].student_name == "Sam Student"
+        user_repo.list_students_by_ids.assert_called_once()
+
+    def test_unknown_student_falls_back_to_placeholder_name(self, service, stub_repos, session):
+        attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        attendance_repo.list_for_report.return_value = [
+            AttendanceRecord(
+                id=uuid.uuid4(), student_id=uuid.uuid4(), class_session_id=uuid.uuid4(),
+                marked_by_teacher_id=uuid.uuid4(), attendance_date=date(2026, 1, 5), status="present",
+            )
+        ]
+        user_repo.list_students_by_ids.return_value = []
+
+        result = service.get_reports(session, None, None)
+
+        assert result.summary[0].student_name == "Unknown Student"

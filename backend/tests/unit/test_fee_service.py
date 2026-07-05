@@ -379,7 +379,7 @@ class TestGetOverdueAccounts:
         assert exc.value.status_code == 422
 
     def test_only_past_due_unpaid_invoices_included(self, service, stub_repos, session):
-        fee_repo, *_ = stub_repos
+        fee_repo, user_repo, *_ = stub_repos
         fee_structure_past = make_fee_structure(due_date=date(2020, 1, 1), amount=5000)
         fee_structure_future = make_fee_structure(due_date=date(2030, 1, 1), amount=3000)
         invoice_past = make_invoice(fee_structure_id=fee_structure_past.id, status="unpaid")
@@ -389,11 +389,14 @@ class TestGetOverdueAccounts:
             (invoice_future, fee_structure_future),
         ]
         fee_repo.sum_payments.return_value = 0.0
+        overdue_student = make_student(id=invoice_past.student_id)
+        user_repo.list_students_by_ids.return_value = [overdue_student]
 
         result = service.get_overdue_accounts(session, None, None)
         assert len(result.overdue_accounts) == 1
         assert result.overdue_accounts[0].amount_due == 5000.0
         assert result.overdue_accounts[0].days_overdue > 0
+        assert result.overdue_accounts[0].student_name == f"{overdue_student.first_name} {overdue_student.last_name}"
 
 
 class TestNotifyOverdueAccounts:

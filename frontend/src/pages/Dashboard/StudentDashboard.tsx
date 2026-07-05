@@ -4,7 +4,6 @@
 // (ExamList, Attendance, FeeCentre, ResultsView) — no new backend scope.
 
 import { Link } from "react-router-dom";
-import { useMySchedule } from "../../features/schedule";
 import { useExams } from "../../features/exams";
 import { useMyAttendance } from "../../features/attendance";
 import { useMyFees } from "../../features/fees";
@@ -12,13 +11,10 @@ import { useMyResults } from "../../features/results";
 import { DashboardCard } from "./DashboardCard";
 
 export function StudentDashboard() {
-  const { data: schedule } = useMySchedule();
   const { data: exams } = useExams({ pageSize: 100 });
   const { data: attendance } = useMyAttendance();
   const { data: fees } = useMyFees();
   const { data: results } = useMyResults();
-
-  const classNameById = new Map((schedule?.entries ?? []).map((e) => [e.class_session_id, e.course_name]));
 
   const upcoming = (exams?.items ?? [])
     .filter((e) => (e.status === "scheduled" || e.status === "open") && e.scheduled_at)
@@ -40,7 +36,7 @@ export function StudentDashboard() {
           <ul className="space-y-1 text-sm">
             {upcoming.map((exam) => (
               <li key={exam.id}>
-                {exam.title} — {classNameById.get(exam.class_session_id) ?? exam.class_session_id} —{" "}
+                {exam.title} — {exam.course_name} —{" "}
                 {new Date(exam.scheduled_at!).toLocaleDateString()}
               </li>
             ))}
@@ -102,7 +98,10 @@ export function StudentDashboard() {
             </thead>
             <tbody>
               {mostRecentSemester.courses.slice(0, 5).map((course) => (
-                <tr key={course.course_id} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={course.course_id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
                   <td className="py-2">{course.course_name}</td>
                   <td className="py-2">{course.grade_letter}</td>
                   <td className="py-2">{mostRecentSemester.semester_name}</td>

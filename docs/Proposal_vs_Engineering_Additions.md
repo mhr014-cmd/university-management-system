@@ -251,3 +251,36 @@ Found during the Milestone 0 proposal-traceability review: two frontend elements
 **Where:** `frontend/tests/pages/{ExamRoom,GradingInterface,ResultApproval}.test.tsx`, `frontend/tests/setup.ts`; new devDependencies `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`; `test` block added to `vite.config.ts`.
 **Classification: Derived.** `CLAUDE.md` §10 explicitly names "exam timer, grading form, approval workflow" as the frontend's critical interaction logic requiring component tests, and `Implementation_Roadmap.md`'s own Milestone 11 file list names `frontend/tests/` — scaffolded empty since Milestone 0, never populated until now. Covers exactly those three named flows: the Exam Room countdown/auto-submit (`ExamRoomPage`), the Teacher Grading Interface's mark-entry/save and VR-006 max-marks error path (`GradingInterfacePage`), and the Admin Result Approval workflow's approve/reject-requires-comment behavior (`ResultApprovalPage`).
 **Disposition:** Permanent — establishes the pattern (mock the relevant `features/*` hook module, render with a `MemoryRouter`, assert on the mutation call and rendered outcome) for any future frontend test in this project.
+
+---
+
+## Production-Polish Audit Additions (2026-07-05)
+
+### Global keyboard focus-visible styling
+**Where:** `frontend/src/styles/globals.css` (new `@layer base` rule).
+**Classification: Derived.** `Requirement_Analysis.md`/`System_Architecture.md` don't mandate a specific focus style, but accessible keyboard navigation is an implicit baseline for any production web app, and no component in this codebase set one explicitly — focus fell back to each browser's inconsistent default, which is not guaranteed to have sufficient contrast against this app's dark-mode slate backgrounds. Applied once, globally, via `@layer base`, rather than a `focus:` utility repeated across every interactive element in every page — bounded, non-invasive, touches no component markup.
+**Disposition:** Permanent.
+
+A post-M11 production-quality audit, explicitly authorized by the user, found and fixed several places where raw database identifiers (UUIDs) were rendered to end users instead of human-readable names, and one long-standing documented gap (the Parent Portal's manual Student ID entry) that the user's own audit instructions explicitly asked to be revisited. Logged per `CLAUDE.md` §9/§14 item 11.
+
+### `UserProfile.department_name` (additive field on `GET /users/me`)
+**Where:** `backend/app/schemas/user.py` (`UserProfile.department_name`), `backend/app/services/user_service.py` (`_get_own_profile`), `frontend/src/features/users/index.ts`, `frontend/src/pages/Profile/index.tsx`.
+**Classification: Design Enhancement.** The proposal never specifies whether the Profile page's Department field shows an ID or a name, but rendering a raw UUID to an end user is never acceptable UX and was flagged directly by the user's audit ("Investigate why Department displays a UUID. Replace with department name."). The existing `department_id` field is left untouched (additive, non-breaking) — `department_name` is a new, optional field populated via the same `DepartmentRepository.get()` lookup `_get_own_profile` already had a `department_id` for, so no new query pattern or N+1 risk is introduced.
+**Disposition:** Permanent. The Profile page's Department field now renders `department_name` (falling back to `"—"` if a linked department was deleted), read-only, matching the read-only nature already documented for this field in `UI_Wireframes.md`.
+
+### `GET /users/me/children` (Parent-only)
+**Where:** `backend/app/routers/users.py`, `backend/app/services/user_service.py` (`get_my_children`), `backend/app/repositories/user_repository.py` (`list_linked_students`), `backend/app/schemas/user.py` (`ChildEntry`, `MyChildrenResponse`), `frontend/src/features/users/index.ts` (`useMyChildren`), `frontend/src/pages/Dashboard/ParentDashboard.tsx`.
+**Classification: Derived.** This closes a gap that had been explicitly documented as a *permanent, accepted limitation* since Milestone 7 ("no endpoint anywhere enumerates a Parent's linked children... a real deployment would need such an endpoint"; see the now-superseded note in `ParentDashboard.tsx`'s prior revision and the Milestone 7/8/10 `PROJECT_PROGRESS.md` entries referencing it). The user's audit instructions explicitly revisited this exact limitation ("Typing Student IDs manually is not acceptable. If possible: show linked child automatically.") — treated as fresh, explicit authorization to implement it now, not silently invented scope. The endpoint is a thin, read-only wrapper around the `parent_student_link` table that already existed (Milestone 3) for ownership-scoping checks (`parent_has_linked_student`) — no new table, no new business rule, only a new way to *read* an existing relationship.
+**Disposition:** Permanent. `ParentDashboard.tsx`'s manual "Student ID" text input is removed and replaced with a `<select>` populated from this endpoint (auto-selecting the first/only child); `FeeCentre`/`ResultsView`'s own manual student-ID entry points were not in scope for this pass and are unchanged.
+
+### Table/UX polish pass: row hover states, status badges, empty states
+**Where:** `frontend/src/pages/{Admin/FeeDashboard,ResultsView,FeeCentre,Dashboard/ParentDashboard,Dashboard/StudentDashboard,Admin/Reports,Dashboard/AdminDashboard,Admin/ResultApproval,Teacher/AttendanceMarker,Attendance,Admin/UserManagement,ExamList}/index.tsx`.
+**Classification: Design Enhancement.** No business logic changed — purely presentational. Adds a consistent row-hover style (`hover:bg-slate-50`/dark equivalent) to every data table that previously had none (only `ExamList` had it before this pass), colored status badges for the three plain-text status columns that most read like an enum (`UserManagement`'s Active/Inactive, `FeeCentre`'s invoice status, `ExamList`'s exam status), and empty-state messages for three tables that previously rendered a bare empty `<table>` with no explanatory text (`Attendance`, `Admin/UserManagement`, `Teacher/AttendanceMarker`'s roster, plus the Admin Reports attendance-summary table, whose results table already had one).
+**Disposition:** Permanent.
+
+### Invoice download on Admin Fee Dashboard's Overdue Accounts table
+**Where:** `frontend/src/pages/Admin/FeeDashboard/index.tsx` (new "Download Invoice" button per row).
+**Classification: Design Enhancement.** No new endpoint or business logic — reuses the existing `GET /fees/invoices/{invoice_id}` endpoint (already Admin-accessible, per `_require_student_or_admin` in `backend/app/routers/fees.py`) and the existing `useDownloadInvoice()` hook (`frontend/src/features/fees/index.ts`), the same one already wired into the Student-facing `FeeCentre` page. The audit found the Admin Fee Dashboard's overdue-accounts table had no way to view/download the invoice PDF for an overdue account without navigating elsewhere — an inconsistency with the Student view, not a missing capability.
+**Disposition:** Permanent.
+
+---

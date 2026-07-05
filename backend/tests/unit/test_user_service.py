@@ -91,15 +91,30 @@ class TestMeUpdateSchema:
 
 class TestGetMe:
     def test_student_profile_maps_department_id(self, service, stub_repos, session):
-        user_repo, _ = stub_repos
+        user_repo, department_repo = stub_repos
         user = make_user(role="student")
         student = make_student(department_id=uuid.uuid4())
         user_repo.get_student_profile_by_user_id.return_value = student
+        department_repo.get.return_value = Department(id=student.department_id, name="Computer Science", code="CS")
 
         result = service.get_me(session, user)
 
         assert result.profile.first_name == student.first_name
         assert result.profile.department_id == student.department_id
+        # Production-polish fix: the Profile page's read-only Department
+        # field must show a name, not just the raw department_id UUID.
+        assert result.profile.department_name == "Computer Science"
+
+    def test_student_profile_department_name_none_if_department_missing(self, service, stub_repos, session):
+        user_repo, department_repo = stub_repos
+        user = make_user(role="student")
+        student = make_student(department_id=uuid.uuid4())
+        user_repo.get_student_profile_by_user_id.return_value = student
+        department_repo.get.return_value = None
+
+        result = service.get_me(session, user)
+
+        assert result.profile.department_name is None
 
     def test_parent_profile_has_no_department_id(self, service, stub_repos, session):
         user_repo, _ = stub_repos
@@ -110,7 +125,36 @@ class TestGetMe:
         result = service.get_me(session, user)
 
         assert result.profile.department_id is None
+        assert result.profile.department_name is None
         assert result.profile.profile_photo_url is None
+
+
+class TestGetMyChildren:
+    def test_maps_linked_students_to_child_entries(self, service, stub_repos, session):
+        user_repo, _ = stub_repos
+        user = make_user(role="parent")
+        parent = Parent(id=uuid.uuid4(), user_id=user.id, first_name="Pat", last_name="Guardian")
+        student = make_student()
+        user_repo.get_parent_profile_by_user_id.return_value = parent
+        user_repo.list_linked_students.return_value = [student]
+
+        result = service.get_my_children(session, user)
+
+        assert len(result.children) == 1
+        assert result.children[0].id == student.id
+        assert result.children[0].first_name == student.first_name
+        user_repo.list_linked_students.assert_called_once_with(session, parent.id)
+
+    def test_no_linked_students_returns_empty_list(self, service, stub_repos, session):
+        user_repo, _ = stub_repos
+        user = make_user(role="parent")
+        parent = Parent(id=uuid.uuid4(), user_id=user.id, first_name="Pat", last_name="Guardian")
+        user_repo.get_parent_profile_by_user_id.return_value = parent
+        user_repo.list_linked_students.return_value = []
+
+        result = service.get_my_children(session, user)
+
+        assert result.children == []
 
 
 class TestUpdateMe:

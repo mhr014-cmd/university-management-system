@@ -17,6 +17,7 @@ import { useSemesters } from "../../../features/semesters";
 import { useStudents } from "../../../features/users";
 import {
   useCreateFeeStructure,
+  useDownloadInvoice,
   useNotifyOverdueAccounts,
   useOverdueAccounts,
   useRecordPayment,
@@ -30,6 +31,7 @@ export default function FeeDashboardPage() {
   const createFeeStructure = useCreateFeeStructure();
   const recordPayment = useRecordPayment();
   const notifyOverdue = useNotifyOverdueAccounts();
+  const downloadInvoice = useDownloadInvoice();
 
   const [fsDepartmentId, setFsDepartmentId] = useState("");
   const [fsSemesterId, setFsSemesterId] = useState("");
@@ -274,16 +276,20 @@ export default function FeeDashboardPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-2">Student ID</th>
+                <th className="py-2">Student</th>
                 <th className="py-2">Amount Due</th>
                 <th className="py-2">Days Overdue</th>
+                <th className="py-2"></th>
                 <th className="py-2"></th>
               </tr>
             </thead>
             <tbody>
               {overdue.overdue_accounts.map((account) => (
-                <tr key={account.invoice_id} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="py-2">{account.student_id}</td>
+                <tr
+                  key={account.invoice_id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
+                  <td className="py-2">{account.student_name}</td>
                   <td className="py-2">{account.amount_due.toFixed(2)}</td>
                   <td className="py-2">{account.days_overdue}</td>
                   <td className="py-2">
@@ -294,6 +300,16 @@ export default function FeeDashboardPage() {
                       className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
                     >
                       Notify
+                    </button>
+                  </td>
+                  <td className="py-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadInvoice.mutate(account.invoice_id)}
+                      disabled={downloadInvoice.isPending}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
+                    >
+                      Download Invoice
                     </button>
                   </td>
                 </tr>

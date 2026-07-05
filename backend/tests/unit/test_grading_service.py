@@ -19,6 +19,7 @@ from app.models.exam import Exam
 from app.models.exam_submission import ExamSubmission
 from app.models.question import Question
 from app.models.question_grade import QuestionGrade
+from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.user import User
 from app.schemas.grading import ExamGradeRequest, GradeInput
@@ -352,3 +353,37 @@ class TestGetSubmissionDetail:
         assert result.questions[0].feedback == "good"
         assert result.questions[1].answer_id is None
         assert result.questions[1].awarded_marks is None
+
+
+class TestGetResults:
+    """Final-polish fix: GET /exams/{id}/results must return a
+    student_name per submission, resolved via a single batch lookup (not
+    one query per submission — CLAUDE.md §11's N+1 guidance)."""
+
+    def test_summaries_include_student_name_via_single_batch_lookup(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam()
+        exam_repo.get_exam.return_value = exam
+        student = Student(id=uuid.uuid4(), user_id=uuid.uuid4(), department_id=uuid.uuid4(), first_name="Sam", last_name="Student")
+        submission = make_submission(exam_id=exam.id, student_id=student.id, status="graded")
+        exam_repo.list_submissions_for_exam.return_value = [submission]
+        exam_repo.list_grades_for_submission.return_value = []
+        user_repo.list_students_by_ids.return_value = [student]
+
+        result = service.get_results(session, _admin_user(), exam.id)
+
+        assert result.submissions[0].student_name == "Sam Student"
+        user_repo.list_students_by_ids.assert_called_once()
+
+    def test_unknown_student_falls_back_to_placeholder_name(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam()
+        exam_repo.get_exam.return_value = exam
+        submission = make_submission(exam_id=exam.id, status="graded")
+        exam_repo.list_submissions_for_exam.return_value = [submission]
+        exam_repo.list_grades_for_submission.return_value = []
+        user_repo.list_students_by_ids.return_value = []
+
+        result = service.get_results(session, _admin_user(), exam.id)
+
+        assert result.submissions[0].student_name == "Unknown Student"

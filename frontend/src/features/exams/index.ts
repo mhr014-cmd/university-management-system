@@ -59,6 +59,7 @@ export interface ExamListItem {
   id: string;
   title: string;
   class_session_id: string;
+  course_name: string;
   exam_type: ExamType;
   time_limit_minutes: number;
   status: ExamStatus;
@@ -115,6 +116,7 @@ export interface ExamGradeResponse {
 
 export interface ExamResultsSubmissionSummary {
   student_id: string;
+  student_name: string;
   submission_id: string;
   total_awarded_marks: number;
   status: ExamSubmissionStatus;

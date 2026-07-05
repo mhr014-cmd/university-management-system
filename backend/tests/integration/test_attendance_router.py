@@ -299,6 +299,10 @@ class TestAttendanceReports:
         response = client.get("/api/v1/attendance/reports", headers=_headers(admin_token))
         assert response.status_code == 200
         assert response.json()["summary"][0]["percentage"] == 100.0
+        # Final-polish fix: the report must show a display name, not just
+        # the raw student_id, so the frontend Reports page never falls
+        # back to rendering a UUID.
+        assert response.json()["summary"][0]["student_name"] == "Test Student"
 
 
 class TestClassSessionRoster:

@@ -140,7 +140,10 @@ export default function AttendanceMarkerPage() {
             </thead>
             <tbody>
               {roster.students.map((student: RosterEntry) => (
-                <tr key={student.student_id} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={student.student_id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
                   <td className="py-2">{student.first_name} {student.last_name}</td>
                   <td className="py-2">
                     <select
@@ -161,6 +164,9 @@ export default function AttendanceMarkerPage() {
               ))}
             </tbody>
           </table>
+          {roster.students.length === 0 && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">No students enrolled in this class session.</p>
+          )}
 
           <div className="flex items-center justify-between">
             <button

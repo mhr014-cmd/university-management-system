@@ -115,7 +115,10 @@ export default function AttendancePage() {
             {allRecords
               .sort((a, b) => b.date.localeCompare(a.date))
               .map((record, i) => (
-                <tr key={i} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={i}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
                   <td className="py-2">{record.date}</td>
                   <td className="py-2">{record.course_name}</td>
                   <td className="py-2 capitalize">{record.status}</td>
@@ -123,7 +126,11 @@ export default function AttendancePage() {
               ))}
           </tbody>
         </table>
-      ) : (
+      ) : null}
+      {view === "table" && allRecords.length === 0 && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">No attendance records yet.</p>
+      )}
+      {view !== "table" && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Calendar view is not yet implemented — use Table view.
         </p>

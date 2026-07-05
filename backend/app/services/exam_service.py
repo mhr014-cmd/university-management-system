@@ -112,11 +112,18 @@ class ExamService:
                 session, page, page_size, class_session_id=class_session_id, status=status_filter
             )
 
+        # Single batch lookup for every exam's class/course display name —
+        # not one query per exam — so this list never becomes an N+1 query.
+        course_name_by_class_session_id = schedule_repo.get_course_names_for_class_sessions(
+            session, list({e.class_session_id for e in exams})
+        )
+
         items = [
             ExamListItem(
                 id=e.id,
                 title=e.title,
                 class_session_id=e.class_session_id,
+                course_name=course_name_by_class_session_id.get(e.class_session_id, "Unknown Class"),
                 exam_type=e.exam_type,
                 time_limit_minutes=e.time_limit_minutes,
                 status=e.status,

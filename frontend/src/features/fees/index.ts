@@ -67,6 +67,7 @@ export interface PaymentHistoryResponse {
 
 export interface OverdueAccountEntry {
   student_id: string;
+  student_name: string;
   invoice_id: string;
   amount_due: number;
   due_date: string;

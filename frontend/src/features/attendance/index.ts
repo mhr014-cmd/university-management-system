@@ -59,6 +59,7 @@ export interface ClassAttendanceResponse {
 
 export interface AttendanceReportEntry {
   student_id: string;
+  student_name: string;
   percentage: number;
 }
 

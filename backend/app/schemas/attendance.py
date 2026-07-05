@@ -97,6 +97,9 @@ class AttendanceReportScope(BaseModel):
 
 class AttendanceReportEntry(BaseModel):
     student_id: uuid.UUID
+    # Additive display field (final-polish pass): the frontend Reports page
+    # previously rendered the raw student_id UUID — see student_name below.
+    student_name: str
     percentage: float
 
 

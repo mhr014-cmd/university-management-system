@@ -54,6 +54,10 @@ class ExamGradeResponse(BaseModel):
 
 class ExamResultsSubmissionSummary(BaseModel):
     student_id: uuid.UUID
+    # Additive display field (final-polish pass): the Teacher Grading
+    # Interface previously rendered a truncated student_id UUID prefix
+    # instead of the student's name.
+    student_name: str
     submission_id: uuid.UUID
     total_awarded_marks: float
     status: ExamSubmissionStatus

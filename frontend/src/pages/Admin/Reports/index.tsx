@@ -90,14 +90,20 @@ export default function AdminReportsPage() {
             </thead>
             <tbody>
               {attendanceReport.data.summary.map((entry) => (
-                <tr key={entry.student_id} className="border-b border-slate-100 dark:border-slate-800">
-                  <td className="py-2">{entry.student_id}</td>
+                <tr
+                  key={entry.student_id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
+                  <td className="py-2">{entry.student_name}</td>
                   <td className="py-2">{entry.percentage.toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ))}
+      {tab === "attendance" && attendanceReport.data && attendanceReport.data.summary.length === 0 && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">No attendance records in this scope.</p>
+      )}
 
       {tab === "results" &&
         (resultsReport.isLoading || !resultsReport.data ? (
@@ -133,7 +139,10 @@ export default function AdminReportsPage() {
               </thead>
               <tbody>
                 {resultsReport.data.grade_distribution.map((entry) => (
-                  <tr key={entry.grade_letter} className="border-b border-slate-100 dark:border-slate-800">
+                  <tr
+                    key={entry.grade_letter}
+                    className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                  >
                     <td className="py-2">{entry.grade_letter}</td>
                     <td className="py-2">{entry.count}</td>
                   </tr>

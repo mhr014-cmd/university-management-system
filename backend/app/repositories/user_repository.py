@@ -83,6 +83,14 @@ class UserRepository:
         rows = session.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
         return [(row[0], row[1]) for row in rows], total
 
+    def list_students_by_ids(self, session: Session, student_ids: list[uuid.UUID]) -> list[Student]:
+        """Batch name lookup for a set of student IDs — one query regardless
+        of how many IDs are passed, so callers building a display-name map
+        for a report/list response never fall into a per-row N+1 pattern."""
+        if not student_ids:
+            return []
+        return list(session.scalars(select(Student).where(Student.id.in_(student_ids))))
+
     def create_student(
         self,
         session: Session,
@@ -176,5 +184,18 @@ class UserRepository:
             select(Parent.user_id)
             .join(ParentStudentLink, ParentStudentLink.parent_id == Parent.id)
             .where(ParentStudentLink.student_id == student_id)
+        )
+        return list(session.scalars(stmt))
+
+    def list_linked_students(self, session: Session, parent_id: uuid.UUID) -> list[Student]:
+        """All students linked to a given Parent (production-polish audit:
+        backs GET /users/me/children, so the Parent Dashboard/Portal can
+        show linked children by name instead of requiring a manually
+        typed student_id)."""
+        stmt = (
+            select(Student)
+            .join(ParentStudentLink, ParentStudentLink.student_id == Student.id)
+            .where(ParentStudentLink.parent_id == parent_id)
+            .order_by(Student.first_name, Student.last_name)
         )
         return list(session.scalars(stmt))

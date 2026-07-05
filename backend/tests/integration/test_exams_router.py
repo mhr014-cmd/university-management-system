@@ -127,6 +127,13 @@ class TestListAndGetExam:
         get_response = client.get(f"/api/v1/exams/{exam_id}", headers=_headers(student_token))
         assert get_response.status_code == 404
 
+        # Final-polish fix: GET /exams must return a course_name, not just
+        # the raw class_session_id, so the frontend Exam List page never
+        # falls back to rendering a UUID.
+        teacher_list = client.get("/api/v1/exams", headers=_headers(teacher_token)).json()
+        listed_exam = next(e for e in teacher_list["items"] if e["id"] == exam_id)
+        assert listed_exam["course_name"] == "Intro to CS"
+
     def test_unenrolled_student_cannot_view_open_exam(
         self, client, make_teacher_user, make_student_user, make_class_session
     ):
@@ -464,6 +471,10 @@ class TestGradingWorkflow:
         self._submit_full_answers(client, exam, student_token)
 
         results = client.get(f"/api/v1/exams/{exam['id']}/results", headers=_headers(teacher_token))
+        # Final-polish fix: GET /exams/{id}/results must return a
+        # student_name, not just the raw student_id, so the Teacher Grading
+        # Interface never falls back to rendering a truncated UUID.
+        assert results.json()["submissions"][0]["student_name"] == "Test Student"
         submission_id = results.json()["submissions"][0]["submission_id"]
         detail = client.get(
             f"/api/v1/exams/{exam['id']}/submissions/{submission_id}", headers=_headers(teacher_token)

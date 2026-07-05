@@ -89,7 +89,7 @@ export default function ResultApprovalPage() {
             const isExpanded = expandedKey === key;
             return (
               <Fragment key={key}>
-                <tr className="border-b border-slate-100 dark:border-slate-800">
+                <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
                   <td className="py-2">{item.exam_title ?? "—"}</td>
                   <td className="py-2">{item.course_name}</td>
                   <td className="py-2">{item.submitted_by_teacher_name}</td>

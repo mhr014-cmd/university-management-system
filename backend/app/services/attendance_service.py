@@ -331,8 +331,17 @@ class AttendanceService:
         for record in records:
             by_student.setdefault(record.student_id, []).append(record)
 
+        # Single batch lookup for every student's display name — not one
+        # query per student — so this report never becomes an N+1 query.
+        students = user_repo.list_students_by_ids(session, list(by_student.keys()))
+        name_by_student_id = {s.id: f"{s.first_name} {s.last_name}" for s in students}
+
         summary = [
-            AttendanceReportEntry(student_id=student_id, percentage=_percentage(student_records))
+            AttendanceReportEntry(
+                student_id=student_id,
+                student_name=name_by_student_id.get(student_id, "Unknown Student"),
+                percentage=_percentage(student_records),
+            )
             for student_id, student_records in by_student.items()
         ]
         return AttendanceReportsResponse(

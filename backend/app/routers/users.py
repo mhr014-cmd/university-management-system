@@ -21,7 +21,7 @@ from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.student import StudentCreate, StudentRead, StudentUpdate
 from app.schemas.teacher import TeacherCreate, TeacherRead, TeacherUpdate
-from app.schemas.user import MeRead, MeUpdate
+from app.schemas.user import MeRead, MeUpdate, MyChildrenResponse
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -30,6 +30,7 @@ user_service = UserService()
 
 _require_admin = Depends(require_roles("admin"))
 _require_admin_or_teacher = Depends(require_roles("admin", "teacher"))
+_require_parent = Depends(require_roles("parent"))
 
 
 @router.get("/me", response_model=MeRead)
@@ -44,6 +45,11 @@ def update_me(
     db: Session = Depends(get_db),
 ):
     return user_service.update_me(db, current_user, payload)
+
+
+@router.get("/me/children", response_model=MyChildrenResponse, dependencies=[_require_parent])
+def get_my_children(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user_service.get_my_children(db, current_user)
 
 
 @router.get("/students", response_model=PaginatedResponse[StudentRead], dependencies=[_require_admin_or_teacher])

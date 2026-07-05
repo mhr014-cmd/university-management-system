@@ -118,7 +118,7 @@ export default function ProfilePage() {
         {me.profile.department_id && (
           <div>
             <label className="mb-1 block text-sm font-medium">Department</label>
-            <input value={me.profile.department_id} disabled className="w-full rounded border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400" />
+            <input value={me.profile.department_name ?? "—"} disabled className="w-full rounded border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400" />
           </div>
         )}
 

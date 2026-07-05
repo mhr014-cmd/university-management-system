@@ -22,6 +22,14 @@ import type { ExamStatus } from "../../features/exams";
 
 const STATUS_OPTIONS: ExamStatus[] = ["draft", "scheduled", "open", "closed", "published"];
 
+const examStatusStyles: Record<ExamStatus, string> = {
+  draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  open: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+  closed: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  published: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+};
+
 export default function ExamListPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -115,10 +123,12 @@ export default function ExamListPage() {
               className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
             >
               <td className="py-2">{exam.title}</td>
+              <td className="py-2">{exam.course_name}</td>
               <td className="py-2">
-                {uniqueClassSessions.find(([id]) => id === exam.class_session_id)?.[1] ?? exam.class_session_id}
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${examStatusStyles[exam.status]}`}>
+                  {exam.status}
+                </span>
               </td>
-              <td className="py-2 capitalize">{exam.status}</td>
               <td className="py-2">{exam.scheduled_at ? new Date(exam.scheduled_at).toLocaleString() : "—"}</td>
             </tr>
           ))}

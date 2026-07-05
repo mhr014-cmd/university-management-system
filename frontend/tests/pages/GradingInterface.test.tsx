@@ -25,7 +25,15 @@ const mutateAsyncUpdateExam = vi.fn();
 // exhausted the test worker's memory the first time this was written).
 const examResultsData = {
   exam_id: "exam-1",
-  submissions: [{ student_id: "student-1", submission_id: "sub-1", total_awarded_marks: 0, status: "submitted" }],
+  submissions: [
+    {
+      student_id: "student-1",
+      student_name: "Sam Student",
+      submission_id: "sub-1",
+      total_awarded_marks: 0,
+      status: "submitted",
+    },
+  ],
 };
 
 const submissionDetailData = {

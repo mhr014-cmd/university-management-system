@@ -282,6 +282,9 @@ class TestGetOverdueAccounts:
         assert len(accounts) == 1
         assert accounts[0]["amount_due"] == 2000.0
         assert accounts[0]["days_overdue"] > 0
+        # Final-polish fix: the Admin Fee Dashboard must show a display
+        # name, not just the raw student_id.
+        assert accounts[0]["student_name"] == "Test Student"
 
 
 class TestGetInvoice:

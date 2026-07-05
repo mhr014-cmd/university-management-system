@@ -5,13 +5,12 @@
 // Known simplification: this milestone builds the Student-facing view
 // only, matching Implementation_Roadmap.md's Milestone 7 frontend page
 // list ("Results view (Student)"). The wireframe's Role Visibility note
-// says Parent access reuses this same layout with a child selector — but
-// no endpoint exists anywhere to list a Parent's linked children (only
-// ownership *verification* via parent_student_link, not enumeration), so
-// a child selector cannot be populated yet. Left as a known gap for
-// whichever future milestone builds the full Parent Portal (Page 17,
-// Parent: Child View), which will need the same "list my children"
-// capability for attendance/fees/schedule too, not just results. See
+// says Parent access reuses this same layout with a child selector; the
+// production-polish audit added GET /users/me/children (Parent linked-
+// children enumeration) and wired a child selector into
+// ParentDashboard.tsx's Recent Results widget rather than into this page
+// directly. A dedicated Parent-facing Results View reusing this exact
+// layout remains unbuilt — out of scope for that audit pass. See
 // PROJECT_PROGRESS.md's Milestone 7 entry.
 
 import { useState } from "react";
@@ -69,7 +68,10 @@ export default function ResultsViewPage() {
             </thead>
             <tbody>
               {selected.courses.map((course) => (
-                <tr key={course.course_id} className="border-b border-slate-100 dark:border-slate-800">
+                <tr
+                  key={course.course_id}
+                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
                   <td className="py-2">{course.course_name}</td>
                   <td className="py-2">{course.grade_letter}</td>
                   <td className="py-2">{course.grade_point.toFixed(1)}</td>
