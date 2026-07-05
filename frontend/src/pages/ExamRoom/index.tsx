@@ -176,6 +176,24 @@ export default function ExamRoomPage() {
                   </label>
                 ))}
               </div>
+            ) : currentQuestion.question_type === "coding" ? (
+              // Code-editor-style textarea (UI_Wireframes.md Section 5): monospace,
+              // whitespace/indentation preserved natively by <textarea>, no
+              // syntax-highlighting dependency — same answer_text autosave path
+              // as the written/descriptive branch below.
+              <textarea
+                value={answers[currentQuestion.id]?.answer_text ?? ""}
+                onChange={(e) =>
+                  setAnswers((prev) => ({
+                    ...prev,
+                    [currentQuestion.id]: { answer_text: e.target.value },
+                  }))
+                }
+                rows={12}
+                spellCheck={false}
+                placeholder="Write your code here..."
+                className="w-full whitespace-pre rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-900 focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-500"
+              />
             ) : (
               <textarea
                 value={answers[currentQuestion.id]?.answer_text ?? ""}
