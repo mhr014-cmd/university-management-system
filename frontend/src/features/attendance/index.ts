@@ -68,7 +68,9 @@ export interface AttendanceReportResponse {
   summary: AttendanceReportEntry[];
 }
 
-export function useMyAttendance(params?: { classSessionId?: string; dateFrom?: string; dateTo?: string }) {
+export function useMyAttendance(
+  params?: { classSessionId?: string; dateFrom?: string; dateTo?: string; studentId?: string },
+) {
   return useQuery({
     queryKey: ["attendance", "me", params],
     queryFn: async () =>
@@ -78,9 +80,15 @@ export function useMyAttendance(params?: { classSessionId?: string; dateFrom?: s
             class_session_id: params?.classSessionId,
             date_from: params?.dateFrom,
             date_to: params?.dateTo,
+            // Parent scoping (gap closure): required for Parent, ignored
+            // for Student — mirrors useMyFees/useMyResults's student_id.
+            student_id: params?.studentId,
           },
         })
       ).data,
+    // Don't fire a guaranteed-403 request before a Parent has picked a
+    // child — same gating as useMySchedule's Parent path.
+    enabled: params?.studentId !== "",
   });
 }
 

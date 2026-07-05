@@ -207,6 +207,78 @@ class TestGetMyAttendance:
         assert body["overall_percentage"] == 0.0
         assert body["low_attendance_warning"] is True
 
+    # --- Gap closure: Parent access via GET /attendance/me + student_id ---
+
+    def test_parent_without_student_id_returns_403(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment, make_schedule_entry
+    ):
+        _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        make_parent_user("parent@example.com", "parent-password")
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get("/api/v1/attendance/me", headers=_headers(parent_token))
+        assert response.status_code == 403
+
+    def test_parent_without_link_returns_403(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+    ):
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        make_parent_user("parent@example.com", "parent-password")  # not linked to `student`
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(
+            "/api/v1/attendance/me", params={"student_id": str(student.id)}, headers=_headers(parent_token)
+        )
+        assert response.status_code == 403
+
+    def test_parent_with_link_sees_child_attendance(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+        link_parent_student,
+    ):
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        client.post(
+            "/api/v1/attendance",
+            json={
+                "class_session_id": str(class_session.id),
+                "attendance_date": "2026-01-05",
+                "records": [{"student_id": str(student.id), "status": "absent"}],
+            },
+            headers=_headers(teacher_token),
+        )
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(
+            "/api/v1/attendance/me", params={"student_id": str(student.id)}, headers=_headers(parent_token)
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["overall_percentage"] == 0.0
+        assert body["low_attendance_warning"] is True
+
 
 class TestGetClassAttendance:
     def test_parent_without_student_id_returns_403(

@@ -40,17 +40,25 @@ _require_teacher_or_admin = Depends(require_roles("teacher", "admin"))
 # is never included except for GET /attendance/me, per Rule 8.
 _require_teacher_admin_or_parent = Depends(require_roles("teacher", "admin", "parent"))
 _require_admin = Depends(require_roles("admin"))
+# Production-polish gap closure: GET /attendance/me now also accepts Parent
+# (with a required student_id scoped to a linked child), mirroring the
+# Parent-scoping convention already used by GET /fees/me and GET /results/me
+# — see attendance_service.get_me and docs/Proposal_vs_Engineering_Additions.md.
+_require_student_or_parent = Depends(require_roles("student", "parent"))
 
 
-@router.get("/me", response_model=AttendanceMeResponse, dependencies=[_require_student])
+@router.get("/me", response_model=AttendanceMeResponse, dependencies=[_require_student_or_parent])
 def get_my_attendance(
     class_session_id: uuid.UUID | None = Query(default=None),
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
+    student_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = AttendanceMeQuery(class_session_id=class_session_id, date_from=date_from, date_to=date_to)
+    query = AttendanceMeQuery(
+        class_session_id=class_session_id, date_from=date_from, date_to=date_to, student_id=student_id
+    )
     return attendance_service.get_me(db, current_user, query)
 
 

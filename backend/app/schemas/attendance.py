@@ -65,6 +65,12 @@ class AttendanceMeQuery(BaseModel):
     class_session_id: uuid.UUID | None = None
     date_from: date | None = None
     date_to: date | None = None
+    # Parent scoping (FR-032/BR-007 — see attendance_service.get_me):
+    # required when the caller is a Parent, ignored when the caller is a
+    # Student (a Student always sees their own record regardless of this
+    # field). Mirrors the same student_id convention already used by
+    # GET /fees/me and GET /results/me.
+    student_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def check_date_range(self) -> "AttendanceMeQuery":

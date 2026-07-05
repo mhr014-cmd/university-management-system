@@ -327,6 +327,14 @@ class TestGetClassAttendance:
         assert result.records == []
 
 
+def _student_user():
+    return User(id=uuid.uuid4(), email="s@example.com", role="student")
+
+
+def _parent_user():
+    return User(id=uuid.uuid4(), email="p@example.com", role="parent")
+
+
 class TestGetMe:
     def test_computes_percentage_excluding_excused(self, service, stub_repos, session):
         attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
@@ -343,7 +351,7 @@ class TestGetMe:
         ]
         attendance_repo.list_for_student.return_value = [(r, course) for r in records]
 
-        result = service.get_me(session, MagicMock(id=uuid.uuid4()), AttendanceMeQuery())
+        result = service.get_me(session, _student_user(), AttendanceMeQuery())
 
         # 1 present out of 2 countable (excused excluded) = 50%, below 80%.
         assert result.overall_percentage == 50.0
@@ -354,10 +362,43 @@ class TestGetMe:
         user_repo.get_student_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
         attendance_repo.list_for_student.return_value = []
 
-        result = service.get_me(session, MagicMock(id=uuid.uuid4()), AttendanceMeQuery())
+        result = service.get_me(session, _student_user(), AttendanceMeQuery())
 
         assert result.overall_percentage == 100.0
         assert result.low_attendance_warning is False
+
+    # --- Gap closure: Parent access via GET /attendance/me + student_id ---
+
+    def test_parent_without_student_id_rejected(self, service, stub_repos, session):
+        _attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_me(session, _parent_user(), AttendanceMeQuery())
+        assert exc.value.status_code == 403
+
+    def test_parent_without_link_rejected(self, service, stub_repos, session):
+        _attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = False
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_me(session, _parent_user(), AttendanceMeQuery(student_id=uuid.uuid4()))
+        assert exc.value.status_code == 403
+
+    def test_parent_with_link_succeeds(self, service, stub_repos, session):
+        attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = True
+        attendance_repo.list_for_student.return_value = []
+        student_id = uuid.uuid4()
+
+        result = service.get_me(session, _parent_user(), AttendanceMeQuery(student_id=student_id))
+
+        assert result.overall_percentage == 100.0
+        attendance_repo.list_for_student.assert_called_once_with(
+            session, student_id, class_session_id=None, date_from=None, date_to=None
+        )
 
 
 class TestAttendanceMeQueryValidation:

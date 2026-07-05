@@ -199,7 +199,10 @@ class AttendanceService:
                 percentage_after = _percentage([r for r, _course in rows_after])
                 if percentages_before[student_id] >= LOW_ATTENDANCE_THRESHOLD > percentage_after:
                     dispatcher.notify_attendance_warning(
-                        session, student_user_id=student_users[student_id].id, course_name=course_name
+                        session,
+                        student_id=student_id,
+                        student_user_id=student_users[student_id].id,
+                        course_name=course_name,
                     )
 
         return [AttendanceRecordRead.model_validate(record) for record in created]
@@ -229,13 +232,28 @@ class AttendanceService:
         session.refresh(record)
         return AttendanceRecordRead.model_validate(record)
 
-    # --- GET /attendance/me (FR-026, FR-031/BR-008) ----------------------
+    # --- GET /attendance/me (FR-026, FR-031/BR-008; FR-032 for Parent) ----
 
     def get_me(self, session: Session, current_user: User, query: AttendanceMeQuery) -> AttendanceMeResponse:
-        student = user_repo.get_student_profile_by_user_id(session, current_user.id)
+        if current_user.role == "student":
+            student = user_repo.get_student_profile_by_user_id(session, current_user.id)
+            target_student_id = student.id
+        elif current_user.role == "parent":
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            # Domain Rule 9/BR-007: a Parent may only view a linked child's
+            # attendance, and must say which child — same convention as
+            # fee_service.get_my_fees / result_service.get_my_results.
+            if query.student_id is None or not user_repo.parent_has_linked_student(
+                session, parent.id, query.student_id
+            ):
+                raise _forbidden("You may only view attendance for a linked student.")
+            target_student_id = query.student_id
+        else:
+            raise _forbidden("Only Student or Parent callers may use this endpoint.")
+
         rows = attendance_repo.list_for_student(
             session,
-            student.id,
+            target_student_id,
             class_session_id=query.class_session_id,
             date_from=query.date_from,
             date_to=query.date_to,
