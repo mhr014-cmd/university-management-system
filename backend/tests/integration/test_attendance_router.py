@@ -6,6 +6,8 @@ Full request -> DB -> response cycle against a disposable test database
 (see tests/conftest.py). Requires TEST_DATABASE_URL — skipped otherwise.
 """
 
+import uuid
+
 from tests.conftest import requires_test_database
 
 pytestmark = requires_test_database
@@ -375,6 +377,45 @@ class TestAttendanceReports:
         # the raw student_id, so the frontend Reports page never falls
         # back to rendering a UUID.
         assert response.json()["summary"][0]["student_name"] == "Test Student"
+
+    def test_filters_by_student_id(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+    ):
+        """GC-5: student_id filter parity with GET /results/reports and
+        GET /fees/reports — must narrow the summary to the one student."""
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        _other_user, other_student = make_student_user("other-student@example.com", "other-password")
+        make_enrollment(other_student, class_session)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        client.post(
+            "/api/v1/attendance",
+            json={
+                "class_session_id": str(class_session.id),
+                "attendance_date": "2026-01-05",
+                "records": [
+                    {"student_id": str(student.id), "status": "present"},
+                    {"student_id": str(other_student.id), "status": "absent"},
+                ],
+            },
+            headers=_headers(teacher_token),
+        )
+
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get(f"/api/v1/attendance/reports?student_id={student.id}", headers=_headers(admin_token))
+        assert response.status_code == 200
+        assert len(response.json()["summary"]) == 1
+        assert response.json()["summary"][0]["student_id"] == str(student.id)
+        assert response.json()["scope"]["student_id"] == str(student.id)
+
+    def test_invalid_student_id_returns_422(self, client, make_admin_user):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get(f"/api/v1/attendance/reports?student_id={uuid.uuid4()}", headers=_headers(admin_token))
+        assert response.status_code == 422
 
 
 class TestClassSessionRoster:

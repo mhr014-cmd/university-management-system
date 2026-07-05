@@ -89,9 +89,12 @@ def update_attendance(
 def get_attendance_reports(
     department_id: uuid.UUID | None = Query(default=None),
     semester_id: uuid.UUID | None = Query(default=None),
+    student_id: uuid.UUID | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return attendance_service.get_reports(db, department_id, semester_id)
+    return attendance_service.get_reports(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
 
 
 @router.get(

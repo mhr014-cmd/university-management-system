@@ -441,3 +441,30 @@ class TestGetReports:
         result = service.get_reports(session, None, None)
 
         assert result.summary[0].student_name == "Unknown Student"
+
+    def test_invalid_student_id_rejected(self, service, stub_repos, session):
+        """GC-5: student_id filter parity with results/fees reports —
+        must validate the student exists before querying, same as
+        department_id/semester_id above."""
+        _attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_student_with_user.return_value = None
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_reports(session, None, None, student_id=uuid.uuid4())
+
+        assert exc.value.status_code == 422
+
+    def test_student_id_passed_through_to_repository_and_response_scope(self, service, stub_repos, session):
+        attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
+        student_id = uuid.uuid4()
+        student_row = make_student_row()
+        user_repo.get_student_with_user.return_value = student_row
+        attendance_repo.list_for_report.return_value = []
+        user_repo.list_students_by_ids.return_value = []
+
+        result = service.get_reports(session, None, None, student_id=student_id)
+
+        attendance_repo.list_for_report.assert_called_once_with(
+            session, department_id=None, semester_id=None, student_id=student_id
+        )
+        assert result.scope.student_id == student_id

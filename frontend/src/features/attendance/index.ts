@@ -64,7 +64,7 @@ export interface AttendanceReportEntry {
 }
 
 export interface AttendanceReportResponse {
-  scope: { department_id: string | null; semester_id: string | null };
+  scope: { department_id: string | null; semester_id: string | null; student_id: string | null };
   summary: AttendanceReportEntry[];
 }
 
@@ -127,13 +127,17 @@ export function useClassAttendance(classId?: string, params?: { dateFrom?: strin
   });
 }
 
-export function useAttendanceReports(params?: { departmentId?: string; semesterId?: string }) {
+export function useAttendanceReports(params?: { departmentId?: string; semesterId?: string; studentId?: string }) {
   return useQuery({
     queryKey: ["attendance", "reports", params],
     queryFn: async () =>
       (
         await apiClient.get<AttendanceReportResponse>("/attendance/reports", {
-          params: { department_id: params?.departmentId, semester_id: params?.semesterId },
+          params: {
+            department_id: params?.departmentId,
+            semester_id: params?.semesterId,
+            student_id: params?.studentId,
+          },
         })
       ).data,
   });

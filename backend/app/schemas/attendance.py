@@ -99,6 +99,7 @@ class ClassAttendanceResponse(BaseModel):
 class AttendanceReportScope(BaseModel):
     department_id: uuid.UUID | None
     semester_id: uuid.UUID | None
+    student_id: uuid.UUID | None
 
 
 class AttendanceReportEntry(BaseModel):

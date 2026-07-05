@@ -10,6 +10,7 @@ import { useState } from "react";
 import { FileBarChart } from "lucide-react";
 import { useDepartments } from "../../../features/departments";
 import { useSemesters } from "../../../features/semesters";
+import { useStudents } from "../../../features/users";
 import { useAttendanceReports } from "../../../features/attendance";
 import { useResultsReport } from "../../../features/results";
 import { useFeesReport } from "../../../features/fees";
@@ -24,11 +25,17 @@ export default function AdminReportsPage() {
   const [tab, setTab] = useState<ReportTab>("attendance");
   const [departmentId, setDepartmentId] = useState("");
   const [semesterId, setSemesterId] = useState("");
+  const [studentId, setStudentId] = useState("");
 
   const { data: departments } = useDepartments();
   const { data: semesters } = useSemesters();
+  const { data: students } = useStudents(undefined, 1, 100);
 
-  const filters = { departmentId: departmentId || undefined, semesterId: semesterId || undefined };
+  const filters = {
+    departmentId: departmentId || undefined,
+    semesterId: semesterId || undefined,
+    studentId: studentId || undefined,
+  };
 
   const attendanceReport = useAttendanceReports(filters);
   const resultsReport = useResultsReport(filters);
@@ -69,6 +76,14 @@ export default function AdminReportsPage() {
           {semesters?.items.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
+            </option>
+          ))}
+        </select>
+        <select value={studentId} onChange={(e) => setStudentId(e.target.value)} className={`w-auto ${inputClass}`}>
+          <option value="">All Students</option>
+          {students?.items.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.first_name} {s.last_name}
             </option>
           ))}
         </select>

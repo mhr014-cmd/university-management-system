@@ -109,6 +109,7 @@ class AttendanceRepository:
         *,
         department_id: uuid.UUID | None = None,
         semester_id: uuid.UUID | None = None,
+        student_id: uuid.UUID | None = None,
     ) -> list[AttendanceRecord]:
         stmt = select(AttendanceRecord).join(ClassSession, AttendanceRecord.class_session_id == ClassSession.id)
         if department_id is not None:
@@ -117,4 +118,6 @@ class AttendanceRepository:
             )
         if semester_id is not None:
             stmt = stmt.where(ClassSession.semester_id == semester_id)
+        if student_id is not None:
+            stmt = stmt.where(AttendanceRecord.student_id == student_id)
         return list(session.scalars(stmt))

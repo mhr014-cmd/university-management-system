@@ -337,13 +337,18 @@ class AttendanceService:
         session: Session,
         department_id: uuid.UUID | None,
         semester_id: uuid.UUID | None,
+        student_id: uuid.UUID | None = None,
     ) -> AttendanceReportsResponse:
         if department_id is not None and department_repo.get(session, department_id) is None:
             raise _invalid("department_id does not reference an existing department")
         if semester_id is not None and semester_repo.get(session, semester_id) is None:
             raise _invalid("semester_id does not reference an existing semester")
+        if student_id is not None and user_repo.get_student_with_user(session, student_id) is None:
+            raise _invalid("student_id does not reference an existing student")
 
-        records = attendance_repo.list_for_report(session, department_id=department_id, semester_id=semester_id)
+        records = attendance_repo.list_for_report(
+            session, department_id=department_id, semester_id=semester_id, student_id=student_id
+        )
 
         by_student: dict[uuid.UUID, list] = {}
         for record in records:
@@ -363,5 +368,6 @@ class AttendanceService:
             for student_id, student_records in by_student.items()
         ]
         return AttendanceReportsResponse(
-            scope=AttendanceReportScope(department_id=department_id, semester_id=semester_id), summary=summary
+            scope=AttendanceReportScope(department_id=department_id, semester_id=semester_id, student_id=student_id),
+            summary=summary,
         )
