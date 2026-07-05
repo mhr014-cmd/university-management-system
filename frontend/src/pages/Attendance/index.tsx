@@ -7,11 +7,21 @@
 // Gap closure (post-M11 audit): Calendar view (a month-grid rendering of
 // the same GET /attendance/me data — no new endpoint) replaces the
 // previous placeholder message.
+//
+// Gap closure (GC-2): GET /attendance/me already accepted Parent +
+// student_id server-side, but this page never offered a Parent a way to
+// pick which linked child to view, so a Parent following the "Attendance"
+// nav link got a 403 the page didn't handle. Reuses the exact child-
+// selector pattern already proven in Timetable.tsx's ParentScheduleGrid
+// (useMyChildren, auto-select the first/only child) — no new hook, no
+// new endpoint, no change to the Student path below.
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { useAuth } from "../../auth/AuthContext";
 import { useMyAttendance } from "../../features/attendance";
 import type { AttendanceStatus } from "../../features/attendance";
+import { useMyChildren } from "../../features/users";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -137,6 +147,66 @@ function CalendarMonthView({ records }: { records: AttendanceRecordWithCourse[] 
 }
 
 export default function AttendancePage() {
+  const { user } = useAuth();
+
+  if (user?.role === "parent") {
+    return <ParentAttendanceView />;
+  }
+  return <AttendanceContent />;
+}
+
+// Reuses the exact child-selector pattern already proven in
+// Timetable.tsx's ParentScheduleGrid (useMyChildren, auto-select the
+// first/only linked child) — same component, same convention.
+function ParentAttendanceView() {
+  const { data: childrenData, isLoading: childrenLoading, isError: childrenError } = useMyChildren();
+  const children = useMemo(() => childrenData?.children ?? [], [childrenData]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  useEffect(() => {
+    if (!selectedStudentId && children.length > 0) {
+      setSelectedStudentId(children[0].id);
+    }
+  }, [children, selectedStudentId]);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+        </div>
+        {childrenLoading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading your linked children...</p>
+        ) : childrenError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">Unable to load linked children.</p>
+        ) : children.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No children linked yet"
+            description="Contact an administrator to link a child's record to your account."
+          />
+        ) : (
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            className={inputClass}
+          >
+            {children.map((child) => (
+              <option key={child.id} value={child.id}>
+                {child.first_name} {child.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+      {selectedStudentId && <AttendanceContent studentId={selectedStudentId} showHeading={false} />}
+    </div>
+  );
+}
+
+function AttendanceContent({ studentId, showHeading = true }: { studentId?: string; showHeading?: boolean }) {
   const [view, setView] = useState<ViewMode>("table");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -146,6 +216,7 @@ export default function AttendancePage() {
     classSessionId: classSessionId || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    studentId,
   });
 
   if (isLoading || !data) {
@@ -159,8 +230,10 @@ export default function AttendancePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
-        <div className="flex gap-1 rounded-md border border-slate-200 p-1 dark:border-slate-700">
+        {showHeading && (
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
+        )}
+        <div className="ml-auto flex gap-1 rounded-md border border-slate-200 p-1 dark:border-slate-700">
           <button
             type="button"
             onClick={() => setView("table")}
