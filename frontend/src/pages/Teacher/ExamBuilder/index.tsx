@@ -15,13 +15,29 @@
 //
 // Editing is blocked once status === "published" (BR-003), matching
 // ExamService.update_exam's server-side 409.
+//
+// Gap closure (GC-3): the proposal (§7) and UI_Wireframes.md both specify
+// a Preview toggle ("renders the exam as a Student would see it,
+// read-only"), absent until now. Preview renders the exact in-progress
+// `questions`/`title`/`examType`/`timeLimitMinutes` state already held
+// below — no second data model, no server round trip (the draft isn't
+// saved yet, so there is nothing else to fetch) — visually mirroring
+// ExamRoomPage's question-navigator/MCQ-radio-group/textarea layout
+// without importing it directly, since ExamRoomPage consumes
+// server-shaped `ExamRead` (real question/option ids), not this page's
+// pre-save `QuestionInput[]` draft shape.
 
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
+import { AlertCircle, AlertTriangle, CheckCircle2, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMySchedule } from "../../../features/schedule";
 import { useCreateExam, useExam, useUpdateExam } from "../../../features/exams";
 import type { ExamType, QuestionInput, QuestionType } from "../../../features/exams";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
+import { PageLoader } from "../../../components/ui/PageLoader";
+import { inputClass } from "../../../components/ui/classNames";
 
 const EXAM_TYPE_OPTIONS: ExamType[] = ["mcq", "written", "practical_coding", "mixed"];
 const QUESTION_TYPE_OPTIONS: QuestionType[] = ["mcq", "short_answer", "descriptive", "coding"];
@@ -57,6 +73,10 @@ export default function ExamBuilderPage() {
   const [questions, setQuestions] = useState<QuestionInput[]>([blankQuestion(0)]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Preview mode (GC-3): read-only render of the state above, exactly as
+  // a Student would see it — no separate copy of the exam data.
+  const [isPreview, setIsPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   useEffect(() => {
     if (!existingExam) return;
@@ -138,38 +158,99 @@ export default function ExamBuilderPage() {
   };
 
   if (isEditMode && !existingExam) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading exam...</p>;
+    return <PageLoader label="Loading exam..." />;
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-        {isEditMode ? "Edit Exam" : "New Exam"}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+          {isEditMode ? "Edit Exam" : "New Exam"}
+        </h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={isPreview ? <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={() => {
+            setPreviewIndex(0);
+            setIsPreview((prev) => !prev);
+          }}
+        >
+          {isPreview ? "Back to Edit" : "Preview"}
+        </Button>
+      </div>
 
       {message && (
-        <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-          {message}
+        <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{message}</span>
         </div>
       )}
       {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
       {isPublished && (
-        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-          This exam is published and read-only.
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>This exam is published and read-only.</span>
         </div>
       )}
 
-      <fieldset disabled={isPublished} className="space-y-3">
+      {isPreview ? (
+        <div className="flex gap-4">
+          <aside className="w-40 shrink-0 space-y-1">
+            {questions.map((_, qIndex) => (
+              <button
+                key={qIndex}
+                type="button"
+                onClick={() => setPreviewIndex(qIndex)}
+                className={`w-full rounded-md border px-2 py-1.5 text-left text-sm ${
+                  qIndex === previewIndex
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                }`}
+              >
+                Question {qIndex + 1}
+              </button>
+            ))}
+          </aside>
+          <Card className="flex-1 space-y-3">
+            <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              {title || "Untitled exam"} · {examType} · {timeLimitMinutes} min
+            </p>
+            {questions[previewIndex] && (
+              <>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                  {previewIndex + 1}. {questions[previewIndex].question_text || "(no question text yet)"}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{questions[previewIndex].marks} marks</p>
+                {questions[previewIndex].question_type === "mcq" ? (
+                  <div className="space-y-2">
+                    {questions[previewIndex].options.map((option, oIndex) => (
+                      <label key={oIndex} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                        <input type="radio" disabled name={`preview-question-${previewIndex}`} />
+                        {option.option_text || "(empty option)"}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <textarea disabled rows={4} placeholder="Student's answer" className={inputClass} />
+                )}
+              </>
+            )}
+          </Card>
+        </div>
+      ) : (
+      <fieldset disabled={isPublished} className="space-y-4">
         <div className="flex items-center gap-4 text-sm">
           <select
             value={classSessionId}
             onChange={(e) => setClassSessionId(e.target.value)}
             disabled={isEditMode}
-            className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+            className={`w-auto ${inputClass}`}
           >
             <option value="">Select Class</option>
             {uniqueClassSessions.map(([id, name]) => (
@@ -178,11 +259,7 @@ export default function ExamBuilderPage() {
               </option>
             ))}
           </select>
-          <select
-            value={examType}
-            onChange={(e) => setExamType(e.target.value as ExamType)}
-            className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-          >
+          <select value={examType} onChange={(e) => setExamType(e.target.value as ExamType)} className={`w-auto ${inputClass}`}>
             {EXAM_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -194,43 +271,33 @@ export default function ExamBuilderPage() {
             min={1}
             value={timeLimitMinutes}
             onChange={(e) => setTimeLimitMinutes(Number(e.target.value))}
-            className="w-28 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+            className={`w-28 ${inputClass}`}
             placeholder="Minutes"
           />
         </div>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Exam title"
-          className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-        />
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Exam title" className={inputClass} />
 
         <div className="space-y-4">
           {questions.map((question, qIndex) => (
-            <div key={qIndex} className="space-y-2 rounded border border-slate-200 p-3 dark:border-slate-700">
+            <Card key={qIndex} className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Question {qIndex + 1}</span>
-                <button
-                  type="button"
-                  onClick={() => removeQuestion(qIndex)}
-                  className="text-xs text-red-600 dark:text-red-400"
-                >
+                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">Question {qIndex + 1}</span>
+                <Button variant="ghost" size="sm" icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => removeQuestion(qIndex)}>
                   Remove
-                </button>
+                </Button>
               </div>
               <textarea
                 value={question.question_text}
                 onChange={(e) => updateQuestion(qIndex, { question_text: e.target.value })}
                 placeholder="Question text"
                 rows={2}
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+                className={inputClass}
               />
               <div className="flex items-center gap-4 text-sm">
                 <select
                   value={question.question_type}
                   onChange={(e) => updateQuestion(qIndex, { question_type: e.target.value as QuestionType })}
-                  className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                  className={`w-auto ${inputClass}`}
                 >
                   {QUESTION_TYPE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -244,7 +311,7 @@ export default function ExamBuilderPage() {
                   step={0.01}
                   value={question.marks}
                   onChange={(e) => updateQuestion(qIndex, { marks: Number(e.target.value) })}
-                  className="w-24 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                  className={`w-24 ${inputClass}`}
                   placeholder="Marks"
                 />
                 <input
@@ -252,7 +319,7 @@ export default function ExamBuilderPage() {
                   value={question.hint ?? ""}
                   onChange={(e) => updateQuestion(qIndex, { hint: e.target.value })}
                   placeholder="Hint (optional)"
-                  className="flex-1 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                  className={`flex-1 ${inputClass}`}
                 />
               </div>
 
@@ -281,56 +348,35 @@ export default function ExamBuilderPage() {
                           updateQuestion(qIndex, { options: nextOptions });
                         }}
                         placeholder="Option text"
-                        className="flex-1 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                        className={`flex-1 ${inputClass}`}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeOption(qIndex, oIndex)}
-                        className="text-xs text-red-600 dark:text-red-400"
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => removeOption(qIndex, oIndex)}>
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() => addOption(qIndex)}
-                    className="text-xs text-slate-600 dark:text-slate-400"
-                  >
-                    + Add option
-                  </button>
+                  <Button variant="ghost" size="sm" icon={<Plus className="h-3.5 w-3.5" aria-hidden="true" />} onClick={() => addOption(qIndex)}>
+                    Add option
+                  </Button>
                 </div>
               )}
-            </div>
+            </Card>
           ))}
-          <button
-            type="button"
-            onClick={addQuestion}
-            className="rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
-          >
-            + Add question
-          </button>
+          <Button variant="secondary" icon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={addQuestion}>
+            Add question
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => save(undefined)}
-            disabled={createExam.isPending || updateExam.isPending}
-            className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-600"
-          >
+          <Button variant="secondary" onClick={() => save(undefined)} isLoading={createExam.isPending || updateExam.isPending}>
             Save Draft
-          </button>
-          <button
-            type="button"
-            onClick={() => save("open")}
-            disabled={createExam.isPending || updateExam.isPending}
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-          >
+          </Button>
+          <Button onClick={() => save("open")} isLoading={createExam.isPending || updateExam.isPending}>
             Publish Exam
-          </button>
+          </Button>
         </div>
       </fieldset>
+      )}
     </div>
   );
 }
