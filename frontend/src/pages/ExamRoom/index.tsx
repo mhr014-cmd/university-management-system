@@ -13,8 +13,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { useExam, useStartExam, useSubmitExam } from "../../features/exams";
 import type { AnswerInput } from "../../features/exams";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { PageLoader } from "../../components/ui/PageLoader";
 
 type AnswerState = Record<string, { answer_text?: string; selected_option_id?: string }>;
 
@@ -79,23 +83,20 @@ export default function ExamRoomPage() {
   }, [deadline, submitted]);
 
   if (isExamLoading || !exam) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading exam...</p>;
+    return <PageLoader label="Loading exam..." />;
   }
 
   if (submitted) {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-md space-y-4 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400">
+          <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+        </div>
         <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Exam submitted</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Your answers for &ldquo;{exam.title}&rdquo; have been submitted.
         </p>
-        <button
-          type="button"
-          onClick={() => navigate("/exams")}
-          className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900"
-        >
-          Back to Exams
-        </button>
+        <Button onClick={() => navigate("/exams")}>Back to Exams</Button>
       </div>
     );
   }
@@ -113,8 +114,9 @@ export default function ExamRoomPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{exam.title}</h1>
-        <div className="rounded border border-slate-300 px-3 py-1 text-sm font-mono dark:border-slate-600">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{exam.title}</h1>
+        <div className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono font-medium text-slate-900 dark:border-slate-600 dark:text-slate-100">
+          <Clock className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
           {minutes !== null && seconds !== null
             ? `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
             : "--:--"}
@@ -122,8 +124,9 @@ export default function ExamRoomPage() {
       </div>
 
       {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -134,12 +137,12 @@ export default function ExamRoomPage() {
               key={question.id}
               type="button"
               onClick={() => setCurrentIndex(index)}
-              className={`block w-full rounded px-2 py-1 text-left text-sm ${
+              className={`block w-full rounded-md px-2.5 py-1.5 text-left text-sm font-medium transition-colors ${
                 index === currentIndex
                   ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
                   : answers[question.id]
-                    ? "border border-green-300 dark:border-green-800"
-                    : "border border-slate-300 dark:border-slate-600"
+                    ? "border border-green-300 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/50"
+                    : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
               }`}
             >
               Q{index + 1}
@@ -148,7 +151,7 @@ export default function ExamRoomPage() {
         </aside>
 
         {currentQuestion && (
-          <div className="flex-1 space-y-3">
+          <Card className="flex-1 space-y-3">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
               {currentIndex + 1}. {currentQuestion.question_text}
             </p>
@@ -183,39 +186,25 @@ export default function ExamRoomPage() {
                   }))
                 }
                 rows={8}
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-slate-500"
               />
             )}
 
             <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                disabled={currentIndex === 0}
-                onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-                className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-600"
-              >
+              <Button variant="secondary" disabled={currentIndex === 0} onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}>
                 Previous
-              </button>
+              </Button>
               {currentIndex < exam.questions.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setCurrentIndex((i) => Math.min(exam.questions.length - 1, i + 1))}
-                  className="rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
-                >
+                <Button variant="secondary" onClick={() => setCurrentIndex((i) => Math.min(exam.questions.length - 1, i + 1))}>
                   Next
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleSubmitClick}
-                  disabled={submitExam.isPending}
-                  className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-                >
+                <Button onClick={handleSubmitClick} isLoading={submitExam.isPending}>
                   Submit Exam
-                </button>
+                </Button>
               )}
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </div>
