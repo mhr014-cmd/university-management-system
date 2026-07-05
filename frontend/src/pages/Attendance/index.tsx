@@ -4,16 +4,137 @@
 // Entirely read-only for Student/Parent (per the wireframe's Buttons
 // note: "No mutating actions").
 //
-// Known simplification: only the Table view is implemented. The
-// wireframe's Calendar view (a month-grid alternative rendering of the
-// same data) is not built — the toggle is present but Calendar mode
-// shows a placeholder message. See PROJECT_PROGRESS.md's Milestone 5
-// entry.
+// Gap closure (post-M11 audit): Calendar view (a month-grid rendering of
+// the same GET /attendance/me data — no new endpoint) replaces the
+// previous placeholder message.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMyAttendance } from "../../features/attendance";
+import type { AttendanceStatus } from "../../features/attendance";
+import { Badge, type BadgeTone } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { PageLoader } from "../../components/ui/PageLoader";
+import { inputClass } from "../../components/ui/classNames";
 
 type ViewMode = "table" | "calendar";
+
+const statusTone: Record<AttendanceStatus, BadgeTone> = {
+  present: "green",
+  absent: "red",
+  late: "amber",
+  excused: "blue",
+};
+
+const statusDotClass: Record<AttendanceStatus, string> = {
+  present: "bg-green-500",
+  absent: "bg-red-500",
+  late: "bg-amber-500",
+  excused: "bg-blue-500",
+};
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+interface AttendanceRecordWithCourse {
+  date: string;
+  status: AttendanceStatus;
+  course_name: string;
+}
+
+function CalendarMonthView({ records }: { records: AttendanceRecordWithCourse[] }) {
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, AttendanceRecordWithCourse[]>();
+    for (const record of records) {
+      const list = map.get(record.date) ?? [];
+      list.push(record);
+      map.set(record.date, list);
+    }
+    return map;
+  }, [records]);
+
+  const mostRecentDate = records.length > 0 ? records.map((r) => r.date).sort().slice(-1)[0] : undefined;
+  const initialMonth = mostRecentDate ? new Date(`${mostRecentDate}T00:00:00`) : new Date();
+  const [visibleMonth, setVisibleMonth] = useState(new Date(initialMonth.getFullYear(), initialMonth.getMonth(), 1));
+
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  const formatDateKey = (day: number) => {
+    const mm = String(month + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    return `${year}-${mm}-${dd}`;
+  };
+
+  return (
+    <Card>
+      <div className="mb-3 flex items-center justify-between">
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Previous month"
+          onClick={() => setVisibleMonth(new Date(year, month - 1, 1))}
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          {visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Next month"
+          onClick={() => setVisibleMonth(new Date(year, month + 1, 1))}
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-500 dark:text-slate-400">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label} className="py-1">{label}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, i) => {
+          if (day === null) {
+            return <div key={`blank-${i}`} className="aspect-square rounded-md" />;
+          }
+          const dateKey = formatDateKey(day);
+          const dayRecords = recordsByDate.get(dateKey) ?? [];
+          return (
+            <div
+              key={dateKey}
+              className="flex aspect-square flex-col items-center justify-start gap-0.5 rounded-md border border-slate-100 p-1 dark:border-slate-800"
+              title={dayRecords.map((r) => `${r.course_name}: ${r.status}`).join(", ") || undefined}
+            >
+              <span className="text-xs text-slate-600 dark:text-slate-300">{day}</span>
+              <div className="flex flex-wrap justify-center gap-0.5">
+                {dayRecords.map((r, idx) => (
+                  <span key={idx} className={`h-1.5 w-1.5 rounded-full ${statusDotClass[r.status]}`} aria-hidden="true" />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+        {(Object.keys(statusDotClass) as AttendanceStatus[]).map((status) => (
+          <span key={status} className="flex items-center gap-1">
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass[status]}`} aria-hidden="true" />
+            {status}
+          </span>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 export default function AttendancePage() {
   const [view, setView] = useState<ViewMode>("table");
@@ -28,7 +149,7 @@ export default function AttendancePage() {
   });
 
   if (isLoading || !data) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading attendance...</p>;
+    return <PageLoader label="Loading attendance..." />;
   }
 
   const allRecords = data.by_class_session.flatMap((cls) =>
@@ -38,31 +159,27 @@ export default function AttendancePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Attendance</h1>
-        <div className="flex gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
+        <div className="flex gap-1 rounded-md border border-slate-200 p-1 dark:border-slate-700">
           <button
             type="button"
             onClick={() => setView("table")}
-            className={`rounded px-3 py-1 text-sm ${view === "table" ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "border border-slate-300 dark:border-slate-600"}`}
+            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${view === "table" ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
           >
             Table view
           </button>
           <button
             type="button"
             onClick={() => setView("calendar")}
-            className={`rounded px-3 py-1 text-sm ${view === "calendar" ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "border border-slate-300 dark:border-slate-600"}`}
+            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${view === "calendar" ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}
           >
             Calendar view
           </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm">
-        <select
-          value={classSessionId}
-          onChange={(e) => setClassSessionId(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-        >
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <select value={classSessionId} onChange={(e) => setClassSessionId(e.target.value)} className={`w-auto ${inputClass}`}>
           <option value="">All Classes</option>
           {data.by_class_session.map((cls) => (
             <option key={cls.class_session_id} value={cls.class_session_id}>
@@ -70,70 +187,65 @@ export default function AttendancePage() {
             </option>
           ))}
         </select>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-        />
-        <span>to</span>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-        />
+        <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`w-auto ${inputClass}`} />
+        <span className="text-slate-400">to</span>
+        <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`w-auto ${inputClass}`} />
       </div>
 
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-semibold">Overall: {data.overall_percentage}%</span>
-          <div className="h-2 w-40 rounded bg-slate-200 dark:bg-slate-700">
+      <Card>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">Overall: {data.overall_percentage}%</span>
+          <div className="h-2 w-40 rounded-full bg-slate-200 dark:bg-slate-700">
             <div
-              className="h-2 rounded bg-slate-900 dark:bg-slate-100"
+              className="h-2 rounded-full bg-slate-900 dark:bg-slate-100"
               style={{ width: `${Math.min(data.overall_percentage, 100)}%` }}
             />
           </div>
           {data.low_attendance_warning && (
-            <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-              ⚠ Below 80%
+            <span className="flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+              Below 80%
             </span>
           )}
         </div>
-      </div>
+      </Card>
 
       {view === "table" ? (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="py-2">Date</th>
-              <th className="py-2">Class</th>
-              <th className="py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allRecords
-              .sort((a, b) => b.date.localeCompare(a.date))
-              .map((record, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                >
-                  <td className="py-2">{record.date}</td>
-                  <td className="py-2">{record.course_name}</td>
-                  <td className="py-2 capitalize">{record.status}</td>
+        allRecords.length === 0 ? (
+          <EmptyState icon={CalendarDays} title="No attendance records yet" />
+        ) : (
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="px-4 py-2.5">Date</th>
+                  <th className="px-4 py-2.5">Class</th>
+                  <th className="px-4 py-2.5">Status</th>
                 </tr>
-              ))}
-          </tbody>
-        </table>
-      ) : null}
-      {view === "table" && allRecords.length === 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No attendance records yet.</p>
-      )}
-      {view !== "table" && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Calendar view is not yet implemented — use Table view.
-        </p>
+              </thead>
+              <tbody>
+                {allRecords
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((record, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    >
+                      <td className="px-4 py-2.5">{record.date}</td>
+                      <td className="px-4 py-2.5">{record.course_name}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={statusTone[record.status]}>{record.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </Card>
+        )
+      ) : allRecords.length === 0 ? (
+        <EmptyState icon={CalendarDays} title="No attendance records yet" />
+      ) : (
+        <CalendarMonthView records={allRecords} />
       )}
     </div>
   );
