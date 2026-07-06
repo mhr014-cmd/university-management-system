@@ -309,4 +309,14 @@ A direct audit against `docs/product_proposal.pdf` (requested by the user) found
 **Classification: Derived.** `UI_Wireframes.md`'s "calendar or table view" toggle existed since Milestone 5 with Calendar mode showing a placeholder message. Implemented as a month-grid rendering of the same `GET /attendance/me` data already fetched for Table view — no new endpoint.
 **Disposition:** Permanent.
 
+### Profile photo upload (Student/Teacher)
+**Where:** `frontend/src/pages/Profile/index.tsx` (client-side resize-to-JPEG-data-URI, then `PUT /users/me` with `profile_photo_url`).
+**Classification: Derived.** The proposal (Section 3, Student — Profile) explicitly requires a profile photo; `MeUpdate.profile_photo_url` and the `student`/`teacher` table columns already existed (since Milestone 3) but no frontend page ever offered a way to set them. No new backend endpoint — the existing `PUT /users/me` field is reused as-is. Not suitable for large-scale production use (a data-URI string in a `VARCHAR` column doesn't belong in a real object-storage architecture), but proportionate to this project's scope and explicitly avoids inventing new storage infrastructure/folders outside `System_Architecture.md` §7's documented structure.
+**Disposition:** Permanent, with the production caveat above noted for any future hardening pass.
+
+### Profile page academic history / assigned courses sections
+**Where:** `frontend/src/pages/Profile/index.tsx` (`AcademicHistorySection` for Student, `AssignedCoursesSection` for Teacher).
+**Classification: Derived.** FR-008 (Student — "views academic history alongside profile data") and the Teacher Profile & courses feature (Section 4) were both previously satisfied only by data being reachable on a *different* page (Results View, Timetable) — this pass adds Profile-page sections that reuse `GET /results/me`/`GET /schedule/me` directly, no new endpoints. Teacher "teaching history" across past semesters (as distinct from the current semester's assignments) remains unbuilt — no endpoint exposes it, and the section is labeled "this semester" rather than overclaiming.
+**Disposition:** Permanent, with the teaching-history limitation noted above tracked as a known, honestly-labeled gap.
+
 ---
