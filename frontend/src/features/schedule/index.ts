@@ -53,10 +53,19 @@ export interface RequestedChangeInput {
   room_id?: string;
 }
 
-export function useMySchedule() {
+export function useMySchedule(studentId?: string) {
   return useQuery({
-    queryKey: ["schedule", "me"],
-    queryFn: async () => (await apiClient.get<{ entries: ScheduleMeEntry[] }>("/schedule/me")).data,
+    queryKey: ["schedule", "me", studentId],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ entries: ScheduleMeEntry[] }>("/schedule/me", {
+          params: studentId ? { student_id: studentId } : undefined,
+        })
+      ).data,
+    // Parent scoping (gap closure): when studentId is required (Parent
+    // role) but not yet selected, don't fire the request — mirrors the
+    // enabled-gating pattern already used by useMyFees/useMyResults.
+    enabled: studentId !== "",
   });
 }
 

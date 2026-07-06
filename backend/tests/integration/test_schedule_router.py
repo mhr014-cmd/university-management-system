@@ -85,7 +85,15 @@ class TestCreateEnrollment:
 
 class TestScheduleEntryLifecycle:
     def test_create_conflict_and_get_me(
-        self, client, make_admin_user, make_student_user, make_teacher_user, make_class_session, make_room
+        self,
+        client,
+        make_admin_user,
+        make_student_user,
+        make_teacher_user,
+        make_class_session,
+        make_room,
+        make_parent_user,
+        link_parent_student,
     ):
         make_admin_user("admin@example.com", "correct-password")
         admin_token = _login(client, "admin@example.com", "correct-password")
@@ -130,6 +138,20 @@ class TestScheduleEntryLifecycle:
         teacher_me_response = client.get("/api/v1/schedule/me", headers=_headers(teacher_token))
         assert teacher_me_response.status_code == 200
         assert len(teacher_me_response.json()["entries"]) == 1
+
+        # Gap closure: a linked Parent can see the same child's timetable
+        # via GET /schedule/me + student_id; an unlinked Parent cannot.
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        parent_response = client.get(
+            "/api/v1/schedule/me", params={"student_id": str(student.id)}, headers=_headers(parent_token)
+        )
+        assert parent_response.status_code == 200
+        assert len(parent_response.json()["entries"]) == 1
+
+        no_link_response = client.get("/api/v1/schedule/me", headers=_headers(parent_token))
+        assert no_link_response.status_code == 403
 
     def test_student_forbidden_from_creating_entry(self, client, make_student_user):
         make_student_user("student@example.com", "correct-password")

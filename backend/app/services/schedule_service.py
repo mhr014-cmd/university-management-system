@@ -51,6 +51,10 @@ def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
 
 
+def _forbidden(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
 def _invalid_reference(field: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"{field} does not reference an existing row"
@@ -123,10 +127,21 @@ class ScheduleService:
 
     # --- schedule_entry (API_Contract.md Section 7.1-7.5) -------------------
 
-    def get_me(self, session: Session, current_user: User) -> ScheduleMeResponse:
+    def get_me(
+        self, session: Session, current_user: User, student_id: uuid.UUID | None = None
+    ) -> ScheduleMeResponse:
         if current_user.role == "teacher":
             teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
             rows = schedule_repo.list_entries_for_teacher(session, teacher.id)
+        elif current_user.role == "parent":
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            # Same Parent-scoping convention as fee_service.get_my_fees /
+            # attendance_service.get_me: a linked student_id is required,
+            # and ownership is verified via ParentStudentLink.
+            if student_id is None or not user_repo.parent_has_linked_student(session, parent.id, student_id):
+                raise _forbidden("You may only view the timetable for a linked student.")
+            class_session_ids = schedule_repo.list_class_session_ids_for_student(session, student_id)
+            rows = schedule_repo.list_entries_for_class_sessions(session, class_session_ids)
         else:
             student = user_repo.get_student_profile_by_user_id(session, current_user.id)
             class_session_ids = schedule_repo.list_class_session_ids_for_student(session, student.id)

@@ -12,9 +12,9 @@
 // minimal-scope precedent from Milestone 1's reference-data CRUD). See
 // PROJECT_PROGRESS.md's Milestone 4 entry.
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { isAxiosError } from "axios";
-import { AlertCircle, CalendarX2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CalendarX2, CheckCircle2, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import {
   useCreateChangeRequest,
@@ -26,6 +26,7 @@ import {
   type DayOfWeek,
   type ScheduleMeEntry,
 } from "../../features/schedule";
+import { useMyChildren } from "../../features/users";
 import { Button } from "../../components/ui/Button";
 import { Card, CardTitle } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -41,20 +42,32 @@ export default function TimetablePage() {
   if (user?.role === "admin") {
     return <AdminSchedulePanel />;
   }
+  if (user?.role === "parent") {
+    return <ParentScheduleGrid />;
+  }
   return <MyScheduleGrid />;
 }
 
-function MyScheduleGrid() {
-  const { user } = useAuth();
-  const { data, isLoading } = useMySchedule();
-  const [requestingEntry, setRequestingEntry] = useState<ScheduleMeEntry | null>(null);
-
+// Shared weekly-grid renderer (Student/Teacher/Parent all show the same
+// read-only layout; only the per-card action slot differs — Teacher gets
+// "Request Change", Parent and Student get none).
+function WeeklyGrid({
+  entries,
+  isLoading,
+  emptyDescription,
+  renderCardAction,
+}: {
+  entries: ScheduleMeEntry[] | undefined;
+  isLoading: boolean;
+  emptyDescription: string;
+  renderCardAction?: (entry: ScheduleMeEntry) => ReactNode;
+}) {
   if (isLoading) {
     return <PageLoader label="Loading timetable..." />;
   }
 
   const entriesByDay = new Map<DayOfWeek, ScheduleMeEntry[]>();
-  for (const entry of data?.entries ?? []) {
+  for (const entry of entries ?? []) {
     const list = entriesByDay.get(entry.day_of_week) ?? [];
     list.push(entry);
     entriesByDay.set(entry.day_of_week, list);
@@ -62,42 +75,118 @@ function MyScheduleGrid() {
   const daysWithClasses = DAYS.filter((day) => entriesByDay.has(day));
   const visibleDays = daysWithClasses.length > 0 ? daysWithClasses : DAYS.slice(0, 5);
 
+  if ((entries?.length ?? 0) === 0) {
+    return <EmptyState icon={CalendarX2} title="No classes scheduled" description={emptyDescription} />;
+  }
+
+  return (
+    <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${visibleDays.length}, minmax(0, 1fr))` }}>
+      {visibleDays.map((day) => (
+        <div key={day} className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">{day}</h2>
+          {(entriesByDay.get(day) ?? [])
+            .sort((a, b) => a.start_time.localeCompare(b.start_time))
+            .map((entry) => (
+              <Card key={entry.schedule_entry_id} hoverable className="p-3 text-xs">
+                <div className="font-medium text-slate-900 dark:text-slate-100">{entry.course_name}</div>
+                <div className="text-slate-500 dark:text-slate-400">{entry.room_name}</div>
+                <div className="text-slate-500 dark:text-slate-400">
+                  {entry.start_time.slice(0, 5)}–{entry.end_time.slice(0, 5)}
+                </div>
+                {renderCardAction?.(entry)}
+              </Card>
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MyScheduleGrid() {
+  const { user } = useAuth();
+  const { data, isLoading } = useMySchedule();
+  const [requestingEntry, setRequestingEntry] = useState<ScheduleMeEntry | null>(null);
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Timetable</h1>
-      {(data?.entries.length ?? 0) === 0 ? (
-        <EmptyState
-          icon={CalendarX2}
-          title="No classes scheduled"
-          description="Your weekly timetable will appear here once classes are scheduled."
-        />
-      ) : (
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${visibleDays.length}, minmax(0, 1fr))` }}>
-          {visibleDays.map((day) => (
-            <div key={day} className="space-y-2">
-              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">{day}</h2>
-              {(entriesByDay.get(day) ?? [])
-                .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                .map((entry) => (
-                  <Card key={entry.schedule_entry_id} hoverable className="p-3 text-xs">
-                    <div className="font-medium text-slate-900 dark:text-slate-100">{entry.course_name}</div>
-                    <div className="text-slate-500 dark:text-slate-400">{entry.room_name}</div>
-                    <div className="text-slate-500 dark:text-slate-400">
-                      {entry.start_time.slice(0, 5)}–{entry.end_time.slice(0, 5)}
-                    </div>
-                    {user?.role === "teacher" && (
-                      <Button variant="secondary" size="sm" className="mt-1.5" onClick={() => setRequestingEntry(entry)}>
-                        Request Change
-                      </Button>
-                    )}
-                  </Card>
-                ))}
-            </div>
-          ))}
-        </div>
-      )}
+      <WeeklyGrid
+        entries={data?.entries}
+        isLoading={isLoading}
+        emptyDescription="Your weekly timetable will appear here once classes are scheduled."
+        renderCardAction={
+          user?.role === "teacher"
+            ? (entry) => (
+                <Button variant="secondary" size="sm" className="mt-1.5" onClick={() => setRequestingEntry(entry)}>
+                  Request Change
+                </Button>
+              )
+            : undefined
+        }
+      />
       {requestingEntry && (
         <RequestChangeModal entry={requestingEntry} onClose={() => setRequestingEntry(null)} />
+      )}
+    </div>
+  );
+}
+
+// Gap closure (post-M11 audit): the proposal (Section 5, Parent — "Results
+// & schedule") promises Parents visibility into their child's class
+// timetable — GET /schedule/me now accepts Parent + student_id (mirroring
+// the Fee Centre/Results View Parent-scoping convention), so this reuses
+// the same child selector already built for the Parent Dashboard.
+function ParentScheduleGrid() {
+  const { data: childrenData, isLoading: childrenLoading, isError: childrenError } = useMyChildren();
+  const children = useMemo(() => childrenData?.children ?? [], [childrenData]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  useEffect(() => {
+    if (!selectedStudentId && children.length > 0) {
+      setSelectedStudentId(children[0].id);
+    }
+  }, [children, selectedStudentId]);
+
+  const { data, isLoading } = useMySchedule(selectedStudentId || undefined);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Timetable</h1>
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+        </div>
+        {childrenLoading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading your linked children...</p>
+        ) : childrenError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">Unable to load linked children.</p>
+        ) : children.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No children linked yet"
+            description="Contact an administrator to link a child's record to your account."
+          />
+        ) : (
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            className={inputClass}
+          >
+            {children.map((child) => (
+              <option key={child.id} value={child.id}>
+                {child.first_name} {child.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+      {selectedStudentId && (
+        <WeeklyGrid
+          entries={data?.entries}
+          isLoading={isLoading}
+          emptyDescription="Your child's weekly timetable will appear here once classes are scheduled."
+        />
       )}
     </div>
   );

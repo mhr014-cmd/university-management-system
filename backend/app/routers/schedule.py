@@ -35,13 +35,22 @@ schedule_service = ScheduleService()
 
 _require_admin = Depends(require_roles("admin"))
 _require_teacher = Depends(require_roles("teacher"))
-_require_student_or_teacher = Depends(require_roles("student", "teacher"))
+# Gap closure (post-M11 audit): the proposal (Section 5, Parent — "Results
+# & schedule") explicitly promises Parents visibility into their child's
+# class timetable; this endpoint previously excluded Parent entirely.
+# Parent access is scoped to a linked child via student_id, mirroring the
+# same convention already used by GET /fees/me and GET /results/me.
+_require_student_teacher_or_parent = Depends(require_roles("student", "teacher", "parent"))
 _require_teacher_or_admin = Depends(require_roles("teacher", "admin"))
 
 
-@router.get("/me", response_model=ScheduleMeResponse, dependencies=[_require_student_or_teacher])
-def get_my_schedule(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return schedule_service.get_me(db, current_user)
+@router.get("/me", response_model=ScheduleMeResponse, dependencies=[_require_student_teacher_or_parent])
+def get_my_schedule(
+    student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return schedule_service.get_me(db, current_user, student_id=student_id)
 
 
 @router.post("", response_model=ScheduleEntryRead, status_code=status.HTTP_201_CREATED, dependencies=[_require_admin])

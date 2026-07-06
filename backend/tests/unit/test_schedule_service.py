@@ -306,3 +306,42 @@ class TestResolveChangeRequest:
         assert result.status == "approved"
         assert entry.start_time == time(11, 0)
         assert entry.end_time == time(12, 0)
+
+
+class TestGetMe:
+    """Gap closure: Parent access via GET /schedule/me + student_id,
+    mirroring the same convention as attendance_service.get_me /
+    fee_service.get_my_fees."""
+
+    def _parent_user(self):
+        return User(id=uuid.uuid4(), email="p@example.com", role="parent")
+
+    def test_parent_without_student_id_rejected(self, service, stub_repos, session):
+        _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_me(session, self._parent_user())
+        assert exc.value.status_code == 403
+
+    def test_parent_without_link_rejected(self, service, stub_repos, session):
+        _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = False
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_me(session, self._parent_user(), student_id=uuid.uuid4())
+        assert exc.value.status_code == 403
+
+    def test_parent_with_link_returns_child_schedule(self, service, stub_repos, session):
+        schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = True
+        schedule_repo.list_class_session_ids_for_student.return_value = []
+        schedule_repo.list_entries_for_class_sessions.return_value = []
+        student_id = uuid.uuid4()
+
+        result = service.get_me(session, self._parent_user(), student_id=student_id)
+
+        assert result.entries == []
+        schedule_repo.list_class_session_ids_for_student.assert_called_once_with(session, student_id)
