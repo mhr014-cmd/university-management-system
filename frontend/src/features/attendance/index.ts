@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../lib/apiClient";
+import { exportReport } from "../../lib/exportClient";
 
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 
@@ -140,5 +141,40 @@ export function useAttendanceReports(params?: { departmentId?: string; semesterI
           },
         })
       ).data,
+  });
+}
+
+// Named "export" (not "download") since these trigger report generation
+// on the backend before the file comes back — reporting infrastructure
+// vertical slice (Version 1.2); reuses lib/exportClient.ts's shared
+// request-then-download behavior, which future Results/Fees/Timetable/
+// Users report exports should reuse the same way.
+export function useExportAttendanceReportPdf() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/attendance/reports/pdf",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "attendance-report.pdf",
+      ),
+  });
+}
+
+export function useExportAttendanceReportExcel() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/attendance/reports/excel",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "attendance-report.xlsx",
+      ),
   });
 }

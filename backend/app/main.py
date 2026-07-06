@@ -73,6 +73,12 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # Browsers only expose a small default set of response headers to
+        # JS across origins — Content-Disposition isn't one of them. Needed
+        # so the frontend's exportClient (Version 1.2 reporting
+        # infrastructure) can read the server-supplied, timestamped export
+        # filename instead of silently falling back to a generic one.
+        expose_headers=["Content-Disposition"],
     )
     app.add_middleware(RequestLoggingMiddleware)
 

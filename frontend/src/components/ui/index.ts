@@ -7,4 +7,6 @@ export { PasswordInput } from "./PasswordInput";
 export { ToastProvider, useToast } from "./Toast";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { Pagination } from "./Pagination";
+export { ReportLayout } from "./ReportLayout";
+export { ReportToolbar } from "./ReportToolbar";
 export { inputClass, labelClass, helperTextClass, errorTextClass } from "./classNames";

@@ -1,0 +1,36 @@
+/* Print stylesheet (Version 1.2 reporting infrastructure).
+ *
+ * A4 paper size for printed reports (no paper size is specified anywhere
+ * in docs/ for this new capability — A4 chosen as a common default).
+ * Print-isolation: hides everything except the report page's own
+ * [data-print-region] wrapper (see components/ui/ReportLayout.tsx), so
+ * the app shell (nav, sidebar, toolbar buttons) never appears in the
+ * printed/PDF-via-browser-print output.
+ */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-region],
+  [data-print-region] * {
+    visibility: visible;
+  }
+
+  [data-print-region] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  [data-print-hidden] {
+    display: none !important;
+  }
+}

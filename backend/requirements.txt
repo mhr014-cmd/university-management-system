@@ -140,3 +140,12 @@ greenlet==3.5.3   # SQLAlchemy's async/greenlet bridge
 reportlab==5.0.0
 pillow==12.3.0
 charset-normalizer==3.4.7
+
+# Excel export (Version 1.2 reporting infrastructure — see
+# docs/Proposal_vs_Engineering_Additions.md). openpyxl chosen for the same
+# reason reportlab was chosen above: pure Python, no external binary
+# dependency, the de facto standard for server-side .xlsx generation.
+# Resolved from a clean `pip install openpyxl` into this project's venv;
+# et-xmlfile is its only new transitive dependency.
+openpyxl==3.1.5
+et-xmlfile==2.0.0

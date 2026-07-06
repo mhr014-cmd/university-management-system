@@ -11,17 +11,25 @@ import { FileBarChart } from "lucide-react";
 import { useDepartments } from "../../../features/departments";
 import { useSemesters } from "../../../features/semesters";
 import { useStudents } from "../../../features/users";
-import { useAttendanceReports } from "../../../features/attendance";
+import {
+  useAttendanceReports,
+  useExportAttendanceReportExcel,
+  useExportAttendanceReportPdf,
+} from "../../../features/attendance";
 import { useResultsReport } from "../../../features/results";
 import { useFeesReport } from "../../../features/fees";
 import { Card } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { PageLoader } from "../../../components/ui/PageLoader";
+import { ReportLayout } from "../../../components/ui/ReportLayout";
+import { ReportToolbar } from "../../../components/ui/ReportToolbar";
+import { useToast } from "../../../components/ui/Toast";
 import { inputClass } from "../../../components/ui/classNames";
 
 type ReportTab = "attendance" | "results" | "fees";
 
 export default function AdminReportsPage() {
+  const { showError } = useToast();
   const [tab, setTab] = useState<ReportTab>("attendance");
   const [departmentId, setDepartmentId] = useState("");
   const [semesterId, setSemesterId] = useState("");
@@ -40,6 +48,8 @@ export default function AdminReportsPage() {
   const attendanceReport = useAttendanceReports(filters);
   const resultsReport = useResultsReport(filters);
   const feesReport = useFeesReport(filters);
+  const exportAttendancePdf = useExportAttendanceReportPdf();
+  const exportAttendanceExcel = useExportAttendanceReportExcel();
 
   return (
     <div className="space-y-4">
@@ -89,34 +99,56 @@ export default function AdminReportsPage() {
         </select>
       </div>
 
-      {tab === "attendance" &&
-        (attendanceReport.isLoading || !attendanceReport.data ? (
-          <PageLoader />
-        ) : attendanceReport.data.summary.length === 0 ? (
-          <EmptyState icon={FileBarChart} title="No attendance records in this scope" description="Try a different department or semester filter." />
-        ) : (
-          <Card className="overflow-x-auto p-0">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
-                <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="px-4 py-2.5">Student</th>
-                  <th className="px-4 py-2.5">Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendanceReport.data.summary.map((entry) => (
-                  <tr
-                    key={entry.student_id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                  >
-                    <td className="px-4 py-2.5">{entry.student_name}</td>
-                    <td className="px-4 py-2.5">{entry.percentage.toFixed(1)}%</td>
+      {tab === "attendance" && (
+        <ReportLayout
+          title="Attendance Report"
+          subtitle="Student attendance percentage for the selected department, semester, or student."
+          toolbar={
+            <ReportToolbar
+              onExportPdf={() =>
+                exportAttendancePdf.mutate(filters, {
+                  onError: () => showError("Could not generate the PDF export. Please try again."),
+                })
+              }
+              onExportExcel={() =>
+                exportAttendanceExcel.mutate(filters, {
+                  onError: () => showError("Could not generate the Excel export. Please try again."),
+                })
+              }
+              isExportingPdf={exportAttendancePdf.isPending}
+              isExportingExcel={exportAttendanceExcel.isPending}
+            />
+          }
+        >
+          {attendanceReport.isLoading || !attendanceReport.data ? (
+            <PageLoader />
+          ) : attendanceReport.data.summary.length === 0 ? (
+            <EmptyState icon={FileBarChart} title="No attendance records in this scope" description="Try a different department or semester filter." />
+          ) : (
+            <Card className="overflow-x-auto p-0">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-4 py-2.5">Percentage</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        ))}
+                </thead>
+                <tbody>
+                  {attendanceReport.data.summary.map((entry) => (
+                    <tr
+                      key={entry.student_id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    >
+                      <td className="px-4 py-2.5">{entry.student_name}</td>
+                      <td className="px-4 py-2.5">{entry.percentage.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )}
+        </ReportLayout>
+      )}
 
       {tab === "results" &&
         (resultsReport.isLoading || !resultsReport.data ? (

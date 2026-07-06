@@ -418,6 +418,115 @@ class TestAttendanceReports:
         assert response.status_code == 422
 
 
+class TestAttendanceReportsExport:
+    """GET /attendance/reports/pdf, GET /attendance/reports/excel — the
+    Version 1.2 reporting-infrastructure vertical slice."""
+
+    def test_pdf_requires_admin(self, client, make_teacher_user):
+        make_teacher_user("teacher@example.com", "correct-password")
+        token = _login(client, "teacher@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_excel_requires_admin(self, client, make_teacher_user):
+        make_teacher_user("teacher@example.com", "correct-password")
+        token = _login(client, "teacher@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/excel", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_pdf_download_has_correct_content_type_and_filename(
+        self,
+        client,
+        make_admin_user,
+        make_teacher_user,
+        make_student_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        client.post(
+            "/api/v1/attendance",
+            json={
+                "class_session_id": str(class_session.id),
+                "attendance_date": "2026-01-05",
+                "records": [{"student_id": str(student.id), "status": "present"}],
+            },
+            headers=_headers(teacher_token),
+        )
+
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(admin_token))
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content.startswith(b"%PDF")
+        content_disposition = response.headers["content-disposition"]
+        assert content_disposition.startswith('attachment; filename="attendance-report-')
+        assert content_disposition.endswith('.pdf"')
+
+    def test_excel_download_has_correct_content_type_and_filename(
+        self,
+        client,
+        make_admin_user,
+        make_teacher_user,
+        make_student_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        client.post(
+            "/api/v1/attendance",
+            json={
+                "class_session_id": str(class_session.id),
+                "attendance_date": "2026-01-05",
+                "records": [{"student_id": str(student.id), "status": "present"}],
+            },
+            headers=_headers(teacher_token),
+        )
+
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/excel", headers=_headers(admin_token))
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert response.content.startswith(b"PK")
+        content_disposition = response.headers["content-disposition"]
+        assert content_disposition.startswith('attachment; filename="attendance-report-')
+        assert content_disposition.endswith('.xlsx"')
+
+    def test_pdf_export_with_no_records_still_succeeds(self, client, make_admin_user):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(admin_token))
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+
+    def test_excel_export_with_no_records_still_succeeds(self, client, make_admin_user):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/excel", headers=_headers(admin_token))
+        assert response.status_code == 200
+        assert response.content.startswith(b"PK")
+
+    def test_invalid_student_id_returns_422_for_pdf(self, client, make_admin_user):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get(
+            f"/api/v1/attendance/reports/pdf?student_id={uuid.uuid4()}", headers=_headers(admin_token)
+        )
+        assert response.status_code == 422
+
+
 class TestClassSessionRoster:
     def test_teacher_sees_enrolled_students(
         self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment

@@ -371,3 +371,38 @@ class AttendanceService:
             scope=AttendanceReportScope(department_id=department_id, semester_id=semester_id, student_id=student_id),
             summary=summary,
         )
+
+    # --- GET /attendance/reports/pdf, /attendance/reports/excel ------------
+    # (Version 1.2 reporting infrastructure) — additive only; get_reports()
+    # above and its JSON contract are untouched.
+
+    def get_report_scope_labels(
+        self,
+        session: Session,
+        department_id: uuid.UUID | None,
+        semester_id: uuid.UUID | None,
+        student_id: uuid.UUID | None,
+    ) -> dict[str, str]:
+        """Human-readable filter labels for the PDF/Excel export header,
+        matching the "All ..." wording already used by the Admin Reports
+        page's own filter dropdowns."""
+        department_label = "All Departments"
+        if department_id is not None:
+            department = department_repo.get(session, department_id)
+            if department is not None:
+                department_label = department.name
+
+        semester_label = "All Semesters"
+        if semester_id is not None:
+            semester = semester_repo.get(session, semester_id)
+            if semester is not None:
+                semester_label = semester.name
+
+        student_label = "All Students"
+        if student_id is not None:
+            row = user_repo.get_student_with_user(session, student_id)
+            if row is not None:
+                student, _user = row
+                student_label = f"{student.first_name} {student.last_name}"
+
+        return {"department": department_label, "semester": semester_label, "student": student_label}

@@ -7,15 +7,18 @@ app/services/attendance_service.py, never here, per CLAUDE.md §6.
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.excel.attendance_report import generate_attendance_report_excel
 from app.middleware.auth import get_current_user
 from app.middleware.rbac import require_roles
 from app.models.user import User
+from app.pdf.attendance_report import generate_attendance_report_pdf
 from app.schemas.attendance import (
     AttendanceMarkRequest,
     AttendanceMeQuery,
@@ -94,6 +97,59 @@ def get_attendance_reports(
 ):
     return attendance_service.get_reports(
         db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+
+
+def _export_filename(extension: str) -> str:
+    # Timestamped (not just dated) so repeated exports in the same session
+    # never overwrite a previous download (Version 1.2 reporting
+    # infrastructure requirement).
+    return f"attendance-report-{datetime.now().strftime('%Y%m%d-%H%M%S')}.{extension}"
+
+
+# Registered before /{class_id} for the same route-ordering reason as
+# /reports above.
+@router.get("/reports/pdf", dependencies=[_require_admin])
+async def get_attendance_reports_pdf(
+    department_id: uuid.UUID | None = Query(default=None),
+    semester_id: uuid.UUID | None = Query(default=None),
+    student_id: uuid.UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    report = attendance_service.get_reports(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    scope_labels = attendance_service.get_report_scope_labels(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    pdf_bytes = await run_in_threadpool(generate_attendance_report_pdf, scope_labels, report.summary)
+    filename = _export_filename("pdf")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/reports/excel", dependencies=[_require_admin])
+async def get_attendance_reports_excel(
+    department_id: uuid.UUID | None = Query(default=None),
+    semester_id: uuid.UUID | None = Query(default=None),
+    student_id: uuid.UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    report = attendance_service.get_reports(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    scope_labels = attendance_service.get_report_scope_labels(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    excel_bytes = await run_in_threadpool(generate_attendance_report_excel, scope_labels, report.summary)
+    filename = _export_filename("xlsx")
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
