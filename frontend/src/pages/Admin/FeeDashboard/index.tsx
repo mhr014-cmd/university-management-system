@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { isAxiosError } from "axios";
+import { AlertTriangle, CheckCircle2, Download, Send, Wallet } from "lucide-react";
 import { useDepartments } from "../../../features/departments";
 import { useSemesters } from "../../../features/semesters";
 import { useStudents } from "../../../features/users";
@@ -22,6 +23,11 @@ import {
   useOverdueAccounts,
   useRecordPayment,
 } from "../../../features/fees";
+import { Button } from "../../../components/ui/Button";
+import { Card, CardTitle } from "../../../components/ui/Card";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { PageLoader } from "../../../components/ui/PageLoader";
+import { inputClass } from "../../../components/ui/classNames";
 
 export default function FeeDashboardPage() {
   const { data: departments } = useDepartments();
@@ -119,7 +125,7 @@ export default function FeeDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Fee Dashboard</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Dashboard</h1>
 
       {message && (
         <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
@@ -133,25 +139,31 @@ export default function FeeDashboardPage() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding (Overdue)</p>
+        <Card>
+          <div className="mb-1 flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding (Overdue)</p>
+          </div>
           <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">{totalOutstanding.toFixed(2)}</p>
-        </div>
-        <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Overdue Accounts</p>
+        </Card>
+        <Card>
+          <div className="mb-1 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Overdue Accounts</p>
+          </div>
           <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
             {overdue?.overdue_accounts.length ?? 0}
           </p>
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        <div className="space-y-2 rounded border border-slate-200 p-4 dark:border-slate-700">
-          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">New Fee Structure</h2>
+        <Card className="space-y-3">
+          <CardTitle>New Fee Structure</CardTitle>
           <select
             value={fsDepartmentId}
             onChange={(e) => setFsDepartmentId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           >
             <option value="">University-wide (all departments)</option>
             {departments?.items.map((d) => (
@@ -160,11 +172,7 @@ export default function FeeDashboardPage() {
               </option>
             ))}
           </select>
-          <select
-            value={fsSemesterId}
-            onChange={(e) => setFsSemesterId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-          >
+          <select value={fsSemesterId} onChange={(e) => setFsSemesterId(e.target.value)} className={inputClass}>
             <option value="">Select Semester</option>
             {semesters?.items.map((s) => (
               <option key={s.id} value={s.id}>
@@ -177,7 +185,7 @@ export default function FeeDashboardPage() {
             value={fsName}
             onChange={(e) => setFsName(e.target.value)}
             placeholder="Fee name (e.g. Tuition Fee)"
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           />
           <input
             type="number"
@@ -186,31 +194,21 @@ export default function FeeDashboardPage() {
             value={fsAmount}
             onChange={(e) => setFsAmount(e.target.value)}
             placeholder="Amount"
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           />
-          <input
-            type="date"
-            value={fsDueDate}
-            onChange={(e) => setFsDueDate(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-          <button
-            type="button"
+          <input type="date" value={fsDueDate} onChange={(e) => setFsDueDate(e.target.value)} className={inputClass} />
+          <Button
             onClick={handleCreateFeeStructure}
-            disabled={!fsSemesterId || !fsName || !fsAmount || !fsDueDate || createFeeStructure.isPending}
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+            disabled={!fsSemesterId || !fsName || !fsAmount || !fsDueDate}
+            isLoading={createFeeStructure.isPending}
           >
             Create Fee Structure
-          </button>
-        </div>
+          </Button>
+        </Card>
 
-        <div className="space-y-2 rounded border border-slate-200 p-4 dark:border-slate-700">
-          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Record Payment</h2>
-          <select
-            value={payStudentId}
-            onChange={(e) => setPayStudentId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-          >
+        <Card className="space-y-3">
+          <CardTitle>Record Payment</CardTitle>
+          <select value={payStudentId} onChange={(e) => setPayStudentId(e.target.value)} className={inputClass}>
             <option value="">Select Student</option>
             {students?.items.map((s) => (
               <option key={s.id} value={s.id}>
@@ -223,7 +221,7 @@ export default function FeeDashboardPage() {
             value={payFeeStructureId}
             onChange={(e) => setPayFeeStructureId(e.target.value)}
             placeholder="Fee Structure ID"
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           />
           <input
             type="number"
@@ -232,93 +230,92 @@ export default function FeeDashboardPage() {
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}
             placeholder="Amount"
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           />
-          <input
-            type="datetime-local"
-            value={payDate}
-            onChange={(e) => setPayDate(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
+          <input type="datetime-local" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputClass} />
           <input
             type="text"
             value={payMethod}
             onChange={(e) => setPayMethod(e.target.value)}
             placeholder="Payment method (optional)"
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           />
-          <button
-            type="button"
+          <Button
             onClick={handleRecordPayment}
-            disabled={!payStudentId || !payFeeStructureId || !payAmount || !payDate || recordPayment.isPending}
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+            disabled={!payStudentId || !payFeeStructureId || !payAmount || !payDate}
+            isLoading={recordPayment.isPending}
           >
             Record Payment
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Overdue Accounts</h2>
-          <button
-            type="button"
-            onClick={handleBulkNotify}
-            disabled={!overdue?.overdue_accounts.length || notifyOverdue.isPending}
-            className="rounded border border-slate-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-slate-600"
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Overdue Accounts</h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Send className="h-3.5 w-3.5" aria-hidden="true" />}
+            onClick={() => void handleBulkNotify()}
+            disabled={!overdue?.overdue_accounts.length}
+            isLoading={notifyOverdue.isPending}
           >
             Send Bulk Overdue Notice
-          </button>
+          </Button>
         </div>
         {isOverdueLoading || !overdue ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>
+          <PageLoader />
+        ) : overdue.overdue_accounts.length === 0 ? (
+          <EmptyState icon={CheckCircle2} title="No overdue accounts" description="Every student is current on their fees." />
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-2">Student</th>
-                <th className="py-2">Amount Due</th>
-                <th className="py-2">Days Overdue</th>
-                <th className="py-2"></th>
-                <th className="py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {overdue.overdue_accounts.map((account) => (
-                <tr
-                  key={account.invoice_id}
-                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                >
-                  <td className="py-2">{account.student_name}</td>
-                  <td className="py-2">{account.amount_due.toFixed(2)}</td>
-                  <td className="py-2">{account.days_overdue}</td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => handleNotify(account.student_id)}
-                      disabled={notifyOverdue.isPending}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
-                    >
-                      Notify
-                    </button>
-                  </td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => downloadInvoice.mutate(account.invoice_id)}
-                      disabled={downloadInvoice.isPending}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
-                    >
-                      Download Invoice
-                    </button>
-                  </td>
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="px-4 py-2.5">Student</th>
+                  <th className="px-4 py-2.5">Amount Due</th>
+                  <th className="px-4 py-2.5">Days Overdue</th>
+                  <th className="px-4 py-2.5"></th>
+                  <th className="px-4 py-2.5"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {overdue && overdue.overdue_accounts.length === 0 && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No overdue accounts.</p>
+              </thead>
+              <tbody>
+                {overdue.overdue_accounts.map((account) => (
+                  <tr
+                    key={account.invoice_id}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                  >
+                    <td className="px-4 py-2.5">{account.student_name}</td>
+                    <td className="px-4 py-2.5">{account.amount_due.toFixed(2)}</td>
+                    <td className="px-4 py-2.5">{account.days_overdue}</td>
+                    <td className="px-4 py-2.5">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Send className="h-3 w-3" aria-hidden="true" />}
+                        onClick={() => handleNotify(account.student_id)}
+                        isLoading={notifyOverdue.isPending}
+                      >
+                        Notify
+                      </Button>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Download className="h-3 w-3" aria-hidden="true" />}
+                        onClick={() => downloadInvoice.mutate(account.invoice_id)}
+                        isLoading={downloadInvoice.isPending}
+                      >
+                        Invoice
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
         )}
       </div>
     </div>
