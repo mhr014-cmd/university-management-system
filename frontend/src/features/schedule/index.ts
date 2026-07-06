@@ -53,6 +53,24 @@ export interface RequestedChangeInput {
   room_id?: string;
 }
 
+// Admin approval queue (production-readiness audit gap closure).
+export interface ScheduleChangeRequestListEntry {
+  id: string;
+  schedule_entry_id: string;
+  course_name: string;
+  section_label: string;
+  requested_by_teacher_id: string;
+  requested_by_teacher_name: string;
+  current_day_of_week: DayOfWeek;
+  current_start_time: string;
+  current_end_time: string;
+  current_room_name: string;
+  requested_change: RequestedChangeInput;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  resolved_at: string | null;
+}
+
 export function useMySchedule(studentId?: string) {
   return useQuery({
     queryKey: ["schedule", "me", studentId],
@@ -117,6 +135,36 @@ export interface RosterEntry {
   student_id: string;
   first_name: string;
   last_name: string;
+}
+
+export function useScheduleChangeRequests(status: "pending" | "approved" | "rejected" = "pending") {
+  return useQuery({
+    queryKey: ["schedule", "change-requests", status],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ items: ScheduleChangeRequestListEntry[] }>("/schedule/change-requests", {
+          params: { status },
+        })
+      ).data,
+  });
+}
+
+export function useResolveScheduleChangeRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      requestId,
+      decision,
+      comment,
+    }: {
+      requestId: string;
+      decision: "approve" | "reject";
+      comment?: string;
+    }) => (await apiClient.post(`/schedule/change-requests/${requestId}/resolve`, { decision, comment })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schedule"] });
+    },
+  });
 }
 
 export function useClassSessionRoster(classSessionId?: string) {

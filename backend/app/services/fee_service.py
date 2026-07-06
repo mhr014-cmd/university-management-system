@@ -316,8 +316,16 @@ class FeeService:
             own_student = user_repo.get_student_profile_by_user_id(session, current_user.id)
             if own_student.id != invoice.student_id:
                 raise _forbidden("You may only download your own invoice.")
+        elif current_user.role == "parent":
+            # Gap closure (production-readiness audit): the proposal
+            # promises Parents a downloadable Invoice/Receipt — this
+            # endpoint previously excluded Parent entirely. Same ownership
+            # convention as get_my_fees.
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            if not user_repo.parent_has_linked_student(session, parent.id, invoice.student_id):
+                raise _forbidden("You may only download a linked student's invoice.")
         elif current_user.role != "admin":
-            raise _forbidden("Only the Student themself or an Admin may download this invoice.")
+            raise _forbidden("Only the Student themself, a linked Parent, or an Admin may download this invoice.")
 
         fee_structure = fee_repo.get_fee_structure(session, invoice.fee_structure_id)
         student_with_user = user_repo.get_student_with_user(session, invoice.student_id)

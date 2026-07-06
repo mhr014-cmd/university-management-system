@@ -72,4 +72,24 @@ describe("ReportToolbar", () => {
 
     expect(screen.getByRole("button", { name: /excel/i })).toBeDisabled();
   });
+
+  it("does not render a CSV button when onExportCsv is omitted", () => {
+    render(<ReportToolbar onExportPdf={vi.fn()} onExportExcel={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /csv/i })).not.toBeInTheDocument();
+  });
+
+  it("calls onExportCsv when CSV is clicked", async () => {
+    const user = userEvent.setup();
+    const onExportCsv = vi.fn();
+    render(<ReportToolbar onExportPdf={vi.fn()} onExportExcel={vi.fn()} onExportCsv={onExportCsv} />);
+
+    await user.click(screen.getByRole("button", { name: /csv/i }));
+
+    expect(onExportCsv).toHaveBeenCalledOnce();
+  });
+
+  it("disables the CSV button while isExportingCsv is true", () => {
+    render(<ReportToolbar onExportPdf={vi.fn()} onExportExcel={vi.fn()} onExportCsv={vi.fn()} isExportingCsv />);
+    expect(screen.getByRole("button", { name: /csv/i })).toBeDisabled();
+  });
 });

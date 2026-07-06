@@ -50,15 +50,25 @@ def _safe_dispatch(session: Session, source: str, build) -> None:
 
 
 def notify_result_published(
-    session: Session, *, student_user_id: uuid.UUID, course_name: str, semester_name: str
+    session: Session,
+    *,
+    student_id: uuid.UUID,
+    student_user_id: uuid.UUID,
+    course_name: str,
+    semester_name: str,
 ) -> None:
+    # Gap closure (production-readiness audit): the proposal (Section 5,
+    # Parent — "Results & schedule") explicitly promises Parents visibility
+    # into a child's results — previously only the Student was notified.
+    # Same fan-out pattern already used by notify_attendance_warning/
+    # notify_fee_due (Domain Rule 15: recipients resolved from
+    # ParentStudentLink, no per-recipient validation step required).
+    message = f"Result published: {course_name} {semester_name}"
+
     def _build() -> None:
-        notification_repo.create(
-            session,
-            user_id=student_user_id,
-            type="result_published",
-            message=f"Result published: {course_name} {semester_name}",
-        )
+        notification_repo.create(session, user_id=student_user_id, type="result_published", message=message)
+        for parent_user_id in user_repo.list_parent_user_ids_for_student(session, student_id):
+            notification_repo.create(session, user_id=parent_user_id, type="result_published", message=message)
 
     _safe_dispatch(session, "notify_result_published", _build)
 
@@ -71,6 +81,7 @@ def notify_schedule_change(
     course_name: str,
     room_name: str | None = None,
     cancelled: bool = False,
+    student_ids: list[uuid.UUID] | None = None,
 ) -> None:
     message = (
         f"Schedule change: {course_name} class cancelled"
@@ -79,10 +90,34 @@ def notify_schedule_change(
     )
 
     def _build() -> None:
-        for user_id in [*student_user_ids, teacher_user_id]:
+        recipient_user_ids = {*student_user_ids, teacher_user_id}
+        # Gap closure (production-readiness audit): fan out to every linked
+        # Parent of an enrolled student, same convention as above. `student_ids`
+        # is optional and None for any pre-existing caller that hasn't been
+        # updated to pass it, so this stays backward compatible.
+        for student_id in student_ids or []:
+            recipient_user_ids.update(user_repo.list_parent_user_ids_for_student(session, student_id))
+        for user_id in recipient_user_ids:
             notification_repo.create(session, user_id=user_id, type="schedule_change", message=message)
 
     _safe_dispatch(session, "notify_schedule_change", _build)
+
+
+def notify_schedule_change_request_resolved(
+    session: Session, *, teacher_user_id: uuid.UUID, course_name: str, decision: str
+) -> None:
+    # Gap closure (production-readiness audit): resolving a Teacher's own
+    # schedule change request previously updated the timetable but never
+    # told the requesting Teacher the outcome. Reuses the existing
+    # "schedule_change" notification type — this is a schedule-change event
+    # from the Teacher's perspective, not a new category, so no migration
+    # is needed to add a new enum value.
+    message = f"Your schedule change request for {course_name} was {decision}."
+
+    def _build() -> None:
+        notification_repo.create(session, user_id=teacher_user_id, type="schedule_change", message=message)
+
+    _safe_dispatch(session, "notify_schedule_change_request_resolved", _build)
 
 
 def notify_attendance_warning(

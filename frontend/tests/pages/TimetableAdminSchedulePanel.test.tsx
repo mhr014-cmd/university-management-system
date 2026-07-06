@@ -89,6 +89,8 @@ vi.mock("../../src/features/users", () => ({
 const mutateAsyncCreateClassSession = vi.fn();
 const mutateAsyncCreateEnrollment = vi.fn();
 const mutateAsyncCreateScheduleEntry = vi.fn();
+const mutateAsyncResolveChangeRequest = vi.fn();
+const useScheduleChangeRequestsMock = vi.fn(() => ({ data: { items: [] }, isLoading: false }));
 
 vi.mock("../../src/features/schedule", () => ({
   useCreateClassSession: () => ({ mutateAsync: mutateAsyncCreateClassSession, isPending: false }),
@@ -97,6 +99,8 @@ vi.mock("../../src/features/schedule", () => ({
   useCreateChangeRequest: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useMySchedule: () => ({ data: undefined, isLoading: false }),
   useScheduleConflicts: () => ({ data: undefined, refetch: vi.fn() }),
+  useScheduleChangeRequests: () => useScheduleChangeRequestsMock(),
+  useResolveScheduleChangeRequest: () => ({ mutateAsync: mutateAsyncResolveChangeRequest, isPending: false }),
 }));
 
 function renderPage() {
@@ -118,6 +122,9 @@ describe("Timetable Admin Schedule Panel", () => {
     mutateAsyncCreateClassSession.mockReset();
     mutateAsyncCreateEnrollment.mockReset();
     mutateAsyncCreateScheduleEntry.mockReset();
+    mutateAsyncResolveChangeRequest.mockReset();
+    useScheduleChangeRequestsMock.mockReset();
+    useScheduleChangeRequestsMock.mockReturnValue({ data: { items: [] }, isLoading: false });
   });
 
   it("submits course_id/teacher_id/semester_id/section_label when creating a class session", async () => {
@@ -223,5 +230,75 @@ describe("Timetable Admin Schedule Panel", () => {
     await user.click(within(form).getByRole("button", { name: "Create Entry" }));
 
     expect(await screen.findByText(/conflicts with an existing room or teacher booking/i)).toBeInTheDocument();
+  });
+});
+
+describe("Pending Schedule Change Requests panel", () => {
+  beforeEach(() => {
+    mutateAsyncResolveChangeRequest.mockReset();
+    useScheduleChangeRequestsMock.mockReset();
+  });
+
+  const pendingRequest = {
+    id: "req-1",
+    schedule_entry_id: "entry-1",
+    course_name: "Intro to CS",
+    section_label: "A",
+    requested_by_teacher_id: "teacher-1",
+    requested_by_teacher_name: "Jane Doe",
+    current_day_of_week: "Mon",
+    current_start_time: "09:00:00",
+    current_end_time: "10:00:00",
+    current_room_name: "Room 101",
+    requested_change: { day_of_week: "Tue", start_time: "11:00:00", end_time: "12:00:00" },
+    status: "pending",
+    created_at: "2026-01-01T00:00:00Z",
+    resolved_at: null,
+  };
+
+  it("shows a no-pending-requests message when the queue is empty", () => {
+    useScheduleChangeRequestsMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    renderPage();
+    expect(screen.getByText("No pending requests.")).toBeInTheDocument();
+  });
+
+  it("lists a pending request with its current and requested values", () => {
+    useScheduleChangeRequestsMock.mockReturnValue({ data: { items: [pendingRequest] }, isLoading: false });
+    renderPage();
+
+    expect(screen.getByText(/Intro to CS \(A\) — Jane Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Current: Mon 09:00–10:00 in Room 101/)).toBeInTheDocument();
+    expect(screen.getByText(/Day: Tue.*Time: 11:00–12:00/)).toBeInTheDocument();
+  });
+
+  it("approves a request, including any typed comment", async () => {
+    useScheduleChangeRequestsMock.mockReturnValue({ data: { items: [pendingRequest] }, isLoading: false });
+    mutateAsyncResolveChangeRequest.mockResolvedValue({ id: "req-1", status: "approved" });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByPlaceholderText("Optional comment (shown to the Teacher)"), "Looks good");
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(mutateAsyncResolveChangeRequest).toHaveBeenCalledWith({
+      requestId: "req-1",
+      decision: "approve",
+      comment: "Looks good",
+    });
+  });
+
+  it("rejects a request", async () => {
+    useScheduleChangeRequestsMock.mockReturnValue({ data: { items: [pendingRequest] }, isLoading: false });
+    mutateAsyncResolveChangeRequest.mockResolvedValue({ id: "req-1", status: "rejected" });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole("button", { name: "Reject" }));
+
+    expect(mutateAsyncResolveChangeRequest).toHaveBeenCalledWith({
+      requestId: "req-1",
+      decision: "reject",
+      comment: undefined,
+    });
   });
 });

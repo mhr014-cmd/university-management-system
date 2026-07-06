@@ -145,6 +145,30 @@ class ScheduleChangeRequestResolveResponse(BaseModel):
     resolved_at: datetime
 
 
+# --- schedule_change_request list (Admin approval queue) -------------------
+
+
+class ScheduleChangeRequestListEntry(BaseModel):
+    id: uuid.UUID
+    schedule_entry_id: uuid.UUID
+    course_name: str
+    section_label: str
+    requested_by_teacher_id: uuid.UUID
+    requested_by_teacher_name: str
+    current_day_of_week: DayOfWeek
+    current_start_time: time
+    current_end_time: time
+    current_room_name: str
+    requested_change: RequestedChange
+    status: Literal["pending", "approved", "rejected"]
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class ScheduleChangeRequestListResponse(BaseModel):
+    items: list[ScheduleChangeRequestListEntry]
+
+
 # --- class_session roster (Derived, API_Contract.md Section 7.10) ---------
 
 

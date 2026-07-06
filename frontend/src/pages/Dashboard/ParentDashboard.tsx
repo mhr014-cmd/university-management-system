@@ -12,9 +12,11 @@
 // manually-typed Student ID.
 
 import { useEffect, useMemo, useState } from "react";
-import { Award, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Award, Bell, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
 import { useMyAttendance } from "../../features/attendance";
 import { useMyFees } from "../../features/fees";
+import { useNotifications } from "../../features/notifications";
 import { useMyResults } from "../../features/results";
 import { useMyChildren } from "../../features/users";
 import { Card } from "../../components/ui/Card";
@@ -151,6 +153,50 @@ export function ParentDashboard() {
           </table>
         )}
       </Card>
+
+      <RecentNotificationsCard />
     </div>
+  );
+}
+
+// Gap closure (production-readiness audit): the Notifications feature
+// already existed (GET /notifications, generic across every role) but had
+// no dashboard-level presence for Parent, only the standalone
+// Notifications page. Reuses the existing hook, no new endpoint.
+function RecentNotificationsCard() {
+  const { data, isLoading } = useNotifications({ pageSize: 5 });
+
+  return (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Latest Notifications</p>
+        </div>
+        <Link to="/notifications" className="text-xs font-medium text-slate-600 hover:underline dark:text-slate-300">
+          View all
+        </Link>
+      </div>
+      {isLoading ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p>
+      ) : !data || data.items.length === 0 ? (
+        <EmptyState icon={Bell} title="No notifications yet" />
+      ) : (
+        <ul className="space-y-2">
+          {data.items.map((notification) => (
+            <li key={notification.id} className="flex items-start gap-2 text-sm">
+              <span
+                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                  notification.is_read ? "border border-slate-400" : "bg-slate-900 dark:bg-slate-100"
+                }`}
+              />
+              <span className={notification.is_read ? "text-slate-500 dark:text-slate-400" : "font-medium text-slate-900 dark:text-slate-100"}>
+                {notification.message}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

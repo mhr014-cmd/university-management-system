@@ -27,6 +27,8 @@ import {
   useCreateEnrollment,
   useCreateScheduleEntry,
   useMySchedule,
+  useResolveScheduleChangeRequest,
+  useScheduleChangeRequests,
   useScheduleConflicts,
   type DayOfWeek,
   type ScheduleMeEntry,
@@ -201,11 +203,23 @@ function ParentScheduleGrid() {
 
 function RequestChangeModal({ entry, onClose }: { entry: ScheduleMeEntry; onClose: () => void }) {
   const createChangeRequest = useCreateChangeRequest();
+  const { data: rooms } = useRooms();
   const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>(entry.day_of_week);
   const [startTime, setStartTime] = useState(entry.start_time.slice(0, 5));
   const [endTime, setEndTime] = useState(entry.end_time.slice(0, 5));
+  // Optional room-change request (production-readiness audit gap closure)
+  // — the backend's RequestedChange schema already accepted room_id; this
+  // modal previously never collected it. Left unselected ("") means "no
+  // room change requested", matching day/time's own it's-already-the-
+  // current-value default.
+  const [roomId, setRoomId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const roomOptions = (rooms?.items ?? []).map((r) => ({
+    value: r.id,
+    label: r.building ? `${r.name} — ${r.building}` : r.name,
+  }));
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -217,12 +231,19 @@ function RequestChangeModal({ entry, onClose }: { entry: ScheduleMeEntry; onClos
     try {
       await createChangeRequest.mutateAsync({
         schedule_entry_id: entry.schedule_entry_id,
-        requested_change: { day_of_week: dayOfWeek, start_time: `${startTime}:00`, end_time: `${endTime}:00` },
+        requested_change: {
+          day_of_week: dayOfWeek,
+          start_time: `${startTime}:00`,
+          end_time: `${endTime}:00`,
+          ...(roomId ? { room_id: roomId } : {}),
+        },
       });
       setSuccess(true);
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 422) {
         setError("Invalid requested time range.");
+      } else if (isAxiosError(err) && err.response?.status === 409) {
+        setError("The requested time/room conflicts with an existing booking.");
       } else {
         setError("Could not submit the request. Please try again.");
       }
@@ -256,6 +277,18 @@ function RequestChangeModal({ entry, onClose }: { entry: ScheduleMeEntry; onClos
             </select>
             <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inputClass} />
             <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inputClass} />
+            <div>
+              <label htmlFor="request-change-room" className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                Requested Room (optional — leave unset to keep {entry.room_name})
+              </label>
+              <SearchableSelect
+                id="request-change-room"
+                options={roomOptions}
+                value={roomId}
+                onChange={setRoomId}
+                placeholder="No room change"
+              />
+            </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
               <Button type="submit" isLoading={createChangeRequest.isPending}>Submit Request</Button>
@@ -264,6 +297,104 @@ function RequestChangeModal({ entry, onClose }: { entry: ScheduleMeEntry; onClos
         )}
       </div>
     </div>
+  );
+}
+
+// Admin approval queue (production-readiness audit gap closure) — the
+// backend's create/resolve endpoints already existed, but there was no
+// frontend surface at all for an Admin to see and act on a Teacher's
+// pending schedule change request. "Request modification" from the brief
+// is expressed as Reject + an explanatory comment (visible to the Teacher
+// via the schedule_change notification dispatched on resolution) rather
+// than a third request status — the schema's status enum is exactly
+// pending/approved/rejected (Database_Design.md §6.13), and adding a
+// fourth state would mean an Alembic migration to alter that Postgres
+// enum, which is out of scope for this pass.
+function PendingChangeRequestsPanel() {
+  const { showSuccess, showError } = useToast();
+  const { data, isLoading } = useScheduleChangeRequests("pending");
+  const resolveRequest = useResolveScheduleChangeRequest();
+  const [commentByRequestId, setCommentByRequestId] = useState<Record<string, string>>({});
+
+  const describeChange = (change: {
+    day_of_week?: DayOfWeek;
+    start_time?: string;
+    end_time?: string;
+    room_id?: string;
+  }) => {
+    const parts: string[] = [];
+    if (change.day_of_week) parts.push(`Day: ${change.day_of_week}`);
+    if (change.start_time && change.end_time) {
+      parts.push(`Time: ${change.start_time.slice(0, 5)}–${change.end_time.slice(0, 5)}`);
+    }
+    if (change.room_id) parts.push("Room change requested");
+    return parts.length > 0 ? parts.join(" · ") : "No fields changed";
+  };
+
+  const handleResolve = async (requestId: string, decision: "approve" | "reject") => {
+    try {
+      await resolveRequest.mutateAsync({ requestId, decision, comment: commentByRequestId[requestId] || undefined });
+      showSuccess(decision === "approve" ? "Change request approved." : "Change request rejected.");
+    } catch {
+      showError("Could not resolve this request — it may already have been resolved, or conflict with another booking.");
+    }
+  };
+
+  return (
+    <Card>
+      <CardTitle>Pending Schedule Change Requests</CardTitle>
+      {isLoading ? (
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading pending requests...</p>
+      ) : !data || data.items.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No pending requests.</p>
+      ) : (
+        <ul className="mt-2 space-y-3">
+          {data.items.map((request) => (
+            <li key={request.id} className="rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-slate-100">
+                    {request.course_name} ({request.section_label}) — {request.requested_by_teacher_name}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Current: {request.current_day_of_week} {request.current_start_time.slice(0, 5)}–
+                    {request.current_end_time.slice(0, 5)} in {request.current_room_name}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Requested change: {describeChange(request.requested_change)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  placeholder="Optional comment (shown to the Teacher)"
+                  value={commentByRequestId[request.id] ?? ""}
+                  onChange={(e) =>
+                    setCommentByRequestId((prev) => ({ ...prev, [request.id]: e.target.value }))
+                  }
+                  className={`flex-1 ${inputClass}`}
+                />
+                <Button
+                  size="sm"
+                  isLoading={resolveRequest.isPending}
+                  onClick={() => void handleResolve(request.id, "approve")}
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  isLoading={resolveRequest.isPending}
+                  onClick={() => void handleResolve(request.id, "reject")}
+                >
+                  Reject
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 
@@ -374,6 +505,8 @@ function AdminSchedulePanel() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Timetable — Admin</h1>
+
+      <PendingChangeRequestsPanel />
 
       <Card>
         <form onSubmit={handleCreateClassSession} className="space-y-2">

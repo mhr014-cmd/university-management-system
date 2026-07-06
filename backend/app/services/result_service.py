@@ -340,6 +340,7 @@ class ResultService:
                 _student, student_user = student_with_user
                 dispatcher.notify_result_published(
                     session,
+                    student_id=result.student_id,
                     student_user_id=student_user.id,
                     course_name=course.name,
                     semester_name=semester.name,
@@ -363,8 +364,16 @@ class ResultService:
             own_student = user_repo.get_student_profile_by_user_id(session, current_user.id)
             if own_student.id != student_id:
                 raise _forbidden("You may only download your own transcript.")
+        elif current_user.role == "parent":
+            # Gap closure (production-readiness audit): the proposal
+            # promises Parents a downloadable "Semester Result" — this
+            # endpoint previously excluded Parent entirely. Same ownership
+            # convention as get_my_results.
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            if not user_repo.parent_has_linked_student(session, parent.id, student_id):
+                raise _forbidden("You may only download a linked student's transcript.")
         elif current_user.role != "admin":
-            raise _forbidden("Only the Student themself or an Admin may download this transcript.")
+            raise _forbidden("Only the Student themself, a linked Parent, or an Admin may download this transcript.")
 
         results = result_repo.list_for_student(session, student_id, status="published")
         semester_entries = _build_semester_entries(session, results)

@@ -24,9 +24,12 @@ from app.schemas.schedule import (
     ClassSessionRosterResponse,
     EnrollmentCreate,
     EnrollmentRead,
+    RequestedChange,
     RosterEntry,
     ScheduleChangeRequestCreate,
     ScheduleChangeRequestCreateResponse,
+    ScheduleChangeRequestListEntry,
+    ScheduleChangeRequestListResponse,
     ScheduleChangeRequestResolve,
     ScheduleChangeRequestResolveResponse,
     ScheduleConflict,
@@ -280,10 +283,12 @@ class ScheduleService:
             room_name = room.name if room is not None else None
 
         student_user_ids = []
+        student_ids = []
         for student in schedule_repo.list_enrolled_students(session, class_session_id):
             student_with_user = user_repo.get_student_with_user(session, student.id)
             if student_with_user is not None:
                 student_user_ids.append(student_with_user[1].id)
+                student_ids.append(student.id)
 
         dispatcher.notify_schedule_change(
             session,
@@ -292,6 +297,7 @@ class ScheduleService:
             course_name=course.name,
             room_name=room_name,
             cancelled=cancelled,
+            student_ids=student_ids,
         )
 
     def get_conflicts(self, session: Session, semester_id: uuid.UUID | None = None) -> ScheduleConflictsResponse:
@@ -389,6 +395,49 @@ class ScheduleService:
         session.refresh(request)
         return ScheduleChangeRequestCreateResponse(id=request.id, status=request.status, created_at=request.created_at)
 
+    def list_change_requests(
+        self, session: Session, status_filter: str | None = None
+    ) -> ScheduleChangeRequestListResponse:
+        # Admin approval queue (production-readiness audit gap closure) —
+        # backend support for create/resolve already existed, but nothing
+        # ever listed pending requests for an Admin to act on.
+        requests = schedule_repo.list_change_requests(session, status=status_filter)
+
+        items = []
+        for request in requests:
+            entry = schedule_repo.get_schedule_entry(session, request.schedule_entry_id)
+            if entry is None:
+                continue
+            class_session = schedule_repo.get_class_session(session, entry.class_session_id)
+            if class_session is None:
+                continue
+            course = course_repo.get(session, class_session.course_id)
+            room = room_repo.get(session, entry.room_id)
+            teacher_with_user = user_repo.get_teacher_with_user(session, request.requested_by_teacher_id)
+            if course is None or room is None or teacher_with_user is None:
+                continue
+            teacher, _user = teacher_with_user
+
+            items.append(
+                ScheduleChangeRequestListEntry(
+                    id=request.id,
+                    schedule_entry_id=entry.id,
+                    course_name=course.name,
+                    section_label=class_session.section_label,
+                    requested_by_teacher_id=request.requested_by_teacher_id,
+                    requested_by_teacher_name=f"{teacher.first_name} {teacher.last_name}",
+                    current_day_of_week=entry.day_of_week,
+                    current_start_time=entry.start_time,
+                    current_end_time=entry.end_time,
+                    current_room_name=room.name,
+                    requested_change=RequestedChange(**request.requested_change),
+                    status=request.status,
+                    created_at=request.created_at,
+                    resolved_at=request.resolved_at,
+                )
+            )
+        return ScheduleChangeRequestListResponse(items=items)
+
     def resolve_change_request(
         self, session: Session, request_id: uuid.UUID, payload: ScheduleChangeRequestResolve, current_admin: User
     ) -> ScheduleChangeRequestResolveResponse:
@@ -435,6 +484,32 @@ class ScheduleService:
         session.add(request)
         session.commit()
         session.refresh(request)
+
+        # Gap closure (production-readiness audit): notify the requesting
+        # Teacher of the outcome — Domain Rule 4, dispatch only after the
+        # commit above has succeeded. On approval, also notify the class's
+        # enrolled students/parents that the schedule actually changed,
+        # exactly as a direct Admin edit already does via update_entry().
+        entry_for_notify = schedule_repo.get_schedule_entry(session, request.schedule_entry_id)
+        if entry_for_notify is not None:
+            teacher_with_user = user_repo.get_teacher_with_user(session, entry_for_notify.teacher_id)
+            class_session = schedule_repo.get_class_session(session, entry_for_notify.class_session_id)
+            course = course_repo.get(session, class_session.course_id) if class_session is not None else None
+            if teacher_with_user is not None and course is not None:
+                dispatcher.notify_schedule_change_request_resolved(
+                    session,
+                    teacher_user_id=teacher_with_user[1].id,
+                    course_name=course.name,
+                    decision=request.status,
+                )
+                if request.status == "approved":
+                    self._notify_schedule_change(
+                        session,
+                        class_session_id=entry_for_notify.class_session_id,
+                        teacher_id=entry_for_notify.teacher_id,
+                        room_id=entry_for_notify.room_id,
+                    )
+
         return ScheduleChangeRequestResolveResponse(
             id=request.id, status=request.status, resolved_at=request.resolved_at
         )

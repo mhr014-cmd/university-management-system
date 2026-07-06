@@ -527,6 +527,102 @@ class TestAttendanceReportsExport:
         assert response.status_code == 422
 
 
+class TestAttendanceReportsExportParentAccess:
+    """Gap closure (production-readiness audit): Parent may download their
+    own linked child's attendance report (PDF/Excel/CSV), scoped by
+    ownership — same convention as GET /attendance/me."""
+
+    def test_parent_without_student_id_rejected(self, client, make_parent_user):
+        make_parent_user("parent@example.com", "parent-password")
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(parent_token))
+        assert response.status_code == 403
+
+    def test_parent_without_link_rejected(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment, make_schedule_entry
+    ):
+        _teacher, student, _class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        make_parent_user("parent@example.com", "parent-password")  # not linked to `student`
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(
+            f"/api/v1/attendance/reports/pdf?student_id={student.id}", headers=_headers(parent_token)
+        )
+        assert response.status_code == 403
+
+    def test_linked_parent_downloads_pdf(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+        link_parent_student,
+    ):
+        teacher, student, class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        client.post(
+            "/api/v1/attendance",
+            json={
+                "class_session_id": str(class_session.id),
+                "attendance_date": "2026-01-05",
+                "records": [{"student_id": str(student.id), "status": "present"}],
+            },
+            headers=_headers(teacher_token),
+        )
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(
+            f"/api/v1/attendance/reports/pdf?student_id={student.id}", headers=_headers(parent_token)
+        )
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+
+    def test_linked_parent_downloads_csv(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        make_schedule_entry,
+        link_parent_student,
+    ):
+        _teacher, student, _class_session = _setup_class_with_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment, make_schedule_entry
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(
+            f"/api/v1/attendance/reports/csv?student_id={student.id}", headers=_headers(parent_token)
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/csv; charset=utf-8"
+        content_disposition = response.headers["content-disposition"]
+        assert content_disposition.startswith('attachment; filename="attendance-report-')
+        assert content_disposition.endswith('.csv"')
+        assert b"Student,Attendance %" in response.content
+
+    def test_admin_still_gets_school_wide_csv(self, client, make_admin_user):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        response = client.get("/api/v1/attendance/reports/csv", headers=_headers(admin_token))
+        assert response.status_code == 200
+        assert b"Student,Attendance %" in response.content
+
+
 class TestClassSessionRoster:
     def test_teacher_sees_enrolled_students(
         self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment

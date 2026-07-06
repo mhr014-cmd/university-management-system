@@ -335,10 +335,23 @@ class AttendanceService:
     def get_reports(
         self,
         session: Session,
+        current_user: User,
         department_id: uuid.UUID | None,
         semester_id: uuid.UUID | None,
         student_id: uuid.UUID | None = None,
     ) -> AttendanceReportsResponse:
+        # Gap closure (production-readiness audit): Parent access to
+        # attendance reports/exports was previously Admin-only, even though
+        # a Parent may legitimately want their own child's attendance
+        # report as a download. Scoped strictly to a linked student, same
+        # ownership-check convention as get_me/get_class_attendance.
+        if current_user.role == "parent":
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            if student_id is None or not user_repo.parent_has_linked_student(session, parent.id, student_id):
+                raise _forbidden("You may only view attendance reports for a linked student.")
+        elif current_user.role != "admin":
+            raise _forbidden("Only Admin or Parent callers may use this endpoint.")
+
         if department_id is not None and department_repo.get(session, department_id) is None:
             raise _invalid("department_id does not reference an existing department")
         if semester_id is not None and semester_repo.get(session, semester_id) is None:

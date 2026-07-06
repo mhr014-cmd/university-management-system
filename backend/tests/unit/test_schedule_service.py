@@ -56,12 +56,14 @@ def stub_repos(monkeypatch):
     course_repo = MagicMock()
     room_repo = MagicMock()
     semester_repo = MagicMock()
+    dispatcher = MagicMock()
     monkeypatch.setattr(schedule_service_module, "schedule_repo", schedule_repo)
     monkeypatch.setattr(schedule_service_module, "user_repo", user_repo)
     monkeypatch.setattr(schedule_service_module, "course_repo", course_repo)
     monkeypatch.setattr(schedule_service_module, "room_repo", room_repo)
     monkeypatch.setattr(schedule_service_module, "semester_repo", semester_repo)
-    return schedule_repo, user_repo, course_repo, room_repo, semester_repo
+    monkeypatch.setattr(schedule_service_module, "dispatcher", dispatcher)
+    return schedule_repo, user_repo, course_repo, room_repo, semester_repo, dispatcher
 
 
 @pytest.fixture
@@ -76,7 +78,7 @@ def session():
 
 class TestCreateClassSession:
     def test_invalid_course_id_raises_422(self, service, stub_repos, session):
-        _schedule_repo, _user_repo, course_repo, _room_repo, _semester_repo = stub_repos
+        _schedule_repo, _user_repo, course_repo, _room_repo, _semester_repo, _dispatcher = stub_repos
         course_repo.get.return_value = None
         payload = ClassSessionCreate(
             course_id=uuid.uuid4(), teacher_id=uuid.uuid4(), semester_id=uuid.uuid4(), section_label="A"
@@ -88,7 +90,7 @@ class TestCreateClassSession:
 
 class TestCreateEntry:
     def test_start_after_end_raises_422(self, service, stub_repos, session):
-        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo = stub_repos
+        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo, _dispatcher = stub_repos
         payload = ScheduleEntryCreate(
             class_session_id=uuid.uuid4(),
             room_id=uuid.uuid4(),
@@ -103,7 +105,7 @@ class TestCreateEntry:
         schedule_repo.create_schedule_entry.assert_not_called()
 
     def test_conflict_raises_409(self, service, stub_repos, session):
-        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo = stub_repos
+        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo, _dispatcher = stub_repos
         schedule_repo.get_class_session.return_value = MagicMock()
         room_repo.get.return_value = MagicMock()
         user_repo.get_teacher_with_user.return_value = (MagicMock(), MagicMock())
@@ -122,7 +124,7 @@ class TestCreateEntry:
         assert exc.value.status_code == 409
 
     def test_success_creates_entry(self, service, stub_repos, session):
-        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo = stub_repos
+        schedule_repo, user_repo, _course_repo, room_repo, _semester_repo, _dispatcher = stub_repos
         schedule_repo.get_class_session.return_value = MagicMock()
         room_repo.get.return_value = MagicMock()
         user_repo.get_teacher_with_user.return_value = (MagicMock(), MagicMock())
@@ -271,22 +273,38 @@ class TestResolveChangeRequest:
         assert exc.value.status_code == 409
 
     def test_reject_does_not_touch_schedule_entry(self, service, stub_repos, session):
-        schedule_repo, user_repo, *_ = stub_repos
+        # Gap closure (production-readiness audit): resolving now always
+        # notifies the requesting Teacher of the outcome (approve or
+        # reject), which requires looking up the schedule entry to resolve
+        # the Teacher/course — but reject must still never mutate it.
+        schedule_repo, user_repo, course_repo, *_, dispatcher = stub_repos
+        entry = make_entry()
         request = ScheduleChangeRequest(
-            id=uuid.uuid4(), status="pending", schedule_entry_id=uuid.uuid4(), requested_change={}
+            id=uuid.uuid4(), status="pending", schedule_entry_id=entry.id, requested_change={}
         )
         schedule_repo.get_change_request.return_value = request
+        schedule_repo.get_schedule_entry.return_value = entry
+        schedule_repo.get_class_session.return_value = MagicMock(course_id=uuid.uuid4())
+        course = MagicMock()
+        course.name = "DB Systems"
+        course_repo.get.return_value = course
+        user_repo.get_teacher_with_user.return_value = (MagicMock(), MagicMock(id=uuid.uuid4()))
         user_repo.get_admin_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        original_start, original_end = entry.start_time, entry.end_time
 
         result = service.resolve_change_request(
             session, request.id, ScheduleChangeRequestResolve(decision="reject"), User(id=uuid.uuid4())
         )
 
         assert result.status == "rejected"
-        schedule_repo.get_schedule_entry.assert_not_called()
+        assert entry.start_time == original_start
+        assert entry.end_time == original_end
+        dispatcher.notify_schedule_change_request_resolved.assert_called_once()
+        assert dispatcher.notify_schedule_change_request_resolved.call_args.kwargs["decision"] == "rejected"
+        dispatcher.notify_schedule_change.assert_not_called()
 
     def test_approve_applies_requested_time_and_checks_conflicts(self, service, stub_repos, session):
-        schedule_repo, user_repo, *_ = stub_repos
+        schedule_repo, user_repo, course_repo, *_, dispatcher = stub_repos
         entry = make_entry()
         request = ScheduleChangeRequest(
             id=uuid.uuid4(),
@@ -297,6 +315,16 @@ class TestResolveChangeRequest:
         schedule_repo.get_change_request.return_value = request
         schedule_repo.get_schedule_entry.return_value = entry
         schedule_repo.find_overlapping_entries.return_value = []
+        schedule_repo.get_class_session.return_value = MagicMock(course_id=uuid.uuid4())
+        schedule_repo.list_enrolled_students.return_value = []
+        course = MagicMock()
+        course.name = "DB Systems"
+        course_repo.get.return_value = course
+        room_repo = stub_repos[3]
+        room = MagicMock()
+        room.name = "Room 101"
+        room_repo.get.return_value = room
+        user_repo.get_teacher_with_user.return_value = (MagicMock(), MagicMock(id=uuid.uuid4()))
         user_repo.get_admin_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
 
         result = service.resolve_change_request(
@@ -306,6 +334,11 @@ class TestResolveChangeRequest:
         assert result.status == "approved"
         assert entry.start_time == time(11, 0)
         assert entry.end_time == time(12, 0)
+        dispatcher.notify_schedule_change_request_resolved.assert_called_once()
+        assert dispatcher.notify_schedule_change_request_resolved.call_args.kwargs["decision"] == "approved"
+        # Approval also notifies the class roster of the actual schedule
+        # change, same as a direct Admin edit via update_entry() would.
+        dispatcher.notify_schedule_change.assert_called_once()
 
 
 class TestGetMe:

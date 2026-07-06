@@ -178,3 +178,21 @@ export function useExportAttendanceReportExcel() {
       ),
   });
 }
+
+// Production-readiness audit gap closure: CSV export requested for the
+// Parent attendance page specifically, alongside the pre-existing PDF/
+// Excel exports.
+export function useExportAttendanceReportCsv() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/attendance/reports/csv",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "attendance-report.csv",
+      ),
+  });
+}

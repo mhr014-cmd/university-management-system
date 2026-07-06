@@ -68,9 +68,9 @@ export function AppLayout() {
     ...(user?.role === "student" || user?.role === "teacher" || user?.role === "admin"
       ? [{ to: "/exams", label: "Exams" }]
       : []),
-    ...(user?.role === "student" ? [{ to: "/results", label: "Results" }] : []),
+    ...(user?.role === "student" || user?.role === "parent" ? [{ to: "/results", label: "Results" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/result-approval", label: "Result Approval" }] : []),
-    ...(user?.role === "student" ? [{ to: "/fees", label: "Fee Centre" }] : []),
+    ...(user?.role === "student" || user?.role === "parent" ? [{ to: "/fees", label: "Fee Centre" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/fee-dashboard", label: "Fee Dashboard" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/reports", label: "Reports" }] : []),
     ...(user?.role === "admin"

@@ -335,6 +335,10 @@ def _parent_user():
     return User(id=uuid.uuid4(), email="p@example.com", role="parent")
 
 
+def _admin_user():
+    return User(id=uuid.uuid4(), email="a@example.com", role="admin")
+
+
 class TestGetMe:
     def test_computes_percentage_excluding_excused(self, service, stub_repos, session):
         attendance_repo, _schedule_repo, user_repo, *_ = stub_repos
@@ -423,7 +427,7 @@ class TestGetReports:
         ]
         user_repo.list_students_by_ids.return_value = [student]
 
-        result = service.get_reports(session, None, None)
+        result = service.get_reports(session, _admin_user(), None, None)
 
         assert result.summary[0].student_name == "Sam Student"
         user_repo.list_students_by_ids.assert_called_once()
@@ -438,7 +442,7 @@ class TestGetReports:
         ]
         user_repo.list_students_by_ids.return_value = []
 
-        result = service.get_reports(session, None, None)
+        result = service.get_reports(session, _admin_user(), None, None)
 
         assert result.summary[0].student_name == "Unknown Student"
 
@@ -450,7 +454,7 @@ class TestGetReports:
         user_repo.get_student_with_user.return_value = None
 
         with pytest.raises(HTTPException) as exc:
-            service.get_reports(session, None, None, student_id=uuid.uuid4())
+            service.get_reports(session, _admin_user(), None, None, student_id=uuid.uuid4())
 
         assert exc.value.status_code == 422
 
@@ -462,7 +466,7 @@ class TestGetReports:
         attendance_repo.list_for_report.return_value = []
         user_repo.list_students_by_ids.return_value = []
 
-        result = service.get_reports(session, None, None, student_id=student_id)
+        result = service.get_reports(session, _admin_user(), None, None, student_id=student_id)
 
         attendance_repo.list_for_report.assert_called_once_with(
             session, department_id=None, semester_id=None, student_id=student_id

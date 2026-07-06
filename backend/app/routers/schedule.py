@@ -19,6 +19,7 @@ from app.schemas.schedule import (
     EnrollmentRead,
     ScheduleChangeRequestCreate,
     ScheduleChangeRequestCreateResponse,
+    ScheduleChangeRequestListResponse,
     ScheduleChangeRequestResolve,
     ScheduleChangeRequestResolveResponse,
     ScheduleConflictsResponse,
@@ -88,6 +89,20 @@ def create_change_request(
     db: Session = Depends(get_db),
 ):
     return schedule_service.create_change_request(db, current_user, payload)
+
+
+# Admin approval queue (production-readiness audit gap closure) — backend
+# create/resolve already existed, but nothing ever listed pending requests.
+@router.get(
+    "/change-requests",
+    response_model=ScheduleChangeRequestListResponse,
+    dependencies=[_require_admin],
+)
+def list_change_requests(
+    status_filter: str | None = Query(default="pending", alias="status"),
+    db: Session = Depends(get_db),
+):
+    return schedule_service.list_change_requests(db, status_filter)
 
 
 @router.post(

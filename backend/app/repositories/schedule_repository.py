@@ -218,3 +218,9 @@ class ScheduleRepository:
         session.add(request)
         session.flush()
         return request
+
+    def list_change_requests(self, session: Session, status: str | None = None) -> list[ScheduleChangeRequest]:
+        stmt = select(ScheduleChangeRequest).order_by(ScheduleChangeRequest.created_at.desc())
+        if status is not None:
+            stmt = stmt.where(ScheduleChangeRequest.status == status)
+        return list(session.scalars(stmt))

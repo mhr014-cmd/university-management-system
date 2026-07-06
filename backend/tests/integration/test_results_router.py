@@ -466,3 +466,75 @@ class TestTranscript:
         response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(token))
         assert response.status_code == 200
         assert response.content.startswith(b"%PDF")
+
+    def test_unlinked_parent_cannot_download_transcript(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
+    ):
+        # Gap closure (production-readiness audit): Parent transcript
+        # download is scoped to a linked child, same as GET /results/me.
+        _teacher, student, _cs = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        make_parent_user("parent@example.com", "parent-password")  # not linked
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(parent_token))
+        assert response.status_code == 403
+
+    def test_linked_parent_downloads_transcript(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        link_parent_student,
+    ):
+        _teacher, student, _cs = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+        parent_token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(parent_token))
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+
+
+class TestResultPublishedParentNotification:
+    """Gap closure (production-readiness audit): a linked Parent must be
+    notified, same as the Student, when a result is approved/published."""
+
+    def test_linked_parent_receives_result_published_notification(
+        self,
+        client,
+        make_admin_user,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        link_parent_student,
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+        payload = {"results": [{"student_id": str(student.id), "grade_letter": "A", "grade_point": 4.0}]}
+        client.post(f"/api/v1/results/{exam['id']}/submit", json=payload, headers=_headers(teacher_token))
+        pending = client.get("/api/v1/results/pending", headers=_headers(admin_token)).json()
+        result_id = pending["items"][0]["results"][0]["result_id"]
+        client.post(f"/api/v1/results/{result_id}/approve", json={"decision": "approve"}, headers=_headers(admin_token))
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        notifications = client.get("/api/v1/notifications", headers=_headers(parent_token)).json()
+        assert any(n["type"] == "result_published" for n in notifications["items"])

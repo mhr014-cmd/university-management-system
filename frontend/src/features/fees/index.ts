@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../lib/apiClient";
+import { downloadBlob, filenameFromContentDisposition } from "../../lib/exportClient";
 
 export type InvoiceStatus = "unpaid" | "partially_paid" | "paid" | "overdue";
 
@@ -204,14 +205,12 @@ export function useDownloadInvoice() {
   return useMutation({
     mutationFn: async (invoiceId: string) => {
       const response = await apiClient.get(`/fees/invoices/${invoiceId}`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "invoice.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      // Server labels a paid invoice's PDF (and its Content-Disposition
+      // filename) as a Receipt instead of an Invoice — see
+      // invoice_generator.py's docstring — so the downloaded filename
+      // reflects whichever the backend actually generated.
+      const filename = filenameFromContentDisposition(response.headers["content-disposition"]) ?? "invoice.pdf";
+      downloadBlob(response.data, filename);
     },
   });
 }

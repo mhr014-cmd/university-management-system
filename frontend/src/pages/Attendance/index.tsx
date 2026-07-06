@@ -19,7 +19,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
-import { useMyAttendance } from "../../features/attendance";
+import {
+  useExportAttendanceReportCsv,
+  useExportAttendanceReportExcel,
+  useExportAttendanceReportPdf,
+  useMyAttendance,
+} from "../../features/attendance";
 import type { AttendanceStatus } from "../../features/attendance";
 import { useMyChildren } from "../../features/users";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
@@ -27,6 +32,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { ReportToolbar } from "../../components/ui/ReportToolbar";
 import { inputClass } from "../../components/ui/classNames";
 
 type ViewMode = "table" | "calendar";
@@ -169,10 +175,27 @@ function ParentAttendanceView() {
     }
   }, [children, selectedStudentId]);
 
+  const selectedChild = children.find((c) => c.id === selectedStudentId);
+  const exportPdf = useExportAttendanceReportPdf();
+  const exportExcel = useExportAttendanceReportExcel();
+  const exportCsv = useExportAttendanceReportCsv();
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
-      <Card>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Attendance</h1>
+        {selectedStudentId && (
+          <ReportToolbar
+            onExportPdf={() => exportPdf.mutate({ studentId: selectedStudentId })}
+            onExportExcel={() => exportExcel.mutate({ studentId: selectedStudentId })}
+            onExportCsv={() => exportCsv.mutate({ studentId: selectedStudentId })}
+            isExportingPdf={exportPdf.isPending}
+            isExportingExcel={exportExcel.isPending}
+            isExportingCsv={exportCsv.isPending}
+          />
+        )}
+      </div>
+      <Card data-print-hidden>
         <div className="mb-2 flex items-center gap-2">
           <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
@@ -201,7 +224,17 @@ function ParentAttendanceView() {
           </select>
         )}
       </Card>
-      {selectedStudentId && <AttendanceContent studentId={selectedStudentId} showHeading={false} />}
+      {selectedStudentId && selectedChild && (
+        <div data-print-region className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Viewing attendance for:{" "}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {selectedChild.first_name} {selectedChild.last_name}
+            </span>
+          </p>
+          <AttendanceContent studentId={selectedStudentId} showHeading={false} />
+        </div>
+      )}
     </div>
   );
 }

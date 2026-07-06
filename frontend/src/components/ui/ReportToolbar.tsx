@@ -14,6 +14,11 @@ interface ReportToolbarProps {
   onExportExcel: () => void;
   isExportingPdf?: boolean;
   isExportingExcel?: boolean;
+  // Optional — added for the Parent Attendance export (production-
+  // readiness audit gap closure). Omitted by every pre-existing caller
+  // (Admin Reports), so this stays backward compatible.
+  onExportCsv?: () => void;
+  isExportingCsv?: boolean;
 }
 
 export function ReportToolbar({
@@ -22,6 +27,8 @@ export function ReportToolbar({
   onExportExcel,
   isExportingPdf,
   isExportingExcel,
+  onExportCsv,
+  isExportingCsv,
 }: ReportToolbarProps) {
   const defaultPrint = usePrint();
 
@@ -53,6 +60,17 @@ export function ReportToolbar({
       >
         Excel
       </Button>
+      {onExportCsv && (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={onExportCsv}
+          isLoading={isExportingCsv}
+        >
+          CSV
+        </Button>
+      )}
     </div>
   );
 }

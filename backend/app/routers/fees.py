@@ -35,7 +35,10 @@ fee_service = FeeService()
 _require_admin = Depends(require_roles("admin"))
 _require_student_or_parent = Depends(require_roles("student", "parent"))
 _require_admin_or_parent = Depends(require_roles("admin", "parent"))
-_require_student_or_admin = Depends(require_roles("student", "admin"))
+# Gap closure (production-readiness audit): Parent may download their own
+# linked child's invoice/receipt PDF — ownership enforced in
+# fee_service.get_invoice_data, same convention as GET /fees/me.
+_require_student_parent_or_admin = Depends(require_roles("student", "parent", "admin"))
 
 
 # Registered before /me isn't required (distinct literal path), but placed
@@ -98,10 +101,18 @@ def notify_overdue_accounts(payload: OverdueNotifyRequest, db: Session = Depends
     return fee_service.notify_overdue_accounts(db, payload)
 
 
-@router.get("/invoices/{invoice_id}", dependencies=[_require_student_or_admin])
+@router.get("/invoices/{invoice_id}", dependencies=[_require_student_parent_or_admin])
 async def get_invoice(
     invoice_id: uuid.UUID, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
     invoice_data = fee_service.get_invoice_data(db, current_user, invoice_id)
     pdf_bytes = await run_in_threadpool(generate_invoice_pdf, invoice_data)
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    # A paid invoice's PDF is labeled "Fee Receipt" (see invoice_generator's
+    # own docstring) — the filename mirrors that so a downloaded file's
+    # name matches what's printed on the document itself.
+    filename = "receipt.pdf" if invoice_data["status"] == "paid" else "invoice.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

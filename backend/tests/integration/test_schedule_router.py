@@ -293,3 +293,159 @@ class TestChangeRequestWorkflow:
             headers=_headers(other_token),
         )
         assert response.status_code == 403
+
+    def test_room_change_request_is_supported(
+        self, client, make_admin_user, make_teacher_user, make_class_session, make_room
+    ):
+        # Gap closure (production-readiness audit): RequestedChange already
+        # supported room_id server-side — this confirms the full path
+        # (create with a room change, approve, timetable updates) works.
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        _teacher_user, teacher = make_teacher_user("teacher@example.com", "teacher-password")
+        class_session = make_class_session(teacher=teacher)
+        old_room = make_room(name="Room A")
+        new_room = make_room(name="Room B")
+
+        entry_response = client.post(
+            "/api/v1/schedule",
+            json={
+                "class_session_id": str(class_session.id),
+                "room_id": str(old_room.id),
+                "teacher_id": str(teacher.id),
+                "day_of_week": "Wed",
+                "start_time": "09:00:00",
+                "end_time": "10:00:00",
+            },
+            headers=_headers(admin_token),
+        )
+        entry_id = entry_response.json()["id"]
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        request_response = client.post(
+            "/api/v1/schedule/change-requests",
+            json={"schedule_entry_id": entry_id, "requested_change": {"room_id": str(new_room.id)}},
+            headers=_headers(teacher_token),
+        )
+        request_id = request_response.json()["id"]
+
+        resolve_response = client.post(
+            f"/api/v1/schedule/change-requests/{request_id}/resolve",
+            json={"decision": "approve"},
+            headers=_headers(admin_token),
+        )
+        assert resolve_response.status_code == 200
+
+        me_response = client.get("/api/v1/schedule/me", headers=_headers(teacher_token))
+        assert me_response.json()["entries"][0]["room_name"] == "Room B"
+
+    def test_teacher_notified_after_approval_and_after_rejection(
+        self, client, make_admin_user, make_teacher_user, make_class_session, make_room
+    ):
+        # Gap closure (production-readiness audit): resolving a request
+        # previously updated the timetable silently — the requesting
+        # Teacher must now be notified of the outcome either way.
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        _teacher_user, teacher = make_teacher_user("teacher@example.com", "teacher-password")
+        class_session = make_class_session(teacher=teacher)
+        room = make_room()
+
+        entry_id = client.post(
+            "/api/v1/schedule",
+            json={
+                "class_session_id": str(class_session.id),
+                "room_id": str(room.id),
+                "teacher_id": str(teacher.id),
+                "day_of_week": "Wed",
+                "start_time": "09:00:00",
+                "end_time": "10:00:00",
+            },
+            headers=_headers(admin_token),
+        ).json()["id"]
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        approve_request_id = client.post(
+            "/api/v1/schedule/change-requests",
+            json={"schedule_entry_id": entry_id, "requested_change": {"start_time": "11:00:00", "end_time": "12:00:00"}},
+            headers=_headers(teacher_token),
+        ).json()["id"]
+        client.post(
+            f"/api/v1/schedule/change-requests/{approve_request_id}/resolve",
+            json={"decision": "approve"},
+            headers=_headers(admin_token),
+        )
+
+        reject_request_id = client.post(
+            "/api/v1/schedule/change-requests",
+            json={"schedule_entry_id": entry_id, "requested_change": {"start_time": "13:00:00", "end_time": "14:00:00"}},
+            headers=_headers(teacher_token),
+        ).json()["id"]
+        client.post(
+            f"/api/v1/schedule/change-requests/{reject_request_id}/resolve",
+            json={"decision": "reject"},
+            headers=_headers(admin_token),
+        )
+
+        notifications = client.get("/api/v1/notifications", headers=_headers(teacher_token)).json()["items"]
+        messages = [n["message"] for n in notifications]
+        assert any("approved" in m for m in messages)
+        assert any("rejected" in m for m in messages)
+
+
+class TestListChangeRequests:
+    """Gap closure (production-readiness audit): Admin approval queue —
+    GET /schedule/change-requests previously didn't exist at all."""
+
+    def test_requires_admin_role(self, client, make_teacher_user):
+        _teacher_user, teacher = make_teacher_user("teacher@example.com", "teacher-password")
+        token = _login(client, "teacher@example.com", "teacher-password")
+        response = client.get("/api/v1/schedule/change-requests", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_lists_only_pending_by_default_and_excludes_resolved(
+        self, client, make_admin_user, make_teacher_user, make_class_session, make_room
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        _teacher_user, teacher = make_teacher_user("teacher@example.com", "teacher-password")
+        class_session = make_class_session(teacher=teacher)
+        room = make_room()
+
+        entry_id = client.post(
+            "/api/v1/schedule",
+            json={
+                "class_session_id": str(class_session.id),
+                "room_id": str(room.id),
+                "teacher_id": str(teacher.id),
+                "day_of_week": "Wed",
+                "start_time": "09:00:00",
+                "end_time": "10:00:00",
+            },
+            headers=_headers(admin_token),
+        ).json()["id"]
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        pending_request_id = client.post(
+            "/api/v1/schedule/change-requests",
+            json={"schedule_entry_id": entry_id, "requested_change": {"start_time": "11:00:00", "end_time": "12:00:00"}},
+            headers=_headers(teacher_token),
+        ).json()["id"]
+        resolved_request_id = client.post(
+            "/api/v1/schedule/change-requests",
+            json={"schedule_entry_id": entry_id, "requested_change": {"start_time": "13:00:00", "end_time": "14:00:00"}},
+            headers=_headers(teacher_token),
+        ).json()["id"]
+        client.post(
+            f"/api/v1/schedule/change-requests/{resolved_request_id}/resolve",
+            json={"decision": "reject"},
+            headers=_headers(admin_token),
+        )
+
+        response = client.get("/api/v1/schedule/change-requests", headers=_headers(admin_token))
+        assert response.status_code == 200
+        items = response.json()["items"]
+        assert len(items) == 1
+        assert items[0]["id"] == pending_request_id
+        assert items[0]["requested_by_teacher_name"] == "Test Teacher"
+        assert items[0]["current_room_name"] == room.name

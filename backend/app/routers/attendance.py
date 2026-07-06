@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from app.csv.attendance_report import generate_attendance_report_csv
 from app.db.session import get_db
 from app.excel.attendance_report import generate_attendance_report_excel
 from app.middleware.auth import get_current_user
@@ -48,6 +49,10 @@ _require_admin = Depends(require_roles("admin"))
 # Parent-scoping convention already used by GET /fees/me and GET /results/me
 # — see attendance_service.get_me and docs/Proposal_vs_Engineering_Additions.md.
 _require_student_or_parent = Depends(require_roles("student", "parent"))
+# Gap closure (production-readiness audit): Parent may download their own
+# linked child's attendance report (PDF/Excel/CSV) — ownership is enforced
+# in attendance_service.get_reports, same convention as GET /attendance/me.
+_require_admin_or_parent = Depends(require_roles("admin", "parent"))
 
 
 @router.get("/me", response_model=AttendanceMeResponse, dependencies=[_require_student_or_parent])
@@ -88,15 +93,16 @@ def update_attendance(
 # order, and "/attendance/reports" would otherwise be swallowed by the
 # "/{class_id}" path parameter (matching class_id="reports" and failing
 # UUID validation with a confusing 422 instead of reaching this endpoint).
-@router.get("/reports", response_model=AttendanceReportsResponse, dependencies=[_require_admin])
+@router.get("/reports", response_model=AttendanceReportsResponse, dependencies=[_require_admin_or_parent])
 def get_attendance_reports(
     department_id: uuid.UUID | None = Query(default=None),
     semester_id: uuid.UUID | None = Query(default=None),
     student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     return attendance_service.get_reports(
-        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+        db, current_user, department_id=department_id, semester_id=semester_id, student_id=student_id
     )
 
 
@@ -109,15 +115,16 @@ def _export_filename(extension: str) -> str:
 
 # Registered before /{class_id} for the same route-ordering reason as
 # /reports above.
-@router.get("/reports/pdf", dependencies=[_require_admin])
+@router.get("/reports/pdf", dependencies=[_require_admin_or_parent])
 async def get_attendance_reports_pdf(
     department_id: uuid.UUID | None = Query(default=None),
     semester_id: uuid.UUID | None = Query(default=None),
     student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     report = attendance_service.get_reports(
-        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+        db, current_user, department_id=department_id, semester_id=semester_id, student_id=student_id
     )
     scope_labels = attendance_service.get_report_scope_labels(
         db, department_id=department_id, semester_id=semester_id, student_id=student_id
@@ -131,15 +138,16 @@ async def get_attendance_reports_pdf(
     )
 
 
-@router.get("/reports/excel", dependencies=[_require_admin])
+@router.get("/reports/excel", dependencies=[_require_admin_or_parent])
 async def get_attendance_reports_excel(
     department_id: uuid.UUID | None = Query(default=None),
     semester_id: uuid.UUID | None = Query(default=None),
     student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     report = attendance_service.get_reports(
-        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+        db, current_user, department_id=department_id, semester_id=semester_id, student_id=student_id
     )
     scope_labels = attendance_service.get_report_scope_labels(
         db, department_id=department_id, semester_id=semester_id, student_id=student_id
@@ -149,6 +157,29 @@ async def get_attendance_reports_excel(
     return Response(
         content=excel_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/reports/csv", dependencies=[_require_admin_or_parent])
+async def get_attendance_reports_csv(
+    department_id: uuid.UUID | None = Query(default=None),
+    semester_id: uuid.UUID | None = Query(default=None),
+    student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    report = attendance_service.get_reports(
+        db, current_user, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    scope_labels = attendance_service.get_report_scope_labels(
+        db, department_id=department_id, semester_id=semester_id, student_id=student_id
+    )
+    csv_bytes = await run_in_threadpool(generate_attendance_report_csv, scope_labels, report.summary)
+    filename = _export_filename("csv")
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

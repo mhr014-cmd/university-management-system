@@ -357,6 +357,101 @@ class TestGetInvoice:
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
         assert response.content.startswith(b"%PDF")
+        # Unpaid invoice — filename/document should say "invoice", not "receipt".
+        assert response.headers["content-disposition"] == 'attachment; filename="invoice.pdf"'
+
+    def test_unlinked_parent_cannot_download_invoice(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
+    ):
+        # Gap closure (production-readiness audit): Parent invoice download
+        # is scoped to a linked child, same as GET /fees/me.
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        client.post(
+            "/api/v1/fees",
+            json={"semester_id": str(class_session.semester_id), "name": "Tuition", "amount": 1000, "due_date": "2030-01-01"},
+            headers=_headers(admin_token),
+        )
+        student_token = _login(client, "student@example.com", "student-password")
+        me = client.get("/api/v1/fees/me", headers=_headers(student_token))
+        invoice_id = me.json()["invoices"][0]["invoice_id"]
+
+        make_parent_user("parent@example.com", "parent-password")  # not linked
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(parent_token))
+        assert response.status_code == 403
+
+    def test_linked_parent_downloads_invoice(
+        self,
+        client,
+        make_admin_user,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        link_parent_student,
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        client.post(
+            "/api/v1/fees",
+            json={"semester_id": str(class_session.semester_id), "name": "Tuition", "amount": 1000, "due_date": "2030-01-01"},
+            headers=_headers(admin_token),
+        )
+        student_token = _login(client, "student@example.com", "student-password")
+        me = client.get("/api/v1/fees/me", headers=_headers(student_token))
+        invoice_id = me.json()["invoices"][0]["invoice_id"]
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(parent_token))
+        assert response.status_code == 200
+        assert response.content.startswith(b"%PDF")
+
+    def test_paid_invoice_labeled_as_receipt(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        # Gap closure (production-readiness audit): once fully paid, the
+        # same PDF/filename is labeled "Receipt" instead of "Invoice".
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        client.post(
+            "/api/v1/fees",
+            json={"semester_id": str(class_session.semester_id), "name": "Tuition", "amount": 500, "due_date": "2030-01-01"},
+            headers=_headers(admin_token),
+        )
+        student_token = _login(client, "student@example.com", "student-password")
+        me = client.get("/api/v1/fees/me", headers=_headers(student_token))
+        invoice_id = me.json()["invoices"][0]["invoice_id"]
+        structures = client.get("/api/v1/fees/structures", headers=_headers(admin_token)).json()
+        fee_structure_id = structures["items"][0]["id"]
+
+        client.post(
+            "/api/v1/fees/payments",
+            json={
+                "student_id": str(student.id),
+                "fee_structure_id": fee_structure_id,
+                "amount": 500,
+                "payment_date": "2026-01-01",
+            },
+            headers=_headers(admin_token),
+        )
+
+        response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(student_token))
+        assert response.status_code == 200
+        assert response.headers["content-disposition"] == 'attachment; filename="receipt.pdf"'
 
 
 def _login_and_headers(client, email, password):

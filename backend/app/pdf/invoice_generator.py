@@ -8,6 +8,15 @@ to keep the async event loop unblocked (System_Architecture.md §2.4)
 while still matching the documented synchronous binary-stream response.
 `invoice.pdf_url` stays permanently null — nothing is pre-generated or
 stored (see Database_Design.md §6.25's design note).
+
+Production-readiness audit gap closure: there is no separate "Receipt"
+generator anywhere in this codebase, and the brief's own instruction was
+not to build a duplicate implementation unnecessarily — this same
+document already contains everything a receipt needs (amount paid, date,
+status). The only change here is the document title: once
+`invoice_data["status"] == "paid"`, the same PDF is labeled "Fee Receipt"
+instead of "Fee Invoice", since a fully-paid invoice *is* the receipt of
+that payment.
 """
 
 from io import BytesIO
@@ -22,6 +31,9 @@ UNIVERSITY_NAME = "ICT Education University"
 
 
 def generate_invoice_pdf(invoice_data: dict) -> bytes:
+    is_receipt = invoice_data["status"] == "paid"
+    document_label = "Fee Receipt" if is_receipt else "Fee Invoice"
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=LETTER, topMargin=0.75 * inch, bottomMargin=0.75 * inch)
     styles = getSampleStyleSheet()
@@ -48,7 +60,7 @@ def generate_invoice_pdf(invoice_data: dict) -> bytes:
 
     story = [
         Paragraph(UNIVERSITY_NAME, title_style),
-        Paragraph("Fee Invoice", styles["Heading3"]),
+        Paragraph(document_label, styles["Heading3"]),
         Spacer(1, 0.15 * inch),
         Paragraph(f"Student: {invoice_data['student_name']}", styles["Normal"]),
         Paragraph(f"Issued: {invoice_data['issued_at'].date().isoformat()}", styles["Normal"]),

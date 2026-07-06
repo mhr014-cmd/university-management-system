@@ -2,22 +2,25 @@
 // Section 8: outstanding balance card with due date, payment history
 // table with per-row invoice download.
 //
-// Known simplification: this milestone builds the Student-facing view
-// only, matching Implementation_Roadmap.md's Milestone 8 frontend page
-// list ("Fee centre"). Parent access is fully implemented and tested
-// server-side (GET /fees/me accepts a student_id for Parent callers,
-// verified against parent_student_link); the Parent-facing equivalent of
-// this view is the Fee Status widget on ParentDashboard.tsx (which uses
-// GET /users/me/children, added in the production-polish audit, for
-// child selection) rather than a dedicated Parent Fee Centre page. See
-// PROJECT_PROGRESS.md's Milestone 8 entry.
+// Production-readiness audit gap closure: a dedicated Parent-facing page
+// was previously unbuilt (Parent only had the outstanding-balance widget
+// on ParentDashboard). This page now branches by role — same pattern
+// already established by Timetable/index.tsx and ResultsView/index.tsx —
+// reusing this exact layout/GET /fees/me and GET /fees/invoices/{id}
+// (both already Parent-accessible) with a linked-child selector.
 
-import { Download, Receipt, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, Printer, Receipt, Users, Wallet } from "lucide-react";
+import { useAuth } from "../../auth/AuthContext";
 import { InvoiceStatus, useMyFees, useDownloadInvoice } from "../../features/fees";
+import { useMyChildren } from "../../features/users";
+import { usePrint } from "../../lib/usePrint";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { PageLoader } from "../../components/ui/PageLoader";
+import { inputClass } from "../../components/ui/classNames";
 
 const invoiceStatusTone: Record<InvoiceStatus, BadgeTone> = {
   paid: "green",
@@ -27,11 +30,20 @@ const invoiceStatusTone: Record<InvoiceStatus, BadgeTone> = {
 };
 
 export default function FeeCentrePage() {
-  const { data, isLoading } = useMyFees();
+  const { user } = useAuth();
+  if (user?.role === "parent") {
+    return <ParentFeeCentre />;
+  }
+  return <StudentFeeCentre />;
+}
+
+function FeesPanel({ studentId }: { studentId?: string }) {
+  const { data, isLoading } = useMyFees({ studentId });
   const downloadInvoice = useDownloadInvoice();
+  const print = usePrint();
 
   if (isLoading || !data) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading fee status...</p>;
+    return <PageLoader label="Loading fee status..." />;
   }
 
   const nextDue = data.invoices
@@ -39,8 +51,12 @@ export default function FeeCentrePage() {
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Centre</h1>
+    <div data-print-region className="space-y-4">
+      <div className="flex justify-end" data-print-hidden>
+        <Button variant="secondary" size="sm" icon={<Printer className="h-3.5 w-3.5" aria-hidden="true" />} onClick={print}>
+          Print
+        </Button>
+      </div>
 
       <Card>
         <div className="mb-1 flex items-center gap-2">
@@ -91,7 +107,7 @@ export default function FeeCentrePage() {
                 <th className="px-4 py-2.5">Amount</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Due Date</th>
-                <th className="px-4 py-2.5"></th>
+                <th className="px-4 py-2.5" data-print-hidden></th>
               </tr>
             </thead>
             <tbody>
@@ -105,7 +121,7 @@ export default function FeeCentrePage() {
                     <Badge tone={invoiceStatusTone[invoice.status]}>{invoice.status.replace("_", " ")}</Badge>
                   </td>
                   <td className="px-4 py-2.5">{invoice.due_date}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-2.5" data-print-hidden>
                     <Button
                       variant="secondary"
                       size="sm"
@@ -113,7 +129,7 @@ export default function FeeCentrePage() {
                       onClick={() => downloadInvoice.mutate(invoice.invoice_id)}
                       isLoading={downloadInvoice.isPending}
                     >
-                      Download
+                      {invoice.status === "paid" ? "Download Receipt" : "Download Invoice"}
                     </Button>
                   </td>
                 </tr>
@@ -121,6 +137,77 @@ export default function FeeCentrePage() {
             </tbody>
           </table>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function StudentFeeCentre() {
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Centre</h1>
+      <FeesPanel />
+    </div>
+  );
+}
+
+function ParentFeeCentre() {
+  const { data: childrenData, isLoading: childrenLoading, isError: childrenError } = useMyChildren();
+  const children = useMemo(() => childrenData?.children ?? [], [childrenData]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  useEffect(() => {
+    if (!selectedStudentId && children.length > 0) {
+      setSelectedStudentId(children[0].id);
+    }
+  }, [children, selectedStudentId]);
+
+  const selectedChild = children.find((c) => c.id === selectedStudentId);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Centre</h1>
+
+      <Card data-print-hidden>
+        <div className="mb-2 flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+        </div>
+        {childrenLoading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading your linked children...</p>
+        ) : childrenError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">Unable to load linked children.</p>
+        ) : children.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No children linked yet"
+            description="Contact an administrator to link a child's record to your account."
+          />
+        ) : (
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            className={inputClass}
+          >
+            {children.map((child) => (
+              <option key={child.id} value={child.id}>
+                {child.first_name} {child.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+
+      {selectedStudentId && selectedChild && (
+        <>
+          <p className="text-sm text-slate-500 dark:text-slate-400" data-print-hidden>
+            Viewing fees for:{" "}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {selectedChild.first_name} {selectedChild.last_name}
+            </span>
+          </p>
+          <FeesPanel studentId={selectedStudentId} />
+        </>
       )}
     </div>
   );
