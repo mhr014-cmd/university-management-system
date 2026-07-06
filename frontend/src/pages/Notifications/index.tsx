@@ -4,8 +4,13 @@
 // pagination, and per-item click marks read + deep-links based on type.
 
 import { useNavigate } from "react-router-dom";
+import { Bell, CheckCheck } from "lucide-react";
 import { useMarkNotificationRead, useNotifications } from "../../features/notifications";
 import type { NotificationEntry, NotificationType } from "../../features/notifications";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { PageLoader } from "../../components/ui/PageLoader";
 
 const TYPE_ROUTES: Record<NotificationType, string | null> = {
   result_published: "/results",
@@ -36,32 +41,37 @@ export default function NotificationsPage() {
   };
 
   if (isLoading || !data) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p>;
+    return <PageLoader label="Loading notifications..." />;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           Notifications {data.unread_count > 0 && `(${data.unread_count} unread)`}
         </h1>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<CheckCheck className="h-3.5 w-3.5" aria-hidden="true" />}
           onClick={handleMarkAllAsRead}
-          disabled={data.unread_count === 0 || markRead.isPending}
-          className="rounded border border-slate-300 px-3 py-2 text-sm disabled:opacity-50 dark:border-slate-600"
+          disabled={data.unread_count === 0}
+          isLoading={markRead.isPending}
         >
           Mark all as read
-        </button>
+        </Button>
       </div>
 
-      <ul className="divide-y divide-slate-200 dark:divide-slate-700">
-        {data.items.map((notification) => (
-          <li key={notification.id}>
+      {data.items.length === 0 ? (
+        <EmptyState icon={Bell} title="No notifications yet" description="Result publishing, schedule changes, attendance warnings, and fee due dates will show up here." />
+      ) : (
+        <Card className="divide-y divide-slate-100 p-0 dark:divide-slate-800">
+          {data.items.map((notification) => (
             <button
+              key={notification.id}
               type="button"
               onClick={() => handleClick(notification)}
-              className="flex w-full items-start gap-3 py-3 text-left"
+              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
             >
               <span
                 className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
@@ -77,11 +87,8 @@ export default function NotificationsPage() {
                 </span>
               </span>
             </button>
-          </li>
-        ))}
-      </ul>
-      {data.items.length === 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No notifications yet.</p>
+          ))}
+        </Card>
       )}
     </div>
   );
