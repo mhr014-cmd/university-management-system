@@ -25,11 +25,14 @@ import {
 } from "../../../features/fees";
 import { Button } from "../../../components/ui/Button";
 import { Card, CardTitle } from "../../../components/ui/Card";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { PageLoader } from "../../../components/ui/PageLoader";
+import { useToast } from "../../../components/ui/Toast";
 import { inputClass } from "../../../components/ui/classNames";
 
 export default function FeeDashboardPage() {
+  const { showSuccess, showError } = useToast();
   const { data: departments } = useDepartments();
   const { data: semesters } = useSemesters();
   const { data: students } = useStudents(undefined, 1, 100);
@@ -51,12 +54,9 @@ export default function FeeDashboardPage() {
   const [payDate, setPayDate] = useState("");
   const [payMethod, setPayMethod] = useState("");
 
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [confirmBulkNotify, setConfirmBulkNotify] = useState(false);
 
   const handleCreateFeeStructure = async () => {
-    setMessage(null);
-    setError(null);
     try {
       const result = await createFeeStructure.mutateAsync({
         department_id: fsDepartmentId || undefined,
@@ -65,18 +65,16 @@ export default function FeeDashboardPage() {
         amount: Number(fsAmount),
         due_date: fsDueDate,
       });
-      setMessage(`Fee structure created — ${result.invoices_created} invoice(s) generated.`);
+      showSuccess(`Fee structure created — ${result.invoices_created} invoice(s) generated.`);
       setFsName("");
       setFsAmount("");
       setFsDueDate("");
     } catch {
-      setError("Could not create fee structure. Please check the fields and try again.");
+      showError("Could not create fee structure. Please check the fields and try again.");
     }
   };
 
   const handleRecordPayment = async () => {
-    setMessage(null);
-    setError(null);
     try {
       await recordPayment.mutateAsync({
         student_id: payStudentId,
@@ -85,15 +83,15 @@ export default function FeeDashboardPage() {
         payment_date: payDate,
         payment_method: payMethod || undefined,
       });
-      setMessage("Payment recorded.");
+      showSuccess("Payment recorded.");
       setPayAmount("");
       setPayDate("");
       setPayMethod("");
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
-        setError(err.response.data?.error?.message ?? "Payment exceeds the outstanding balance or invoice is fully paid.");
+        showError(err.response.data?.error?.message ?? "Payment exceeds the outstanding balance or invoice is fully paid.");
       } else {
-        setError("Could not record payment. Please check the fields and try again.");
+        showError("Could not record payment. Please check the fields and try again.");
       }
     }
   };
@@ -101,42 +99,28 @@ export default function FeeDashboardPage() {
   const totalOutstanding = (overdue?.overdue_accounts ?? []).reduce((sum, a) => sum + a.amount_due, 0);
 
   const handleNotify = async (studentId: string) => {
-    setMessage(null);
-    setError(null);
     try {
       const result = await notifyOverdue.mutateAsync({ student_ids: [studentId], scope: "selected" });
-      setMessage(`Notified ${result.notified_count} account(s).`);
+      showSuccess(`Notified ${result.notified_count} account(s).`);
     } catch {
-      setError("Could not send the overdue notice. Please try again.");
+      showError("Could not send the overdue notice. Please try again.");
     }
   };
 
   const handleBulkNotify = async () => {
-    if (!window.confirm("Send an overdue notice to every currently overdue account?")) return;
-    setMessage(null);
-    setError(null);
     try {
       const result = await notifyOverdue.mutateAsync({ student_ids: [], scope: "all_overdue" });
-      setMessage(`Notified ${result.notified_count} account(s).`);
+      showSuccess(`Notified ${result.notified_count} account(s).`);
     } catch {
-      setError("Could not send bulk overdue notices. Please try again.");
+      showError("Could not send bulk overdue notices. Please try again.");
+    } finally {
+      setConfirmBulkNotify(false);
     }
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Dashboard</h1>
-
-      {message && (
-        <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
@@ -257,7 +241,7 @@ export default function FeeDashboardPage() {
             variant="secondary"
             size="sm"
             icon={<Send className="h-3.5 w-3.5" aria-hidden="true" />}
-            onClick={() => void handleBulkNotify()}
+            onClick={() => setConfirmBulkNotify(true)}
             disabled={!overdue?.overdue_accounts.length}
             isLoading={notifyOverdue.isPending}
           >
@@ -318,6 +302,16 @@ export default function FeeDashboardPage() {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmBulkNotify}
+        title="Send bulk overdue notice?"
+        description="This will send an overdue notice to every currently overdue account."
+        confirmLabel="Send Notice"
+        isLoading={notifyOverdue.isPending}
+        onConfirm={() => void handleBulkNotify()}
+        onCancel={() => setConfirmBulkNotify(false)}
+      />
     </div>
   );
 }
