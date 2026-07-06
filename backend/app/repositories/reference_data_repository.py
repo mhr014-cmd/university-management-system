@@ -36,6 +36,10 @@ class DepartmentRepository:
         session.flush()
         return department
 
+    def delete(self, session: Session, department: Department) -> None:
+        session.delete(department)
+        session.flush()
+
 
 class CourseRepository:
     def list(self, session: Session, page: int, page_size: int, department_id: uuid.UUID | None = None):
@@ -53,6 +57,10 @@ class CourseRepository:
         session.flush()
         return course
 
+    def delete(self, session: Session, course: Course) -> None:
+        session.delete(course)
+        session.flush()
+
 
 class RoomRepository:
     def list(self, session: Session, page: int, page_size: int):
@@ -67,6 +75,10 @@ class RoomRepository:
         session.flush()
         return room
 
+    def delete(self, session: Session, room: Room) -> None:
+        session.delete(room)
+        session.flush()
+
 
 class SemesterRepository:
     def list(self, session: Session, page: int, page_size: int):
@@ -80,3 +92,7 @@ class SemesterRepository:
         session.add(semester)
         session.flush()
         return semester
+
+    def delete(self, session: Session, semester: Semester) -> None:
+        session.delete(semester)
+        session.flush()

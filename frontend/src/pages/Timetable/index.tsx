@@ -5,17 +5,22 @@
 // instead of the grid (per the wireframe's Role Visibility note: Admin
 // manages schedules "within Timetable's admin mode", not a separate page).
 //
-// Known limitation: the Admin panel's class_session_id fields are raw
-// UUID text inputs, not dropdowns — no GET /schedule/class-sessions list
-// endpoint exists (the Derived class-session/enrollment endpoints
-// approved for Milestone 4 are deliberately create-only, matching the
-// minimal-scope precedent from Milestone 1's reference-data CRUD). See
-// PROJECT_PROGRESS.md's Milestone 4 entry.
+// Version 2.3 (Academic Setup): course_id/teacher_id/semester_id/room_id/
+// student_id are now SearchableSelect dropdowns sourced from the
+// reference-data and user-list endpoints, replacing raw UUID text
+// entry. class_session_id fields remain raw text — no
+// GET /schedule/class-sessions list endpoint exists (the Derived
+// class-session/enrollment endpoints approved for Milestone 4 are
+// deliberately create-only, matching the minimal-scope precedent from
+// Milestone 1's reference-data CRUD). See PROJECT_PROGRESS.md's
+// Milestone 4 entry.
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { isAxiosError } from "axios";
 import { AlertCircle, CalendarX2, CheckCircle2, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
+import { useCourses } from "../../features/courses";
+import { useRooms } from "../../features/rooms";
 import {
   useCreateChangeRequest,
   useCreateClassSession,
@@ -26,11 +31,13 @@ import {
   type DayOfWeek,
   type ScheduleMeEntry,
 } from "../../features/schedule";
-import { useMyChildren } from "../../features/users";
+import { useSemesters } from "../../features/semesters";
+import { useMyChildren, useStudents, useTeachers } from "../../features/users";
 import { Button } from "../../components/ui/Button";
 import { Card, CardTitle } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useToast } from "../../components/ui/Toast";
 import { inputClass } from "../../components/ui/classNames";
 
@@ -267,55 +274,92 @@ function AdminSchedulePanel() {
   const createScheduleEntry = useCreateScheduleEntry();
   const conflictsQuery = useScheduleConflicts();
 
-  const [entryError, setEntryError] = useState<string | null>(null);
+  const { data: courses } = useCourses();
+  const { data: teachers } = useTeachers(undefined, 1, 100);
+  const { data: semesters } = useSemesters();
+  const { data: students } = useStudents(undefined, 1, 100);
+  const { data: rooms } = useRooms();
+
+  const courseOptions = (courses?.items ?? []).map((c) => ({ value: c.id, label: `${c.name} (${c.code})` }));
+  const teacherOptions = (teachers?.items ?? []).map((t) => ({ value: t.id, label: `${t.first_name} ${t.last_name}` }));
+  const semesterOptions = (semesters?.items ?? []).map((s) => ({ value: s.id, label: s.name }));
+  const studentOptions = (students?.items ?? []).map((s) => ({ value: s.id, label: `${s.first_name} ${s.last_name}` }));
+  const roomOptions = (rooms?.items ?? []).map((r) => ({
+    value: r.id,
+    label: r.building ? `${r.name} — ${r.building}` : r.name,
+  }));
+
+  // --- Create Class Session ---
+  const [csCourseId, setCsCourseId] = useState("");
+  const [csTeacherId, setCsTeacherId] = useState("");
+  const [csSemesterId, setCsSemesterId] = useState("");
+  const [csSectionLabel, setCsSectionLabel] = useState("");
 
   const handleCreateClassSession = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
     try {
       const result = await createClassSession.mutateAsync({
-        course_id: String(form.get("course_id")),
-        teacher_id: String(form.get("teacher_id")),
-        semester_id: String(form.get("semester_id")),
-        section_label: String(form.get("section_label")),
+        course_id: csCourseId,
+        teacher_id: csTeacherId,
+        semester_id: csSemesterId,
+        section_label: csSectionLabel,
       });
       showSuccess(`Class session created: ${result.id}`);
-      event.currentTarget.reset();
+      setCsCourseId("");
+      setCsTeacherId("");
+      setCsSemesterId("");
+      setCsSectionLabel("");
     } catch {
-      showError("Could not create class session — check the referenced IDs.");
+      showError("Could not create class session — check the referenced fields.");
     }
   };
 
+  // --- Enroll Student ---
+  const [enrollStudentId, setEnrollStudentId] = useState("");
+  const [enrollClassSessionId, setEnrollClassSessionId] = useState("");
+
   const handleCreateEnrollment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
     try {
       await createEnrollment.mutateAsync({
-        student_id: String(form.get("student_id")),
-        class_session_id: String(form.get("class_session_id")),
+        student_id: enrollStudentId,
+        class_session_id: enrollClassSessionId,
       });
       showSuccess("Student enrolled.");
-      event.currentTarget.reset();
+      setEnrollStudentId("");
+      setEnrollClassSessionId("");
     } catch {
       showError("Could not enroll this student — check the referenced IDs.");
     }
   };
 
+  // --- Create Schedule Entry ---
+  const [entryClassSessionId, setEntryClassSessionId] = useState("");
+  const [entryRoomId, setEntryRoomId] = useState("");
+  const [entryTeacherId, setEntryTeacherId] = useState("");
+  const [entryDayOfWeek, setEntryDayOfWeek] = useState<DayOfWeek>("Mon");
+  const [entryStartTime, setEntryStartTime] = useState("");
+  const [entryEndTime, setEntryEndTime] = useState("");
+  const [entryError, setEntryError] = useState<string | null>(null);
+
   const handleCreateEntry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setEntryError(null);
-    const form = new FormData(event.currentTarget);
     try {
       await createScheduleEntry.mutateAsync({
-        class_session_id: String(form.get("class_session_id")),
-        room_id: String(form.get("room_id")),
-        teacher_id: String(form.get("teacher_id")),
-        day_of_week: form.get("day_of_week") as DayOfWeek,
-        start_time: `${form.get("start_time")}:00`,
-        end_time: `${form.get("end_time")}:00`,
+        class_session_id: entryClassSessionId,
+        room_id: entryRoomId,
+        teacher_id: entryTeacherId,
+        day_of_week: entryDayOfWeek,
+        start_time: `${entryStartTime}:00`,
+        end_time: `${entryEndTime}:00`,
       });
       showSuccess("Schedule entry created.");
-      event.currentTarget.reset();
+      setEntryClassSessionId("");
+      setEntryRoomId("");
+      setEntryTeacherId("");
+      setEntryStartTime("");
+      setEntryEndTime("");
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
         setEntryError("This time slot conflicts with an existing room or teacher booking.");
@@ -334,20 +378,40 @@ function AdminSchedulePanel() {
       <Card>
         <form onSubmit={handleCreateClassSession} className="space-y-2">
           <CardTitle>Create Class Session</CardTitle>
-          <input name="course_id" required placeholder="Course ID" className={inputClass} />
-          <input name="teacher_id" required placeholder="Teacher ID" className={inputClass} />
-          <input name="semester_id" required placeholder="Semester ID" className={inputClass} />
-          <input name="section_label" required placeholder="Section Label" className={inputClass} />
-          <Button type="submit" isLoading={createClassSession.isPending}>Create</Button>
+          <SearchableSelect options={courseOptions} value={csCourseId} onChange={setCsCourseId} placeholder="Select Course" />
+          <SearchableSelect options={teacherOptions} value={csTeacherId} onChange={setCsTeacherId} placeholder="Select Teacher" />
+          <SearchableSelect options={semesterOptions} value={csSemesterId} onChange={setCsSemesterId} placeholder="Select Semester" />
+          <input
+            value={csSectionLabel}
+            onChange={(e) => setCsSectionLabel(e.target.value)}
+            required
+            placeholder="Section Label"
+            className={inputClass}
+          />
+          <Button
+            type="submit"
+            isLoading={createClassSession.isPending}
+            disabled={!csCourseId || !csTeacherId || !csSemesterId}
+          >
+            Create
+          </Button>
         </form>
       </Card>
 
       <Card>
         <form onSubmit={handleCreateEnrollment} className="space-y-2">
           <CardTitle>Enroll Student</CardTitle>
-          <input name="student_id" required placeholder="Student ID" className={inputClass} />
-          <input name="class_session_id" required placeholder="Class Session ID" className={inputClass} />
-          <Button type="submit" isLoading={createEnrollment.isPending}>Enroll</Button>
+          <SearchableSelect options={studentOptions} value={enrollStudentId} onChange={setEnrollStudentId} placeholder="Select Student" />
+          <input
+            value={enrollClassSessionId}
+            onChange={(e) => setEnrollClassSessionId(e.target.value)}
+            required
+            placeholder="Class Session ID"
+            className={inputClass}
+          />
+          <Button type="submit" isLoading={createEnrollment.isPending} disabled={!enrollStudentId}>
+            Enroll
+          </Button>
         </form>
       </Card>
 
@@ -360,17 +424,29 @@ function AdminSchedulePanel() {
               <span>{entryError}</span>
             </div>
           )}
-          <input name="class_session_id" required placeholder="Class Session ID" className={inputClass} />
-          <input name="room_id" required placeholder="Room ID" className={inputClass} />
-          <input name="teacher_id" required placeholder="Teacher ID" className={inputClass} />
-          <select name="day_of_week" required className={inputClass}>
+          <input
+            value={entryClassSessionId}
+            onChange={(e) => setEntryClassSessionId(e.target.value)}
+            required
+            placeholder="Class Session ID"
+            className={inputClass}
+          />
+          <SearchableSelect options={roomOptions} value={entryRoomId} onChange={setEntryRoomId} placeholder="Select Room" />
+          <SearchableSelect options={teacherOptions} value={entryTeacherId} onChange={setEntryTeacherId} placeholder="Select Teacher" />
+          <select value={entryDayOfWeek} onChange={(e) => setEntryDayOfWeek(e.target.value as DayOfWeek)} className={inputClass}>
             {DAYS.map((day) => (
               <option key={day} value={day}>{day}</option>
             ))}
           </select>
-          <input name="start_time" type="time" required className={inputClass} />
-          <input name="end_time" type="time" required className={inputClass} />
-          <Button type="submit" isLoading={createScheduleEntry.isPending}>Create Entry</Button>
+          <input type="time" required value={entryStartTime} onChange={(e) => setEntryStartTime(e.target.value)} className={inputClass} />
+          <input type="time" required value={entryEndTime} onChange={(e) => setEntryEndTime(e.target.value)} className={inputClass} />
+          <Button
+            type="submit"
+            isLoading={createScheduleEntry.isPending}
+            disabled={!entryRoomId || !entryTeacherId}
+          >
+            Create Entry
+          </Button>
         </form>
       </Card>
 

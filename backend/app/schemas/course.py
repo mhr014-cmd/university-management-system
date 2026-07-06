@@ -15,6 +15,13 @@ class CourseCreate(BaseModel):
     credit_hours: int
 
 
+class CourseUpdate(BaseModel):
+    department_id: uuid.UUID | None = None
+    name: str | None = Field(default=None, min_length=1)
+    code: str | None = Field(default=None, min_length=1)
+    credit_hours: int | None = None
+
+
 class CourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

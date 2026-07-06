@@ -13,6 +13,11 @@ class DepartmentCreate(BaseModel):
     code: str = Field(min_length=1)
 
 
+class DepartmentUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    code: str | None = Field(default=None, min_length=1)
+
+
 class DepartmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

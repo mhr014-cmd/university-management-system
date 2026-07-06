@@ -13,6 +13,12 @@ class RoomCreate(BaseModel):
     capacity: int | None = None
 
 
+class RoomUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    building: str | None = None
+    capacity: int | None = None
+
+
 class RoomRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

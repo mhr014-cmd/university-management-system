@@ -9,4 +9,5 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export { Pagination } from "./Pagination";
 export { ReportLayout } from "./ReportLayout";
 export { ReportToolbar } from "./ReportToolbar";
+export { SearchableSelect, type SearchableSelectOption } from "./SearchableSelect";
 export { inputClass, labelClass, helperTextClass, errorTextClass } from "./classNames";

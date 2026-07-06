@@ -73,6 +73,9 @@ export function AppLayout() {
     ...(user?.role === "student" ? [{ to: "/fees", label: "Fee Centre" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/fee-dashboard", label: "Fee Dashboard" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/reports", label: "Reports" }] : []),
+    ...(user?.role === "admin"
+      ? [{ to: "/admin/academic-setup/departments", label: "Academic Setup" }]
+      : []),
   ];
 
   return (

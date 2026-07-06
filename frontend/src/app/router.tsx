@@ -23,6 +23,10 @@ import ResultApprovalPage from "../pages/Admin/ResultApproval";
 import FeeCentrePage from "../pages/FeeCentre";
 import FeeDashboardPage from "../pages/Admin/FeeDashboard";
 import AdminReportsPage from "../pages/Admin/Reports";
+import AcademicSetupDepartmentsPage from "../pages/Admin/AcademicSetup/Departments";
+import AcademicSetupCoursesPage from "../pages/Admin/AcademicSetup/Courses";
+import AcademicSetupRoomsPage from "../pages/Admin/AcademicSetup/Rooms";
+import AcademicSetupSemestersPage from "../pages/Admin/AcademicSetup/Semesters";
 import NotificationsPage from "../pages/Notifications";
 import NotFoundPage from "../pages/NotFound";
 
@@ -104,6 +108,22 @@ export const router = createBrowserRouter([
           {
             path: "/admin/reports",
             element: <AdminReportsPage />,
+          },
+          {
+            path: "/admin/academic-setup/departments",
+            element: <AcademicSetupDepartmentsPage />,
+          },
+          {
+            path: "/admin/academic-setup/courses",
+            element: <AcademicSetupCoursesPage />,
+          },
+          {
+            path: "/admin/academic-setup/rooms",
+            element: <AcademicSetupRoomsPage />,
+          },
+          {
+            path: "/admin/academic-setup/semesters",
+            element: <AcademicSetupSemestersPage />,
           },
           {
             path: "/notifications",
