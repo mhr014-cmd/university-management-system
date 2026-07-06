@@ -5,13 +5,14 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { isAxiosError } from "axios";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useMe, useUpdateMe } from "../../features/users";
 import { useChangePassword } from "../../features/auth";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { PasswordInput } from "../../components/ui/PasswordInput";
+import { useToast } from "../../components/ui/Toast";
 import { inputClass, labelClass } from "../../components/ui/classNames";
 
 function ErrorAlert({ children }: { children: React.ReactNode }) {
@@ -23,29 +24,19 @@ function ErrorAlert({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SuccessAlert({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
-      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{children}</span>
-    </div>
-  );
-}
-
 export default function ProfilePage() {
+  const { showSuccess } = useToast();
   const { data: me, isLoading } = useMe();
   const updateMe = useUpdateMe();
   const changePassword = useChangePassword();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,7 +48,6 @@ export default function ProfilePage() {
 
   const handleProfileSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setProfileMessage(null);
     setProfileError(null);
     if (firstName.trim().length === 0 || lastName.trim().length === 0) {
       setProfileError("First and last name are required.");
@@ -65,7 +55,7 @@ export default function ProfilePage() {
     }
     try {
       await updateMe.mutateAsync({ first_name: firstName, last_name: lastName });
-      setProfileMessage("Profile updated.");
+      showSuccess("Profile updated.");
     } catch {
       setProfileError("Could not update profile. Please try again.");
     }
@@ -73,7 +63,6 @@ export default function ProfilePage() {
 
   const handlePasswordSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setPasswordMessage(null);
     setPasswordError(null);
     if (newPassword !== confirmPassword) {
       setPasswordError("New password and confirmation do not match.");
@@ -81,7 +70,7 @@ export default function ProfilePage() {
     }
     try {
       await changePassword.mutateAsync({ current_password: currentPassword, new_password: newPassword });
-      setPasswordMessage("Password updated.");
+      showSuccess("Password updated.");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -106,7 +95,6 @@ export default function ProfilePage() {
 
       <Card>
         <form onSubmit={handleProfileSubmit} className="space-y-4">
-          {profileMessage && <SuccessAlert>{profileMessage}</SuccessAlert>}
           {profileError && <ErrorAlert>{profileError}</ErrorAlert>}
 
           <div>
@@ -141,7 +129,6 @@ export default function ProfilePage() {
         <form onSubmit={handlePasswordSubmit} className="space-y-4">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Change Password</h2>
 
-          {passwordMessage && <SuccessAlert>{passwordMessage}</SuccessAlert>}
           {passwordError && <ErrorAlert>{passwordError}</ErrorAlert>}
 
           <div>
