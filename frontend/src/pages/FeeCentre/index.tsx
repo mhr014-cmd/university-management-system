@@ -12,13 +12,18 @@
 // child selection) rather than a dedicated Parent Fee Centre page. See
 // PROJECT_PROGRESS.md's Milestone 8 entry.
 
+import { Download, Receipt, Wallet } from "lucide-react";
 import { InvoiceStatus, useMyFees, useDownloadInvoice } from "../../features/fees";
+import { Badge, type BadgeTone } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
 
-const invoiceStatusStyles: Record<InvoiceStatus, string> = {
-  paid: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
-  partially_paid: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  unpaid: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  overdue: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+const invoiceStatusTone: Record<InvoiceStatus, BadgeTone> = {
+  paid: "green",
+  partially_paid: "amber",
+  unpaid: "neutral",
+  overdue: "red",
 };
 
 export default function FeeCentrePage() {
@@ -35,81 +40,87 @@ export default function FeeCentrePage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Fee Centre</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Fee Centre</h1>
 
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-        <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding Balance</p>
+      <Card>
+        <div className="mb-1 flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding Balance</p>
+        </div>
         <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
           {data.outstanding_balance.toFixed(2)}
         </p>
         {nextDue && <p className="text-sm text-slate-500 dark:text-slate-400">Due: {nextDue.due_date}</p>}
-      </div>
+      </Card>
 
-      <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Payment History</h2>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 dark:border-slate-700">
-            <th className="py-2">Date</th>
-            <th className="py-2">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.payments.map((payment) => (
-            <tr
-              key={payment.payment_id}
-              className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-            >
-              <td className="py-2">{new Date(payment.payment_date).toLocaleDateString()}</td>
-              <td className="py-2">{payment.amount.toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {data.payments.length === 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No payments recorded yet.</p>
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Payment History</h2>
+      {data.payments.length === 0 ? (
+        <EmptyState icon={Receipt} title="No payments recorded yet" />
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-2.5">Date</th>
+                <th className="px-4 py-2.5">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.payments.map((payment) => (
+                <tr
+                  key={payment.payment_id}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
+                  <td className="px-4 py-2.5">{new Date(payment.payment_date).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5">{payment.amount.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
 
-      <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Invoices</h2>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 dark:border-slate-700">
-            <th className="py-2">Amount</th>
-            <th className="py-2">Status</th>
-            <th className="py-2">Due Date</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.invoices.map((invoice) => (
-            <tr
-              key={invoice.invoice_id}
-              className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-            >
-              <td className="py-2">{invoice.amount.toFixed(2)}</td>
-              <td className="py-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${invoiceStatusStyles[invoice.status]}`}
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Invoices</h2>
+      {data.invoices.length === 0 ? (
+        <EmptyState icon={Receipt} title="No invoices yet" />
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-2.5">Amount</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Due Date</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.invoices.map((invoice) => (
+                <tr
+                  key={invoice.invoice_id}
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 >
-                  {invoice.status.replace("_", " ")}
-                </span>
-              </td>
-              <td className="py-2">{invoice.due_date}</td>
-              <td className="py-2">
-                <button
-                  type="button"
-                  onClick={() => downloadInvoice.mutate(invoice.invoice_id)}
-                  disabled={downloadInvoice.isPending}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-slate-600"
-                >
-                  Download
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {data.invoices.length === 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No invoices yet.</p>
+                  <td className="px-4 py-2.5">{invoice.amount.toFixed(2)}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge tone={invoiceStatusTone[invoice.status]}>{invoice.status.replace("_", " ")}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">{invoice.due_date}</td>
+                  <td className="px-4 py-2.5">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Download className="h-3 w-3" aria-hidden="true" />}
+                      onClick={() => downloadInvoice.mutate(invoice.invoice_id)}
+                      isLoading={downloadInvoice.isPending}
+                    >
+                      Download
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
     </div>
   );

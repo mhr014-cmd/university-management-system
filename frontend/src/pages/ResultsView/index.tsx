@@ -14,7 +14,13 @@
 // PROJECT_PROGRESS.md's Milestone 7 entry.
 
 import { useState } from "react";
+import { Award, Download } from "lucide-react";
 import { useMyResults, useDownloadTranscript } from "../../features/results";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { PageLoader } from "../../components/ui/PageLoader";
+import { inputClass } from "../../components/ui/classNames";
 
 export default function ResultsViewPage() {
   const [semesterId, setSemesterId] = useState("");
@@ -22,7 +28,7 @@ export default function ResultsViewPage() {
   const downloadTranscript = useDownloadTranscript();
 
   if (isLoading || !data) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading results...</p>;
+    return <PageLoader label="Loading results..." />;
   }
 
   const semesters = data.semesters;
@@ -36,12 +42,8 @@ export default function ResultsViewPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Results</h1>
-        <select
-          value={semesterId}
-          onChange={(e) => setSemesterId(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
-        >
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Results</h1>
+        <select value={semesterId} onChange={(e) => setSemesterId(e.target.value)} className={`w-auto ${inputClass}`}>
           <option value="">Most recent</option>
           {semesters.map((s) => (
             <option key={s.semester_id} value={s.semester_id}>
@@ -52,45 +54,47 @@ export default function ResultsViewPage() {
       </div>
 
       {!hasAnyPublishedResults ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No published results yet.</p>
+        <EmptyState icon={Award} title="No published results yet" description="Results will appear here once your teacher submits and an admin publishes them." />
       ) : selected ? (
         <>
           <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             GPA this semester: {selected.gpa.toFixed(2)}
           </p>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-2">Course</th>
-                <th className="py-2">Grade</th>
-                <th className="py-2">GPA Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selected.courses.map((course) => (
-                <tr
-                  key={course.course_id}
-                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                >
-                  <td className="py-2">{course.course_name}</td>
-                  <td className="py-2">{course.grade_letter}</td>
-                  <td className="py-2">{course.grade_point.toFixed(1)}</td>
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700">
+                  <th className="px-4 py-2.5">Course</th>
+                  <th className="px-4 py-2.5">Grade</th>
+                  <th className="px-4 py-2.5">GPA Points</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {selected.courses.map((course) => (
+                  <tr
+                    key={course.course_id}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                  >
+                    <td className="px-4 py-2.5">{course.course_name}</td>
+                    <td className="px-4 py-2.5">{course.grade_letter}</td>
+                    <td className="px-4 py-2.5">{course.grade_point.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
         </>
       ) : null}
 
       <div className="flex justify-center pt-2">
-        <button
-          type="button"
+        <Button
           onClick={handleDownload}
-          disabled={!hasAnyPublishedResults || downloadTranscript.isPending}
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
+          disabled={!hasAnyPublishedResults}
+          isLoading={downloadTranscript.isPending}
+          icon={<Download className="h-4 w-4" aria-hidden="true" />}
         >
-          {downloadTranscript.isPending ? "Preparing..." : "Download Transcript (PDF)"}
-        </button>
+          Download Transcript (PDF)
+        </Button>
       </div>
     </div>
   );

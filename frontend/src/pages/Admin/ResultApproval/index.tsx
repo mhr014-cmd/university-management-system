@@ -10,8 +10,13 @@
 // docs/Proposal_vs_Engineering_Additions.md.
 
 import { Fragment, useState } from "react";
+import { AlertCircle, ClipboardCheck } from "lucide-react";
 import { usePendingResults, useApproveOrRejectResult } from "../../../features/results";
 import type { ResultStatus } from "../../../features/results";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { inputClass } from "../../../components/ui/classNames";
 
 const STATUS_OPTIONS: ResultStatus[] = ["submitted", "published", "rejected"];
 
@@ -53,11 +58,11 @@ export default function ResultApprovalPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Result Approval</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Result Approval</h1>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ResultStatus)}
-          className="rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+          className={`w-auto ${inputClass}`}
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option} value={option}>
@@ -68,103 +73,105 @@ export default function ResultApprovalPage() {
       </div>
 
       {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 dark:border-slate-700">
-            <th className="py-2">Exam</th>
-            <th className="py-2">Class</th>
-            <th className="py-2">Submitted By</th>
-            <th className="py-2">Date</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.map((item) => {
-            const key = `${item.exam_id}-${item.course_id}-${item.submitted_by_teacher_id}-${item.submitted_at}`;
-            const isExpanded = expandedKey === key;
-            return (
-              <Fragment key={key}>
-                <tr className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
-                  <td className="py-2">{item.exam_title ?? "—"}</td>
-                  <td className="py-2">{item.course_name}</td>
-                  <td className="py-2">{item.submitted_by_teacher_name}</td>
-                  <td className="py-2">{new Date(item.submitted_at).toLocaleDateString()}</td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedKey(isExpanded ? null : key)}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-600"
-                    >
-                      {isExpanded ? "Close" : "Review"}
-                    </button>
-                  </td>
-                </tr>
-                {isExpanded && (
-                  <tr>
-                    <td colSpan={5} className="border-b border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr>
-                            <th className="py-1">Student</th>
-                            <th className="py-1">Grade</th>
-                            <th className="py-1">Points</th>
-                            {item.status === "submitted" && <th className="py-1">Action</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {item.results.map((r) => (
-                            <tr key={r.result_id}>
-                              <td className="py-1">{r.student_name}</td>
-                              <td className="py-1">{r.grade_letter ?? "—"}</td>
-                              <td className="py-1">{r.grade_point?.toFixed(1) ?? "—"}</td>
-                              {item.status === "submitted" && (
-                                <td className="py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApprove(r.result_id)}
-                                    disabled={approveOrReject.isPending}
-                                    className="mr-2 rounded bg-green-600 px-2 py-1 text-xs text-white disabled:opacity-50"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReject(r.result_id)}
-                                    disabled={approveOrReject.isPending}
-                                    className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-50"
-                                  >
-                                    Reject
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {item.status === "submitted" && (
-                        <input
-                          type="text"
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
-                          placeholder="Comment (required if reject)"
-                          className="mt-2 w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-900"
-                        />
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-      {data.items.length === 0 && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No results in this status.</p>
+      {data.items.length === 0 ? (
+        <EmptyState icon={ClipboardCheck} title={`No results with status "${status}"`} />
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+              <tr className="border-b border-slate-200 dark:border-slate-700">
+                <th className="px-4 py-2.5">Exam</th>
+                <th className="px-4 py-2.5">Class</th>
+                <th className="px-4 py-2.5">Submitted By</th>
+                <th className="px-4 py-2.5">Date</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((item) => {
+                const key = `${item.exam_id}-${item.course_id}-${item.submitted_by_teacher_id}-${item.submitted_at}`;
+                const isExpanded = expandedKey === key;
+                return (
+                  <Fragment key={key}>
+                    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50">
+                      <td className="px-4 py-2.5">{item.exam_title ?? "—"}</td>
+                      <td className="px-4 py-2.5">{item.course_name}</td>
+                      <td className="px-4 py-2.5">{item.submitted_by_teacher_name}</td>
+                      <td className="px-4 py-2.5">{new Date(item.submitted_at).toLocaleDateString()}</td>
+                      <td className="px-4 py-2.5">
+                        <Button variant="secondary" size="sm" onClick={() => setExpandedKey(isExpanded ? null : key)}>
+                          {isExpanded ? "Close" : "Review"}
+                        </Button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={5} className="border-b border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                          <table className="w-full text-left text-sm">
+                            <thead>
+                              <tr>
+                                <th className="py-1">Student</th>
+                                <th className="py-1">Grade</th>
+                                <th className="py-1">Points</th>
+                                {item.status === "submitted" && <th className="py-1">Action</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {item.results.map((r) => (
+                                <tr key={r.result_id}>
+                                  <td className="py-1">{r.student_name}</td>
+                                  <td className="py-1">{r.grade_letter ?? "—"}</td>
+                                  <td className="py-1">{r.grade_point?.toFixed(1) ?? "—"}</td>
+                                  {item.status === "submitted" && (
+                                    <td className="py-1">
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="success"
+                                          onClick={() => handleApprove(r.result_id)}
+                                          isLoading={approveOrReject.isPending}
+                                        >
+                                          Approve
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="danger"
+                                          onClick={() => handleReject(r.result_id)}
+                                          isLoading={approveOrReject.isPending}
+                                        >
+                                          Reject
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {item.status === "submitted" && (
+                            <input
+                              type="text"
+                              value={comment}
+                              onChange={(e) => setComment(e.target.value)}
+                              placeholder="Comment (required if reject)"
+                              className={`mt-2 ${inputClass}`}
+                            />
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
       )}
     </div>
   );
