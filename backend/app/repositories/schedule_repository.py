@@ -93,6 +93,16 @@ class ScheduleRepository:
         )
         return list(session.scalars(stmt))
 
+    def teacher_teaches_student(self, session: Session, teacher_id: uuid.UUID, student_id: uuid.UUID) -> bool:
+        """True if `student_id` is enrolled in any class session taught by `teacher_id`."""
+        stmt = (
+            select(Enrollment.student_id)
+            .join(ClassSession, ClassSession.id == Enrollment.class_session_id)
+            .where(ClassSession.teacher_id == teacher_id, Enrollment.student_id == student_id)
+            .limit(1)
+        )
+        return session.scalar(stmt) is not None
+
     # --- schedule_entry ------------------------------------------------------
 
     def get_schedule_entry(self, session: Session, schedule_entry_id: uuid.UUID) -> ScheduleEntry | None:

@@ -41,8 +41,16 @@ class ResultsMeResponse(BaseModel):
 
 class ResultSubmitEntry(BaseModel):
     student_id: uuid.UUID
-    grade_letter: str = Field(min_length=1)
-    grade_point: float = Field(ge=0)
+    # grade_letter stays free text, not a fixed Literal/enum — per
+    # report_service.py's own documented rationale, no letter-grade-boundary
+    # scheme is hard-coded anywhere (Teacher-supplied, API_Contract.md §5.2).
+    # max_length is a sanity bound only, not a grading-scale definition.
+    grade_letter: str = Field(min_length=1, max_length=10)
+    # le=4.0 matches Requirement_Analysis.md A-004's "conventional university
+    # GPA scheme" assumption (standard 4.0 scale) — prevents an out-of-range
+    # value (e.g. grade_point=99) from silently corrupting the GPA
+    # computation and the printed transcript.
+    grade_point: float = Field(ge=0, le=4.0)
 
 
 class ResultSubmitRequest(BaseModel):

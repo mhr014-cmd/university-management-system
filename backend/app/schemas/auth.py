@@ -4,12 +4,12 @@ Pydantic request/response schemas: auth (see docs/API_Contract.md §1).
 
 import uuid
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, SecretStr, model_validator
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1)
+    password: SecretStr = Field(min_length=1)
 
 
 class AuthenticatedUser(BaseModel):
@@ -36,16 +36,16 @@ class RefreshResponse(BaseModel):
 
 
 class PasswordChangeRequest(BaseModel):
-    current_password: str = Field(min_length=1)
+    current_password: SecretStr = Field(min_length=1)
     # Minimum length only — VR-002's "minimum complexity standard" is
     # explicitly undefined by the proposal (Requirement_Analysis.md §14
     # item 13); 8 is a conservative placeholder baseline, not a decided
     # policy. Revisit if/when that ambiguity is formally resolved.
-    new_password: str = Field(min_length=8)
+    new_password: SecretStr = Field(min_length=8)
 
     @model_validator(mode="after")
     def check_passwords_differ(self) -> "PasswordChangeRequest":
-        if self.current_password == self.new_password:
+        if self.current_password.get_secret_value() == self.new_password.get_secret_value():
             raise ValueError("new_password must differ from current_password")
         return self
 

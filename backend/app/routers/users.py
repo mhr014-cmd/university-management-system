@@ -69,8 +69,12 @@ def create_student(payload: StudentCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/students/{student_id}", response_model=StudentRead, dependencies=[_require_admin_or_teacher])
-def get_student(student_id: uuid.UUID, db: Session = Depends(get_db)):
-    return user_service.get_student(db, student_id)
+def get_student(
+    student_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return user_service.get_student(db, current_user, student_id)
 
 
 @router.put("/students/{student_id}", response_model=StudentRead, dependencies=[_require_admin])

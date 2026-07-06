@@ -41,19 +41,19 @@ class UserRepository:
         user.current_refresh_token_jti = jti
         user.refresh_token_expires_at = expires_at
         session.add(user)
-        session.commit()
+        session.flush()
         session.refresh(user)
 
     def clear_refresh_token(self, session: Session, user: User) -> None:
         user.current_refresh_token_jti = None
         user.refresh_token_expires_at = None
         session.add(user)
-        session.commit()
+        session.flush()
 
     def update_password_hash(self, session: Session, user: User, password_hash: str) -> None:
         user.password_hash = password_hash
         session.add(user)
-        session.commit()
+        session.flush()
 
     def create_user(self, session: Session, *, email: str, password_hash: str, role: str) -> User:
         user = User(email=email, password_hash=password_hash, role=role)

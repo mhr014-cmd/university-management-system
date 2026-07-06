@@ -150,6 +150,88 @@ class TestSubmitResults:
         response = client.post(f"/api/v1/results/{exam['id']}/submit", json=payload, headers=_headers(teacher_token))
         assert response.status_code == 422
 
+    def test_grade_point_above_max_rejected(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        """V1.1 stabilization fix: grade_point must not exceed the
+        conventional 4.0 GPA scale (Requirement_Analysis.md A-004) — an
+        out-of-range value would silently corrupt GPA computation and the
+        printed transcript."""
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        create_response = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(str(class_session.id)), headers=_headers(teacher_token)
+        )
+        exam = create_response.json()
+
+        response = client.post(
+            f"/api/v1/results/{exam['id']}/submit",
+            json={"results": [{"student_id": str(student.id), "grade_letter": "A", "grade_point": 4.5}]},
+            headers=_headers(teacher_token),
+        )
+        assert response.status_code == 422
+
+    def test_grade_point_negative_rejected(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        create_response = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(str(class_session.id)), headers=_headers(teacher_token)
+        )
+        exam = create_response.json()
+
+        response = client.post(
+            f"/api/v1/results/{exam['id']}/submit",
+            json={"results": [{"student_id": str(student.id), "grade_letter": "F", "grade_point": -1.0}]},
+            headers=_headers(teacher_token),
+        )
+        assert response.status_code == 422
+
+    def test_grade_letter_too_long_rejected(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        """V1.1 stabilization fix: grade_letter stays free text (no fixed
+        letter-grade enum — see report_service.py's documented rationale)
+        but is bounded so an unreasonably long string can't be submitted."""
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        create_response = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(str(class_session.id)), headers=_headers(teacher_token)
+        )
+        exam = create_response.json()
+
+        response = client.post(
+            f"/api/v1/results/{exam['id']}/submit",
+            json={"results": [{"student_id": str(student.id), "grade_letter": "A" * 11, "grade_point": 4.0}]},
+            headers=_headers(teacher_token),
+        )
+        assert response.status_code == 422
+
+    def test_grade_point_at_max_boundary_accepted(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        """4.0 exactly (the top of the conventional scale) must still be accepted."""
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+
+        response = client.post(
+            f"/api/v1/results/{exam['id']}/submit",
+            json={"results": [{"student_id": str(student.id), "grade_letter": "A", "grade_point": 4.0}]},
+            headers=_headers(teacher_token),
+        )
+        assert response.status_code == 201
+
     def test_rejected_result_can_be_resubmitted(
         self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
     ):

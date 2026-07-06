@@ -5,13 +5,13 @@ Pydantic request/response schemas: teacher (see docs/API_Contract.md §2.8-2.10)
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, SecretStr
 
 
 class TeacherCreate(BaseModel):
     email: EmailStr
     # Same provisioning decision as StudentCreate — see its comment.
-    password: str = Field(min_length=8)
+    password: SecretStr = Field(min_length=8)
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)
     department_id: uuid.UUID

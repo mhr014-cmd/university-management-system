@@ -162,6 +162,49 @@ def test_change_password_new_equal_to_current_returns_422(client, make_user):
     )
 
     assert response.status_code == 422
+    # V1.1 stabilization fix: the whole-model validator error's `input` echo
+    # must never contain the raw submitted password (CLAUDE.md §12/§13).
+    assert "correct-password" not in response.text
+
+
+def test_change_password_too_short_returns_422_without_leaking_password(client, make_user, caplog):
+    """V1.1 stabilization fix: a too-short new_password must not leak the
+    raw submitted value into the HTTP response body or the server logs."""
+    import logging
+
+    caplog.set_level(logging.INFO, logger="app.errors")
+
+    make_user("student@example.com", "correct-password", "student")
+    login_response = client.post(
+        "/api/v1/auth/login", json={"email": "student@example.com", "password": "correct-password"}
+    )
+    access_token = login_response.json()["access_token"]
+
+    # A distinctive value that can't collide with any Pydantic-internal
+    # vocabulary (e.g. its own "too_short" error type name).
+    response = client.put(
+        "/api/v1/auth/password",
+        json={"current_password": "correct-password", "new_password": "zqx9pw"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 422
+    assert "zqx9pw" not in response.text
+    body = response.json()
+    detail = body["error"]["details"][0]
+    assert detail["loc"] == ["body", "new_password"]
+    assert detail["input"] == "[REDACTED]"
+    assert "zqx9pw" not in caplog.text
+
+
+def test_login_malformed_password_returns_422_without_leaking_password(client):
+    """Same redaction guarantee on the login endpoint's password field."""
+    response = client.post(
+        "/api/v1/auth/login", json={"email": "student@example.com", "password": ""}
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"][0]["input"] == "[REDACTED]"
 
 
 class TestLoginRateLimit:

@@ -17,6 +17,7 @@ from app.models.student import Student
 from app.models.teacher import Teacher
 from app.models.user import User
 from app.repositories.reference_data_repository import DepartmentRepository
+from app.repositories.schedule_repository import ScheduleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.student import StudentCreate, StudentRead, StudentUpdate
 from app.schemas.teacher import TeacherCreate, TeacherRead, TeacherUpdate
@@ -24,6 +25,7 @@ from app.schemas.user import ChildEntry, MeRead, MeUpdate, MyChildrenResponse, U
 
 user_repo = UserRepository()
 department_repo = DepartmentRepository()
+schedule_repo = ScheduleRepository()
 
 _STUDENT_NOT_FOUND = "Student not found"
 _TEACHER_NOT_FOUND = "Teacher not found"
@@ -32,6 +34,10 @@ _INVALID_DEPARTMENT = "department_id does not reference an existing department"
 
 def _not_found(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+
+def _forbidden(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 def _invalid_department() -> HTTPException:
@@ -155,10 +161,14 @@ class UserService:
         rows, total = user_repo.list_students_with_user(session, page, page_size, department_id)
         return [_student_to_read(student, user) for student, user in rows], total
 
-    def get_student(self, session: Session, student_id: uuid.UUID) -> StudentRead:
+    def get_student(self, session: Session, current_user: User, student_id: uuid.UUID) -> StudentRead:
         row = user_repo.get_student_with_user(session, student_id)
         if row is None:
             raise _not_found(_STUDENT_NOT_FOUND)
+        if current_user.role == "teacher":
+            teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
+            if not schedule_repo.teacher_teaches_student(session, teacher.id, student_id):
+                raise _forbidden("You may only view students enrolled in one of your class sessions.")
         return _student_to_read(*row)
 
     def create_student(self, session: Session, payload: StudentCreate) -> StudentRead:
@@ -169,7 +179,7 @@ class UserService:
             # committed together, so a failure anywhere (e.g. duplicate
             # email) leaves neither row behind.
             user = user_repo.create_user(
-                session, email=payload.email, password_hash=hash_password(payload.password), role="student"
+                session, email=payload.email, password_hash=hash_password(payload.password.get_secret_value()), role="student"
             )
             student = user_repo.create_student(
                 session,
@@ -240,7 +250,7 @@ class UserService:
             raise _invalid_department()
         try:
             user = user_repo.create_user(
-                session, email=payload.email, password_hash=hash_password(payload.password), role="teacher"
+                session, email=payload.email, password_hash=hash_password(payload.password.get_secret_value()), role="teacher"
             )
             teacher = user_repo.create_teacher(
                 session,

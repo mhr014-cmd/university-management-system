@@ -67,18 +67,24 @@ class TestLogin:
         assert called_user is user
         assert isinstance(jti, str)
         assert expires_at > datetime.now(timezone.utc)
+        # V1.1 stabilization fix: transaction ownership (commit) now sits in
+        # the service, not the repository — UserRepository.set_refresh_token
+        # only flushes (see tests/integration/test_user_repository.py).
+        session.commit.assert_called_once()
 
     def test_unknown_email_raises_401(self, service, stub_repo, session):
         stub_repo.get_by_email.return_value = None
         with pytest.raises(HTTPException) as exc:
             service.login(session, "nobody@example.com", "whatever")
         assert exc.value.status_code == 401
+        session.commit.assert_not_called()
 
     def test_wrong_password_raises_401(self, service, stub_repo, session):
         stub_repo.get_by_email.return_value = make_user()
         with pytest.raises(HTTPException) as exc:
             service.login(session, "student@example.com", "wrong-password")
         assert exc.value.status_code == 401
+        session.commit.assert_not_called()
 
     def test_deactivated_account_raises_403_even_with_correct_password(self, service, stub_repo, session):
         # BR-006: a deactivated account must fail login even with correct credentials.
@@ -87,6 +93,7 @@ class TestLogin:
             service.login(session, "student@example.com", "correct-password")
         assert exc.value.status_code == 403
         stub_repo.set_refresh_token.assert_not_called()
+        session.commit.assert_not_called()
 
 
 class TestRefresh:
@@ -102,6 +109,7 @@ class TestRefresh:
         assert new_access_token
         assert new_refresh_token != token
         stub_repo.set_refresh_token.assert_called_once()
+        session.commit.assert_called_once()
 
     def test_access_token_rejected_as_refresh_token(self, service, stub_repo, session):
         from app.core.security import create_access_token
@@ -111,6 +119,7 @@ class TestRefresh:
             service.refresh(session, access_token)
         assert exc.value.status_code == 401
         stub_repo.get_by_id.assert_not_called()
+        session.commit.assert_not_called()
 
     def test_malformed_token_raises_401(self, service, stub_repo, session):
         with pytest.raises(HTTPException) as exc:
@@ -162,6 +171,7 @@ class TestLogout:
         user = make_user()
         service.logout(session, user)
         stub_repo.clear_refresh_token.assert_called_once_with(session, user)
+        session.commit.assert_called_once()
 
 
 class TestChangePassword:
@@ -172,6 +182,7 @@ class TestChangePassword:
             service.change_password(session, user, payload)
         assert exc.value.status_code == 401
         stub_repo.update_password_hash.assert_not_called()
+        session.commit.assert_not_called()
 
     def test_success_updates_password_hash(self, service, stub_repo, session):
         user = make_user()
@@ -181,6 +192,7 @@ class TestChangePassword:
         called_user, new_hash = stub_repo.update_password_hash.call_args.args[1:]
         assert called_user is user
         assert new_hash != "new-password-123"
+        session.commit.assert_called_once()
 
     def test_new_password_equal_to_current_rejected_at_schema_layer(self):
         # VR-002: enforced by PasswordChangeRequest's own model_validator,

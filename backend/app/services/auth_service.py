@@ -49,6 +49,7 @@ class AuthService:
         access_token = create_access_token(user.id, user.role)
         refresh_token, jti, expires_at = create_refresh_token(user.id)
         user_repo.set_refresh_token(session, user, jti, expires_at)
+        session.commit()
         return access_token, refresh_token, user
 
     def refresh(self, session: Session, refresh_token: str) -> tuple[str, str]:
@@ -83,14 +84,17 @@ class AuthService:
         new_access_token = create_access_token(user.id, user.role)
         new_refresh_token, new_jti, new_expires_at = create_refresh_token(user.id)
         user_repo.set_refresh_token(session, user, new_jti, new_expires_at)
+        session.commit()
         return new_access_token, new_refresh_token
 
     def logout(self, session: Session, user: User) -> None:
         user_repo.clear_refresh_token(session, user)
+        session.commit()
 
     def change_password(self, session: Session, user: User, payload: PasswordChangeRequest) -> None:
-        if not verify_password(payload.current_password, user.password_hash):
+        if not verify_password(payload.current_password.get_secret_value(), user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
         # payload's own model_validator already rejects new_password == current_password
         # (VR-002) at the schema layer, before this service method is ever called.
-        user_repo.update_password_hash(session, user, hash_password(payload.new_password))
+        user_repo.update_password_hash(session, user, hash_password(payload.new_password.get_secret_value()))
+        session.commit()

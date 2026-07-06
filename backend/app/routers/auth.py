@@ -27,7 +27,7 @@ auth_service = AuthService()
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(enforce_login_rate_limit)])
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    access_token, refresh_token, user = auth_service.login(db, payload.email, payload.password)
+    access_token, refresh_token, user = auth_service.login(db, payload.email, payload.password.get_secret_value())
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,

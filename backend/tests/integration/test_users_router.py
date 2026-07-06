@@ -223,6 +223,59 @@ class TestCreateStudent:
         assert response.status_code == 409
 
 
+class TestGetStudent:
+    """GET /users/students/{student_id} — Teacher access must be scoped to
+    students actually enrolled in one of that Teacher's class sessions
+    (V1.1 stabilization fix: Teacher previously could fetch any student's
+    profile by id, per the pre-V1.1 architecture audit)."""
+
+    def test_admin_can_view_any_student(self, client, make_admin_user, make_student_user):
+        make_admin_user("admin@example.com", "correct-password")
+        _, student = make_student_user("student@example.com", "some-password")
+        token = _login(client, "admin@example.com", "correct-password")
+
+        response = client.get(f"/api/v1/users/students/{student.id}", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert response.json()["id"] == str(student.id)
+
+    def test_teacher_can_view_a_student_enrolled_in_their_class(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher_user, teacher = make_teacher_user("teacher@example.com", "correct-password")
+        _, student = make_student_user("student@example.com", "some-password")
+        class_session = make_class_session(teacher=teacher)
+        make_enrollment(student, class_session)
+        token = _login(client, "teacher@example.com", "correct-password")
+
+        response = client.get(f"/api/v1/users/students/{student.id}", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 200
+        assert response.json()["id"] == str(student.id)
+
+    def test_teacher_cannot_view_a_student_not_enrolled_in_their_class(
+        self, client, make_teacher_user, make_student_user
+    ):
+        make_teacher_user("teacher@example.com", "correct-password")
+        _, student = make_student_user("student@example.com", "some-password")
+        token = _login(client, "teacher@example.com", "correct-password")
+
+        response = client.get(f"/api/v1/users/students/{student.id}", headers={"Authorization": f"Bearer {token}"})
+
+        assert response.status_code == 403
+
+    def test_forbidden_for_student_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        other_student_id = "00000000-0000-0000-0000-000000000000"
+
+        response = client.get(
+            f"/api/v1/users/students/{other_student_id}", headers={"Authorization": f"Bearer {token}"}
+        )
+
+        assert response.status_code == 403
+
+
 class TestStudentLifecycle:
     def test_get_nonexistent_student_returns_404(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")

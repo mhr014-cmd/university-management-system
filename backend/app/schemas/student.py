@@ -5,7 +5,7 @@ Pydantic request/response schemas: student (see docs/API_Contract.md §2.3-2.7).
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, SecretStr
 
 
 class StudentCreate(BaseModel):
@@ -16,7 +16,7 @@ class StudentCreate(BaseModel):
     # exists yet (that's Milestone 9, Notifications). Same min_length=8
     # placeholder baseline as PasswordChangeRequest (schemas/auth.py) —
     # VR-002's complexity standard is still undefined by the proposal.
-    password: str = Field(min_length=8)
+    password: SecretStr = Field(min_length=8)
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)
     department_id: uuid.UUID
