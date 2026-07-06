@@ -67,6 +67,37 @@ def test_create_department_succeeds_for_admin_role(client, make_user):
     assert response.json()["code"] == "CS"
 
 
+# Production-readiness QA pass gap closure: CourseCreate.credit_hours and
+# RoomCreate.capacity previously had no lower bound at all (0 or negative
+# was accepted). Fixed with a Pydantic `ge=` constraint only — no schema/
+# migration change, since the underlying columns were always plain `int`.
+def test_create_course_rejects_non_positive_credit_hours(client, make_user, make_department):
+    make_user("admin@example.com", "correct-password", "admin")
+    token = _login(client, "admin@example.com", "correct-password")
+    department = make_department()
+
+    response = client.post(
+        "/api/v1/courses",
+        json={"department_id": str(department.id), "name": "Intro to CS", "code": "CS101", "credit_hours": 0},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_room_rejects_non_positive_capacity(client, make_user):
+    make_user("admin@example.com", "correct-password", "admin")
+    token = _login(client, "admin@example.com", "correct-password")
+
+    response = client.post(
+        "/api/v1/rooms",
+        json={"name": "Room 101", "capacity": -5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_deactivated_user_rejected_even_with_valid_access_token(client, make_user, db_session):
     user = make_user("student@example.com", "correct-password", "student")
     token = _login(client, "student@example.com", "correct-password")

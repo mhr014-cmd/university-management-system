@@ -12,14 +12,16 @@ class CourseCreate(BaseModel):
     department_id: uuid.UUID
     name: str = Field(min_length=1)
     code: str = Field(min_length=1)
-    credit_hours: int
+    # ge=1: a course must carry at least one credit hour — production-
+    # readiness QA pass gap closure (zero/negative previously accepted).
+    credit_hours: int = Field(ge=1)
 
 
 class CourseUpdate(BaseModel):
     department_id: uuid.UUID | None = None
     name: str | None = Field(default=None, min_length=1)
     code: str | None = Field(default=None, min_length=1)
-    credit_hours: int | None = None
+    credit_hours: int | None = Field(default=None, ge=1)
 
 
 class CourseRead(BaseModel):
