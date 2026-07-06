@@ -12,10 +12,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import { Users } from "lucide-react";
 import { useClassSessionRoster, useMySchedule } from "../../../features/schedule";
 import type { RosterEntry } from "../../../features/schedule";
 import { useClassAttendance, useMarkAttendance, useUpdateAttendance } from "../../../features/attendance";
 import type { AttendanceStatus } from "../../../features/attendance";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { inputClass } from "../../../components/ui/classNames";
 
 const STATUS_OPTIONS: AttendanceStatus[] = ["present", "absent", "late", "excused"];
 
@@ -95,14 +100,10 @@ export default function AttendanceMarkerPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Mark Attendance</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Mark Attendance</h1>
 
       <div className="flex items-center gap-4 text-sm">
-        <select
-          value={classSessionId}
-          onChange={(e) => setClassSessionId(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-        >
+        <select value={classSessionId} onChange={(e) => setClassSessionId(e.target.value)} className={`w-auto ${inputClass}`}>
           <option value="">Select Class</option>
           {uniqueClassSessions.map((cls) => (
             <option key={cls.id} value={cls.id}>
@@ -114,7 +115,7 @@ export default function AttendanceMarkerPage() {
           type="date"
           value={attendanceDate}
           onChange={(e) => setAttendanceDate(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+          className={`w-auto ${inputClass}`}
         />
       </div>
 
@@ -131,59 +132,53 @@ export default function AttendanceMarkerPage() {
 
       {classSessionId && roster && (
         <>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                <th className="py-2">Student</th>
-                <th className="py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.students.map((student: RosterEntry) => (
-                <tr
-                  key={student.student_id}
-                  className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                >
-                  <td className="py-2">{student.first_name} {student.last_name}</td>
-                  <td className="py-2">
-                    <select
-                      value={statuses[student.student_id] ?? "present"}
-                      onChange={(e) =>
-                        setStatuses((prev) => ({ ...prev, [student.student_id]: e.target.value as AttendanceStatus }))
-                      }
-                      className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+          {roster.students.length === 0 ? (
+            <EmptyState icon={Users} title="No students enrolled" description="No students are enrolled in this class session." />
+          ) : (
+            <Card className="overflow-x-auto p-0">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-4 py-2.5">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roster.students.map((student: RosterEntry) => (
+                    <tr
+                      key={student.student_id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option.charAt(0).toUpperCase() + option.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {roster.students.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">No students enrolled in this class session.</p>
+                      <td className="px-4 py-2.5">{student.first_name} {student.last_name}</td>
+                      <td className="px-4 py-2.5">
+                        <select
+                          value={statuses[student.student_id] ?? "present"}
+                          onChange={(e) =>
+                            setStatuses((prev) => ({ ...prev, [student.student_id]: e.target.value as AttendanceStatus }))
+                          }
+                          className={`w-auto ${inputClass}`}
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option.charAt(0).toUpperCase() + option.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
           )}
 
           <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleMarkAllPresent}
-              className="rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600"
-            >
+            <Button variant="secondary" onClick={handleMarkAllPresent}>
               Mark all present
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={markAttendance.isPending || updateAttendance.isPending}
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-            >
-              {markAttendance.isPending || updateAttendance.isPending ? "Saving..." : "Save Attendance"}
-            </button>
+            </Button>
+            <Button onClick={handleSave} isLoading={markAttendance.isPending || updateAttendance.isPending}>
+              Save Attendance
+            </Button>
           </div>
         </>
       )}
