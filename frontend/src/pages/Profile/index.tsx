@@ -5,8 +5,32 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { isAxiosError } from "axios";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useMe, useUpdateMe } from "../../features/users";
 import { useChangePassword } from "../../features/auth";
+import { Button } from "../../components/ui/Button";
+import { Card } from "../../components/ui/Card";
+import { PageLoader } from "../../components/ui/PageLoader";
+import { PasswordInput } from "../../components/ui/PasswordInput";
+import { inputClass, labelClass } from "../../components/ui/classNames";
+
+function ErrorAlert({ children }: { children: React.ReactNode }) {
+  return (
+    <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function SuccessAlert({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
+      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { data: me, isLoading } = useMe();
@@ -73,117 +97,84 @@ export default function ProfilePage() {
   };
 
   if (isLoading || !me) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading profile...</p>;
+    return <PageLoader label="Loading profile..." />;
   }
 
   return (
     <div className="max-w-2xl space-y-8">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Profile</h1>
 
-      <form onSubmit={handleProfileSubmit} className="space-y-4 rounded border border-slate-200 p-6 dark:border-slate-700">
-        {profileMessage && (
-          <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-            {profileMessage}
-          </div>
-        )}
-        {profileError && (
-          <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-            {profileError}
-          </div>
-        )}
+      <Card>
+        <form onSubmit={handleProfileSubmit} className="space-y-4">
+          {profileMessage && <SuccessAlert>{profileMessage}</SuccessAlert>}
+          {profileError && <ErrorAlert>{profileError}</ErrorAlert>}
 
-        <div>
-          <label htmlFor="first_name" className="mb-1 block text-sm font-medium">First Name</label>
-          <input
-            id="first_name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
-        <div>
-          <label htmlFor="last_name" className="mb-1 block text-sm font-medium">Last Name</label>
-          <input
-            id="last_name"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Email</label>
-          <input value={me.email} disabled className="w-full rounded border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400" />
-        </div>
-        {/* Department only rendered for Student/Teacher — Parent/Admin have no department_id (VR-009, read-only regardless). */}
-        {me.profile.department_id && (
           <div>
-            <label className="mb-1 block text-sm font-medium">Department</label>
-            <input value={me.profile.department_name ?? "—"} disabled className="w-full rounded border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400" />
+            <label htmlFor="first_name" className={labelClass}>
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <input id="first_name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
           </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={updateMe.isPending}
-          className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
-          {updateMe.isPending ? "Saving..." : "Save Changes"}
-        </button>
-      </form>
-
-      <form onSubmit={handlePasswordSubmit} className="space-y-4 rounded border border-slate-200 p-6 dark:border-slate-700">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Change Password</h2>
-
-        {passwordMessage && (
-          <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-            {passwordMessage}
+          <div>
+            <label htmlFor="last_name" className={labelClass}>
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <input id="last_name" required value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
           </div>
-        )}
-        {passwordError && (
-          <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-            {passwordError}
+          <div>
+            <label htmlFor="email" className={labelClass}>Email</label>
+            <input id="email" value={me.email} disabled className={inputClass} />
           </div>
-        )}
+          {/* Department only rendered for Student/Teacher — Parent/Admin have no department_id (VR-009, read-only regardless). */}
+          {me.profile.department_id && (
+            <div>
+              <label htmlFor="department" className={labelClass}>Department</label>
+              <input id="department" value={me.profile.department_name ?? "—"} disabled className={inputClass} />
+            </div>
+          )}
 
-        <div>
-          <label htmlFor="current_password" className="mb-1 block text-sm font-medium">Current Password</label>
-          <input
-            id="current_password"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
-        <div>
-          <label htmlFor="new_password" className="mb-1 block text-sm font-medium">New Password</label>
-          <input
-            id="new_password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
-        <div>
-          <label htmlFor="confirm_password" className="mb-1 block text-sm font-medium">Confirm Password</label>
-          <input
-            id="confirm_password"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
+          <Button type="submit" isLoading={updateMe.isPending}>Save Changes</Button>
+        </form>
+      </Card>
 
-        <button
-          type="submit"
-          disabled={changePassword.isPending}
-          className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
-          {changePassword.isPending ? "Updating..." : "Update Password"}
-        </button>
-      </form>
+      <Card>
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Change Password</h2>
+
+          {passwordMessage && <SuccessAlert>{passwordMessage}</SuccessAlert>}
+          {passwordError && <ErrorAlert>{passwordError}</ErrorAlert>}
+
+          <div>
+            <label htmlFor="current_password" className={labelClass}>Current Password</label>
+            <PasswordInput
+              id="current_password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <label htmlFor="new_password" className={labelClass}>New Password</label>
+            <PasswordInput
+              id="new_password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label htmlFor="confirm_password" className={labelClass}>Confirm Password</label>
+            <PasswordInput
+              id="confirm_password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+          </div>
+
+          <Button type="submit" isLoading={changePassword.isPending}>Update Password</Button>
+        </form>
+      </Card>
     </div>
   );
 }
