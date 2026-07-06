@@ -96,6 +96,29 @@ export interface OverdueNotifyResponse {
   notified_count: number;
 }
 
+export interface FeeStructureSummary {
+  id: string;
+  name: string;
+  amount: number;
+  due_date: string;
+  semester_id: string;
+  department_id: string | null;
+}
+
+// Gap closure: GET /fees/structures (Derived, admin-only) backs the Admin
+// Fee Dashboard's Record Payment dropdown, replacing a raw UUID text input.
+export function useFeeStructures(page = 1, pageSize = 100) {
+  return useQuery({
+    queryKey: ["fees", "structures", page, pageSize],
+    queryFn: async () =>
+      (
+        await apiClient.get<{ items: FeeStructureSummary[]; total: number }>("/fees/structures", {
+          params: { page, page_size: pageSize },
+        })
+      ).data,
+  });
+}
+
 export function useMyFees(params?: { semesterId?: string; studentId?: string }) {
   return useQuery({
     queryKey: ["fees", "me", params],

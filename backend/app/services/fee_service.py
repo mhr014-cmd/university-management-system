@@ -37,6 +37,7 @@ from app.schemas.fee import (
     FeesMeResponse,
     FeeStructureCreate,
     FeeStructureRead,
+    FeeStructureSummary,
     InvoiceEntry,
     OverdueAccountEntry,
     OverdueNotifyRequest,
@@ -199,6 +200,24 @@ class FeeService:
             payment_date=payment.payment_date,
             fee_structure_id=payment.fee_structure_id,
         )
+
+    # --- GET /fees/structures (Derived, gap-closure addition) ----------------
+
+    def list_fee_structures(
+        self, session: Session, page: int, page_size: int
+    ) -> tuple[list[FeeStructureSummary], int]:
+        rows, total = fee_repo.list_fee_structures(session, page, page_size)
+        return [
+            FeeStructureSummary(
+                id=fs.id,
+                name=fs.name,
+                amount=float(fs.amount),
+                due_date=fs.due_date,
+                semester_id=fs.semester_id,
+                department_id=fs.department_id,
+            )
+            for fs in rows
+        ], total
 
     # --- GET /fees/me (FR-038, FR-037-style Parent scoping) -----------------
 

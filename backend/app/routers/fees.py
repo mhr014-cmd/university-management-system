@@ -13,10 +13,12 @@ from app.middleware.auth import get_current_user
 from app.middleware.rbac import require_roles
 from app.models.user import User
 from app.pdf.invoice_generator import generate_invoice_pdf
+from app.schemas.common import PaginatedResponse
 from app.schemas.fee import (
     FeesMeResponse,
     FeeStructureCreate,
     FeeStructureRead,
+    FeeStructureSummary,
     OverdueNotifyRequest,
     OverdueNotifyResponse,
     OverdueResponse,
@@ -34,6 +36,19 @@ _require_admin = Depends(require_roles("admin"))
 _require_student_or_parent = Depends(require_roles("student", "parent"))
 _require_admin_or_parent = Depends(require_roles("admin", "parent"))
 _require_student_or_admin = Depends(require_roles("student", "admin"))
+
+
+# Registered before /me isn't required (distinct literal path), but placed
+# ahead of "" for readability — no path-matching ambiguity here since
+# "/structures" doesn't overlap with any other fees route pattern.
+@router.get("/structures", response_model=PaginatedResponse[FeeStructureSummary], dependencies=[_require_admin])
+def list_fee_structures(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    items, total = fee_service.list_fee_structures(db, page, page_size)
+    return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/me", response_model=FeesMeResponse, dependencies=[_require_student_or_parent])

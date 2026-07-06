@@ -115,6 +115,24 @@ def _parent_user():
     return User(id=uuid.uuid4(), email="p@example.com", role="parent")
 
 
+class TestListFeeStructures:
+    """Gap closure: GET /fees/structures backs the Admin Fee Dashboard's
+    Record Payment dropdown (Derived addition, admin-only)."""
+
+    def test_maps_repo_rows_to_summaries(self, service, stub_repos, session):
+        fee_repo, *_ = stub_repos
+        fee_structure = make_fee_structure(name="Tuition", amount=5000)
+        fee_repo.list_fee_structures.return_value = ([fee_structure], 1)
+
+        items, total = service.list_fee_structures(session, 1, 20)
+
+        assert total == 1
+        assert items[0].id == fee_structure.id
+        assert items[0].name == "Tuition"
+        assert items[0].amount == 5000.0
+        fee_repo.list_fee_structures.assert_called_once_with(session, 1, 20)
+
+
 class TestCreateFeeStructure:
     def test_rule4_invalid_semester_rejected(self, service, stub_repos, session):
         _fee_repo, _user_repo, _department_repo, semester_repo = stub_repos

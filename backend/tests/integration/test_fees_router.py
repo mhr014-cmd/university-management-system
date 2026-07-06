@@ -29,6 +29,33 @@ def _setup_enrolled_student(make_teacher_user, make_student_user, make_class_ses
     return teacher, student, class_session
 
 
+class TestListFeeStructures:
+    """Gap closure: GET /fees/structures (Derived) backs the Admin Fee
+    Dashboard's Record Payment dropdown."""
+
+    def test_requires_admin_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        response = client.get("/api/v1/fees/structures", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_admin_lists_created_structures(self, client, make_admin_user, make_semester):
+        make_admin_user("admin@example.com", "correct-password")
+        token = _login(client, "admin@example.com", "correct-password")
+        semester = make_semester()
+        client.post(
+            "/api/v1/fees",
+            json={"semester_id": str(semester.id), "name": "Tuition", "amount": 5000, "due_date": "2030-01-01"},
+            headers=_headers(token),
+        )
+
+        response = client.get("/api/v1/fees/structures", headers=_headers(token))
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        assert body["items"][0]["name"] == "Tuition"
+
+
 class TestCreateFeeStructure:
     def test_requires_admin_role(self, client, make_teacher_user):
         make_teacher_user("teacher@example.com", "correct-password")

@@ -19,6 +19,7 @@ import { useStudents } from "../../../features/users";
 import {
   useCreateFeeStructure,
   useDownloadInvoice,
+  useFeeStructures,
   useNotifyOverdueAccounts,
   useOverdueAccounts,
   useRecordPayment,
@@ -36,6 +37,7 @@ export default function FeeDashboardPage() {
   const { data: departments } = useDepartments();
   const { data: semesters } = useSemesters();
   const { data: students } = useStudents(undefined, 1, 100);
+  const { data: feeStructures } = useFeeStructures();
   const { data: overdue, isLoading: isOverdueLoading } = useOverdueAccounts();
   const createFeeStructure = useCreateFeeStructure();
   const recordPayment = useRecordPayment();
@@ -200,13 +202,18 @@ export default function FeeDashboardPage() {
               </option>
             ))}
           </select>
-          <input
-            type="text"
+          <select
             value={payFeeStructureId}
             onChange={(e) => setPayFeeStructureId(e.target.value)}
-            placeholder="Fee Structure ID"
             className={inputClass}
-          />
+          >
+            <option value="">Select Fee Structure</option>
+            {feeStructures?.items.map((fs) => (
+              <option key={fs.id} value={fs.id}>
+                {fs.name} — {fs.amount.toFixed(2)} (due {fs.due_date})
+              </option>
+            ))}
+          </select>
           <input
             type="number"
             min={0.01}

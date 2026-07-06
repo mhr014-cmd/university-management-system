@@ -30,6 +30,20 @@ class FeeStructureRead(BaseModel):
     invoices_created: int
 
 
+class FeeStructureSummary(BaseModel):
+    """GET /fees/structures (Derived, gap-closure addition): a lightweight
+    listing used to populate the Admin Fee Dashboard's Record Payment
+    fee-structure dropdown, replacing a raw UUID text field. Deliberately
+    excludes invoices_created (only meaningful at creation time)."""
+
+    id: uuid.UUID
+    name: str
+    amount: float
+    due_date: date
+    semester_id: uuid.UUID
+    department_id: uuid.UUID | None
+
+
 class InvoiceEntry(BaseModel):
     invoice_id: uuid.UUID
     amount: float

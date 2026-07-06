@@ -22,11 +22,21 @@ from app.models.student import Student
 from app.models.user import User
 
 
+def _paginate(session: Session, stmt, page: int, page_size: int):
+    total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    items = session.scalars(stmt.offset((page - 1) * page_size).limit(page_size)).all()
+    return items, total
+
+
 class FeeRepository:
     # --- fee_structure -------------------------------------------------------
 
     def get_fee_structure(self, session: Session, fee_structure_id: uuid.UUID) -> FeeStructure | None:
         return session.get(FeeStructure, fee_structure_id)
+
+    def list_fee_structures(self, session: Session, page: int, page_size: int):
+        stmt = select(FeeStructure).order_by(FeeStructure.due_date.desc())
+        return _paginate(session, stmt, page, page_size)
 
     def create_fee_structure(
         self,
