@@ -284,3 +284,29 @@ A post-M11 production-quality audit, explicitly authorized by the user, found an
 **Disposition:** Permanent.
 
 ---
+
+## Post-M11 Gap Closure Audit Additions (2026-07-05)
+
+A direct audit against `docs/product_proposal.pdf` (requested by the user) found the Parent role's proposal-promised attendance and timetable visibility (`product_proposal.pdf` Section 5) had no API support at all — not merely a missing frontend screen, as `Requirement_Traceability_Matrix.md`'s prior "Known Gaps" note had characterized it for FR-032/FR-037. See `PROJECT_PROGRESS.md`'s "Post-M11 Gap Closure" entry for the full summary; this section classifies each new/changed endpoint.
+
+### `GET /attendance/me` Parent scoping (`student_id` query parameter)
+**Where:** `backend/app/routers/attendance.py` (`_require_student_or_parent` dependency), `backend/app/schemas/attendance.py` (`AttendanceMeQuery.student_id`), `backend/app/services/attendance_service.py` (`get_me`), `backend/app/notifications/dispatcher.py` (`notify_attendance_warning` now fans out to linked Parents).
+**Classification: Derived.** The proposal (Section 5) explicitly promises Parents "automatic alerts for absences" and an attendance summary — `GET /attendance/me` previously rejected any Parent request outright. Extended using the exact Parent-scoping convention already established by `GET /fees/me`/`GET /results/me` (required `student_id`, ownership-verified via `parent_student_link`) — no new endpoint path, no schema/migration change.
+**Disposition:** Permanent.
+
+### `GET /schedule/me` Parent scoping (`student_id` query parameter)
+**Where:** `backend/app/routers/schedule.py` (`_require_student_teacher_or_parent` dependency), `backend/app/services/schedule_service.py` (`get_me`).
+**Classification: Derived.** The proposal (Section 5, "Results & schedule") explicitly promises Parents their child's class timetable — `GET /schedule/me`'s RBAC previously excluded Parent from the allowed-roles list entirely (a request would 403 before reaching any ownership check). Same Parent-scoping convention as above.
+**Disposition:** Permanent.
+
+### `GET /fees/structures` (Derived, admin-only, paginated)
+**Where:** `backend/app/routers/fees.py`, `backend/app/services/fee_service.py` (`list_fee_structures`), `backend/app/repositories/fee_repository.py` (`list_fee_structures`), `backend/app/schemas/fee.py` (`FeeStructureSummary`), `frontend/src/features/fees/index.ts` (`useFeeStructures`), `frontend/src/pages/Admin/FeeDashboard/index.tsx` (Record Payment's Fee Structure field is now a `<select>`).
+**Classification: Derived.** No endpoint anywhere listed existing fee structures — the Admin Fee Dashboard's Record Payment form required an Admin to already know and hand-type a `fee_structure_id` UUID, the same class of known limitation as Milestone 4's Admin schedule panel (`PROJECT_PROGRESS.md` Milestone 8 entry). Follows the existing reference-data pagination convention (`PaginatedResponse`, per `CLAUDE.md` §11) rather than an unbounded list.
+**Disposition:** Permanent.
+
+### Attendance page Calendar view
+**Where:** `frontend/src/pages/Attendance/index.tsx` (`CalendarMonthView`).
+**Classification: Derived.** `UI_Wireframes.md`'s "calendar or table view" toggle existed since Milestone 5 with Calendar mode showing a placeholder message. Implemented as a month-grid rendering of the same `GET /attendance/me` data already fetched for Table view — no new endpoint.
+**Disposition:** Permanent.
+
+---
