@@ -17,9 +17,10 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
+      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
         Welcome back{me ? `, ${me.profile.first_name}` : ""}
       </h1>
+      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Here's what's happening with your account.</p>
 
       {user?.role === "student" && <StudentDashboard />}
       {user?.role === "teacher" && <TeacherDashboard />}

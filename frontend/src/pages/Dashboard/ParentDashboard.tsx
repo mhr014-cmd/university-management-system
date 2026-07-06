@@ -1,8 +1,10 @@
 // Parent Dashboard widgets (Milestone 10, production-polish audit update).
-// Fee Status and Recent Results are backed by GET /fees/me and
-// GET /results/me with a student_id, verified server-side against
-// parent_student_link. Attendance % and Upcoming Exams render an honest
-// "Not available" state — no endpoint exposes either to the Parent role.
+// Fee Status, Recent Results, and Attendance % are backed by GET /fees/me,
+// GET /results/me, and GET /attendance/me, all with a student_id, verified
+// server-side against parent_student_link (attendance access added in the
+// post-M11 gap-closure pass — see Requirement_Traceability_Matrix.md).
+// Upcoming Exams still renders an honest "Not available" state — no
+// endpoint exposes exam schedules to the Parent role.
 //
 // GET /users/me/children (added in the production-polish audit) now
 // enumerates a Parent's linked children, so the child is selected from a
@@ -10,9 +12,14 @@
 // manually-typed Student ID.
 
 import { useEffect, useMemo, useState } from "react";
+import { Award, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
+import { useMyAttendance } from "../../features/attendance";
 import { useMyFees } from "../../features/fees";
 import { useMyResults } from "../../features/results";
 import { useMyChildren } from "../../features/users";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { inputClass } from "../../components/ui/classNames";
 import { DashboardCard, NotAvailableCard } from "./DashboardCard";
 
 export function ParentDashboard() {
@@ -29,6 +36,7 @@ export function ParentDashboard() {
 
   const { data: fees, isError: feesError } = useMyFees({ studentId: selectedStudentId || undefined });
   const { data: results, isError: resultsError } = useMyResults({ studentId: selectedStudentId || undefined });
+  const { data: attendance, isError: attendanceError } = useMyAttendance({ studentId: selectedStudentId });
 
   const mostRecentSemester = results?.semesters[0];
   const nextDueInvoice = (fees?.invoices ?? [])
@@ -37,21 +45,26 @@ export function ParentDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+        </div>
         {childrenLoading ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">Loading your linked children...</p>
         ) : childrenError ? (
           <p className="text-sm text-red-600 dark:text-red-400">Unable to load linked children.</p>
         ) : children.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            No children are linked to your account yet. Contact an administrator if this is unexpected.
-          </p>
+          <EmptyState
+            icon={Users}
+            title="No children linked yet"
+            description="Contact an administrator to link a child's record to your account."
+          />
         ) : (
           <select
             value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
-            className="w-full rounded border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+            className={inputClass}
           >
             {children.map((child) => (
               <option key={child.id} value={child.id}>
@@ -60,19 +73,19 @@ export function ParentDashboard() {
             ))}
           </select>
         )}
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {!selectedStudentId ? (
-          <DashboardCard title="Fee Status">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Select a child above.</p>
+          <DashboardCard title="Fee Status" icon={Wallet}>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
           </DashboardCard>
         ) : feesError ? (
-          <DashboardCard title="Fee Status">
+          <DashboardCard title="Fee Status" icon={Wallet}>
             <p className="text-sm text-red-600 dark:text-red-400">Not linked, or fee data unavailable.</p>
           </DashboardCard>
         ) : (
-          <DashboardCard title="Fee Status">
+          <DashboardCard title="Fee Status" icon={Wallet}>
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               {fees?.outstanding_balance.toFixed(2) ?? "—"}
             </p>
@@ -82,18 +95,38 @@ export function ParentDashboard() {
           </DashboardCard>
         )}
 
-        <NotAvailableCard title="Attendance %" />
-        <NotAvailableCard title="Upcoming Exams" />
+        {!selectedStudentId ? (
+          <DashboardCard title="Attendance %" icon={PieChart}>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
+          </DashboardCard>
+        ) : attendanceError ? (
+          <DashboardCard title="Attendance %" icon={PieChart}>
+            <p className="text-sm text-red-600 dark:text-red-400">Not linked, or attendance data unavailable.</p>
+          </DashboardCard>
+        ) : (
+          <DashboardCard title="Attendance %" icon={PieChart}>
+            <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+              {attendance?.overall_percentage.toFixed(1) ?? "—"}%
+            </p>
+            {attendance?.low_attendance_warning && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Below 80% — low attendance warning</p>
+            )}
+          </DashboardCard>
+        )}
+        <NotAvailableCard title="Upcoming Exams" icon={CalendarClock} />
       </div>
 
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <Award className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
+        </div>
         {!selectedStudentId ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Select a child above.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
         ) : resultsError ? (
           <p className="text-sm text-red-600 dark:text-red-400">Not linked, or result data unavailable.</p>
         ) : !mostRecentSemester || mostRecentSemester.courses.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No published results yet.</p>
+          <EmptyState icon={Award} title="No published results yet" />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -117,7 +150,7 @@ export function ParentDashboard() {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

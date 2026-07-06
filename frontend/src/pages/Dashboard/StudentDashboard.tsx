@@ -4,10 +4,14 @@
 // (ExamList, Attendance, FeeCentre, ResultsView) — no new backend scope.
 
 import { Link } from "react-router-dom";
+import { Award, CalendarClock, PieChart, Wallet } from "lucide-react";
 import { useExams } from "../../features/exams";
 import { useMyAttendance } from "../../features/attendance";
 import { useMyFees } from "../../features/fees";
 import { useMyResults } from "../../features/results";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { DashboardCard } from "./DashboardCard";
 
 export function StudentDashboard() {
@@ -29,9 +33,9 @@ export function StudentDashboard() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <DashboardCard title="Upcoming Exams">
+      <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
         {upcoming.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No upcoming exams.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">No upcoming exams.</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {upcoming.map((exam) => (
@@ -42,12 +46,12 @@ export function StudentDashboard() {
             ))}
           </ul>
         )}
-        <Link to="/exams" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/exams" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           View all
         </Link>
       </DashboardCard>
 
-      <DashboardCard title="Attendance %">
+      <DashboardCard title="Attendance %" icon={PieChart}>
         {attendance ? (
           <>
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -58,14 +62,14 @@ export function StudentDashboard() {
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>
+          <PageLoader />
         )}
-        <Link to="/attendance" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/attendance" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           View all
         </Link>
       </DashboardCard>
 
-      <DashboardCard title="Fee Status">
+      <DashboardCard title="Fee Status" icon={Wallet}>
         {fees ? (
           <>
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -76,17 +80,20 @@ export function StudentDashboard() {
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>
+          <PageLoader />
         )}
-        <Link to="/fees" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/fees" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           View Fee Centre
         </Link>
       </DashboardCard>
 
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700 sm:col-span-3">
-        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
+      <Card className="sm:col-span-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Award className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
+        </div>
         {!mostRecentSemester || mostRecentSemester.courses.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No published results yet.</p>
+          <EmptyState icon={Award} title="No published results yet" description="Results will appear here once your teacher submits and an admin publishes them." />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -110,10 +117,10 @@ export function StudentDashboard() {
             </tbody>
           </table>
         )}
-        <Link to="/results" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
-          View full results
+        <Link to="/results" className="mt-2 inline-block text-sm font-medium text-slate-900 hover:underline dark:text-slate-100">
+          View full results →
         </Link>
-      </div>
+      </Card>
     </div>
   );
 }

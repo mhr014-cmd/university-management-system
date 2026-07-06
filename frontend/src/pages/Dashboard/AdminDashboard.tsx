@@ -7,9 +7,12 @@
 // no new endpoint or schema change was needed.
 
 import { Link } from "react-router-dom";
+import { AlertTriangle, ClipboardCheck, FileBarChart, Users as UsersIcon } from "lucide-react";
 import { usePendingResults } from "../../features/results";
 import { useOverdueAccounts } from "../../features/fees";
 import { useStudents, useTeachers } from "../../features/users";
+import { Card } from "../../components/ui/Card";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { DashboardCard } from "./DashboardCard";
 
 export function AdminDashboard() {
@@ -33,42 +36,45 @@ export function AdminDashboard() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <DashboardCard title="Pending Result Approvals">
+        <DashboardCard title="Pending Result Approvals" icon={ClipboardCheck}>
           <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{pendingApprovalsCount}</p>
           <Link
             to="/admin/result-approval"
-            className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100"
+            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
           >
             Review
           </Link>
         </DashboardCard>
 
-        <DashboardCard title="Overdue Fees">
+        <DashboardCard title="Overdue Fees" icon={AlertTriangle}>
           <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
             {overdue?.overdue_accounts.length ?? 0}
           </p>
           <Link
             to="/admin/fee-dashboard"
-            className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100"
+            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
           >
             View Fee Dashboard
           </Link>
         </DashboardCard>
 
-        <DashboardCard title="Reports">
+        <DashboardCard title="Reports" icon={FileBarChart}>
           <Link
             to="/admin/reports"
-            className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100"
+            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
           >
             Generate reports
           </Link>
         </DashboardCard>
       </div>
 
-      <div className="rounded border border-slate-200 p-4 dark:border-slate-700">
-        <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Recent User Signups</p>
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <UsersIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Recent User Signups</p>
+        </div>
         {recentSignups.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No users yet.</p>
+          <EmptyState icon={UsersIcon} title="No users yet" description="New student and teacher signups will appear here." />
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
@@ -94,10 +100,10 @@ export function AdminDashboard() {
             </tbody>
           </table>
         )}
-        <Link to="/admin/users" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/admin/users" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           Manage users
         </Link>
-      </div>
+      </Card>
     </div>
   );
 }

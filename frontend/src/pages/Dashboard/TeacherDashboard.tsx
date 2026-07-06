@@ -13,6 +13,7 @@
 
 import { useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { CalendarDays, ClipboardList } from "lucide-react";
 import { apiClient } from "../../lib/apiClient";
 import { useMySchedule } from "../../features/schedule";
 import { useExams, type ExamResultsResponse } from "../../features/exams";
@@ -45,9 +46,9 @@ export function TeacherDashboard() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <DashboardCard title="Classes Today">
+      <DashboardCard title="Classes Today" icon={CalendarDays}>
         {classesToday.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No classes scheduled today.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">No classes scheduled today.</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {classesToday.map((entry) => (
@@ -57,14 +58,14 @@ export function TeacherDashboard() {
             ))}
           </ul>
         )}
-        <Link to="/timetable" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/timetable" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           View timetable
         </Link>
       </DashboardCard>
 
-      <DashboardCard title="Pending Grading">
+      <DashboardCard title="Pending Grading" icon={ClipboardList}>
         <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{pendingGradingCount}</p>
-        <Link to="/exams" className="mt-2 inline-block text-sm text-slate-900 underline dark:text-slate-100">
+        <Link to="/exams" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
           View exams
         </Link>
       </DashboardCard>
