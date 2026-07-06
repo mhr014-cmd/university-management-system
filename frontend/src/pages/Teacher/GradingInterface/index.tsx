@@ -19,6 +19,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
+import { AlertCircle, CheckCircle2, FileText } from "lucide-react";
 import {
   useExam,
   useExamResults,
@@ -26,6 +27,11 @@ import {
   useSubmissionDetail,
   useUpdateExam,
 } from "../../../features/exams";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
+import { EmptyState } from "../../../components/ui/EmptyState";
+import { PageLoader } from "../../../components/ui/PageLoader";
+import { inputClass } from "../../../components/ui/classNames";
 
 type GradeDraft = Record<string, { awardedMarks: string; feedback: string }>;
 
@@ -98,33 +104,31 @@ export default function GradingInterfacePage() {
   };
 
   if (!exam || !results) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>;
+    return <PageLoader />;
   }
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Grading: {exam.title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Grading: {exam.title}</h1>
 
       {message && (
-        <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-          {message}
+        <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{message}</span>
         </div>
       )}
       {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
+        <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
       {results.submissions.length === 0 ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">No submissions yet.</p>
+        <EmptyState icon={FileText} title="No submissions yet" />
       ) : (
         <div className="flex items-center gap-4 text-sm">
-          <select
-            value={submissionId}
-            onChange={(e) => setSubmissionId(e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
-          >
+          <select value={submissionId} onChange={(e) => setSubmissionId(e.target.value)} className={`w-auto ${inputClass}`}>
             {results.submissions.map((submission) => (
               <option key={submission.submission_id} value={submission.submission_id}>
                 {submission.student_name} — {submission.status} ({submission.total_awarded_marks} marks)
@@ -132,24 +136,19 @@ export default function GradingInterfacePage() {
             ))}
           </select>
           {allGraded && (
-            <button
-              type="button"
-              onClick={handlePublish}
-              disabled={updateExam.isPending}
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-            >
+            <Button onClick={handlePublish} isLoading={updateExam.isPending}>
               Publish Exam
-            </button>
+            </Button>
           )}
         </div>
       )}
 
       {isDetailLoading || !detail ? (
-        submissionId && <p className="text-sm text-slate-500 dark:text-slate-400">Loading submission...</p>
+        submissionId && <PageLoader label="Loading submission..." />
       ) : (
         <div className="space-y-4">
           {detail.questions.map((question, index) => (
-            <div key={question.question_id} className="space-y-2 rounded border border-slate-200 p-3 dark:border-slate-700">
+            <Card key={question.question_id} className="space-y-2">
               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                 {index + 1}. {question.question_text}{" "}
                 <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
@@ -161,7 +160,7 @@ export default function GradingInterfacePage() {
                 <p className="text-sm italic text-slate-500 dark:text-slate-400">Not answered.</p>
               ) : (
                 <>
-                  <p className="rounded bg-slate-50 px-2 py-1 text-sm dark:bg-slate-800">
+                  <p className="rounded-md bg-slate-50 px-3 py-1.5 text-sm dark:bg-slate-800">
                     {question.answer_text ?? question.selected_option_id ?? "—"}
                   </p>
                   <div className="flex items-center gap-4 text-sm">
@@ -180,7 +179,7 @@ export default function GradingInterfacePage() {
                           },
                         }))
                       }
-                      className="w-24 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                      className={`w-24 ${inputClass}`}
                       placeholder="Marks"
                     />
                     <input
@@ -196,22 +195,17 @@ export default function GradingInterfacePage() {
                         }))
                       }
                       placeholder="Feedback (optional)"
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800"
+                      className={`flex-1 ${inputClass}`}
                     />
                   </div>
                 </>
               )}
-            </div>
+            </Card>
           ))}
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={gradeExam.isPending}
-            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-          >
+          <Button onClick={handleSave} isLoading={gradeExam.isPending}>
             Save Grades
-          </button>
+          </Button>
         </div>
       )}
     </div>
