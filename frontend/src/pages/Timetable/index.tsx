@@ -30,6 +30,7 @@ import { Button } from "../../components/ui/Button";
 import { Card, CardTitle } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { useToast } from "../../components/ui/Toast";
 import { inputClass } from "../../components/ui/classNames";
 
 const DAYS: DayOfWeek[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -171,14 +172,13 @@ function RequestChangeModal({ entry, onClose }: { entry: ScheduleMeEntry; onClos
 }
 
 function AdminSchedulePanel() {
+  const { showSuccess, showError } = useToast();
   const createClassSession = useCreateClassSession();
   const createEnrollment = useCreateEnrollment();
   const createScheduleEntry = useCreateScheduleEntry();
   const conflictsQuery = useScheduleConflicts();
 
-  const [csResult, setCsResult] = useState<string | null>(null);
   const [entryError, setEntryError] = useState<string | null>(null);
-  const [entrySuccess, setEntrySuccess] = useState(false);
 
   const handleCreateClassSession = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -190,25 +190,31 @@ function AdminSchedulePanel() {
         semester_id: String(form.get("semester_id")),
         section_label: String(form.get("section_label")),
       });
-      setCsResult(`Created class session: ${result.id}`);
+      showSuccess(`Class session created: ${result.id}`);
+      event.currentTarget.reset();
     } catch {
-      setCsResult("Could not create class session — check the referenced IDs.");
+      showError("Could not create class session — check the referenced IDs.");
     }
   };
 
   const handleCreateEnrollment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await createEnrollment.mutateAsync({
-      student_id: String(form.get("student_id")),
-      class_session_id: String(form.get("class_session_id")),
-    });
+    try {
+      await createEnrollment.mutateAsync({
+        student_id: String(form.get("student_id")),
+        class_session_id: String(form.get("class_session_id")),
+      });
+      showSuccess("Student enrolled.");
+      event.currentTarget.reset();
+    } catch {
+      showError("Could not enroll this student — check the referenced IDs.");
+    }
   };
 
   const handleCreateEntry = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setEntryError(null);
-    setEntrySuccess(false);
     const form = new FormData(event.currentTarget);
     try {
       await createScheduleEntry.mutateAsync({
@@ -219,7 +225,8 @@ function AdminSchedulePanel() {
         start_time: `${form.get("start_time")}:00`,
         end_time: `${form.get("end_time")}:00`,
       });
-      setEntrySuccess(true);
+      showSuccess("Schedule entry created.");
+      event.currentTarget.reset();
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
         setEntryError("This time slot conflicts with an existing room or teacher booking.");
@@ -243,7 +250,6 @@ function AdminSchedulePanel() {
           <input name="semester_id" required placeholder="Semester ID" className={inputClass} />
           <input name="section_label" required placeholder="Section Label" className={inputClass} />
           <Button type="submit" isLoading={createClassSession.isPending}>Create</Button>
-          {csResult && <p className="text-xs text-slate-500 dark:text-slate-400">{csResult}</p>}
         </form>
       </Card>
 
@@ -263,12 +269,6 @@ function AdminSchedulePanel() {
             <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{entryError}</span>
-            </div>
-          )}
-          {entrySuccess && (
-            <div className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/50 dark:text-green-300">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>Schedule entry created.</span>
             </div>
           )}
           <input name="class_session_id" required placeholder="Class Session ID" className={inputClass} />
