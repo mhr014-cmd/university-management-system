@@ -20,17 +20,17 @@ import type { AttendanceStatus } from "../../../features/attendance";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
+import { useToast } from "../../../components/ui/Toast";
 import { inputClass } from "../../../components/ui/classNames";
 
 const STATUS_OPTIONS: AttendanceStatus[] = ["present", "absent", "late", "excused"];
 
 export default function AttendanceMarkerPage() {
+  const { showSuccess, showError } = useToast();
   const { data: schedule } = useMySchedule();
   const [classSessionId, setClassSessionId] = useState("");
   const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [statuses, setStatuses] = useState<Record<string, AttendanceStatus>>({});
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const uniqueClassSessions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -69,8 +69,6 @@ export default function AttendanceMarkerPage() {
   };
 
   const handleSave = async () => {
-    setMessage(null);
-    setError(null);
     try {
       if (isCorrectionMode) {
         for (const student of roster?.students ?? []) {
@@ -80,7 +78,7 @@ export default function AttendanceMarkerPage() {
             await updateAttendance.mutateAsync({ id: record.id, status: newStatus });
           }
         }
-        setMessage("Attendance corrected.");
+        showSuccess("Attendance corrected.");
         return;
       }
       await markAttendance.mutateAsync({
@@ -88,12 +86,12 @@ export default function AttendanceMarkerPage() {
         attendance_date: attendanceDate,
         records: Object.entries(statuses).map(([student_id, status]) => ({ student_id, status })),
       });
-      setMessage("Attendance saved.");
+      showSuccess("Attendance saved.");
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
-        setError("Attendance already recorded for this date.");
+        showError("Attendance already recorded for this date.");
       } else {
-        setError("Could not save attendance. Please try again.");
+        showError("Could not save attendance. Please try again.");
       }
     }
   };
@@ -118,17 +116,6 @@ export default function AttendanceMarkerPage() {
           className={`w-auto ${inputClass}`}
         />
       </div>
-
-      {message && (
-        <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
-          {error}
-        </div>
-      )}
 
       {classSessionId && roster && (
         <>
