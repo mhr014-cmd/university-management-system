@@ -319,4 +319,9 @@ A direct audit against `docs/product_proposal.pdf` (requested by the user) found
 **Classification: Derived.** FR-008 (Student — "views academic history alongside profile data") and the Teacher Profile & courses feature (Section 4) were both previously satisfied only by data being reachable on a *different* page (Results View, Timetable) — this pass adds Profile-page sections that reuse `GET /results/me`/`GET /schedule/me` directly, no new endpoints. Teacher "teaching history" across past semesters (as distinct from the current semester's assignments) remains unbuilt — no endpoint exposes it, and the section is labeled "this semester" rather than overclaiming.
 **Disposition:** Permanent, with the teaching-history limitation noted above tracked as a known, honestly-labeled gap.
 
+### Transcript PDF seal graphic
+**Where:** `backend/app/pdf/transcript_generator.py` (`_draw_seal`, `_draw_circular_text`, `_draw_star`).
+**Classification: Design Enhancement.** No real institution seal/logo image asset exists for this project; replaced the plain circle + "SEAL" text placeholder with a programmatically-drawn seal (concentric rings, curved "ICT EDUCATION UNIVERSITY"/"OFFICIAL SEAL" text, five-pointed center emblem) using only `reportlab` canvas primitives already in use elsewhere in this file — no new dependency. Rendered and visually verified during this pass.
+**Disposition:** Permanent, until/unless a real institution logo asset is provided.
+
 ---
