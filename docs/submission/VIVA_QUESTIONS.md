@@ -1,363 +1,413 @@
-# Viva Questions & Model Answers
+# Viva Preparation Guide
 
-100 oral-examination questions with model answers, grounded in the actual implemented University Management System (ICT Education) — FastAPI + PostgreSQL + SQLAlchemy backend, React + TypeScript frontend. Ordered beginner → expert within each of 15 topic areas. Where a question is general computer-science knowledge, the answer ties back to how the concept is actually used in this project.
+**Project:** University Management System (ICT Education)
+**Version:** v2.4.1
+**Format:** ~100 oral-examination questions with detailed model answers, grouped into 23 sections matching the areas an examiner is most likely to probe. Within each section, questions run beginner → difficult, so you can warm up before the harder ones. Every answer is grounded in what is actually implemented in this codebase — not generic textbook material — so cite specifics (endpoint paths, table names, counts) when you answer live, the same way they're cited here.
 
----
-
-## A. Python (Q1–Q6)
-
-**Q1. What are Python's key features that made it suitable for this project's backend?**
-Python offers a large, mature web-framework ecosystem (FastAPI), strong typing support via type hints (used throughout this project's Pydantic schemas and function signatures), readability, and first-class async/await support, which FastAPI relies on for non-blocking request handling.
-
-**Q2. What is a Python decorator, and where is one used in this project?**
-A decorator is a function that wraps another function/class to extend its behavior without modifying its source. This project uses decorators extensively via FastAPI's routing syntax, e.g. `@router.get("/me")`, which registers a function as the handler for that route, and `@pytest.fixture` in the test suite to provide reusable setup objects like a database session.
-
-**Q3. Explain Python type hints and how this project uses them.**
-Type hints (`def f(x: int) -> str`) annotate expected types without enforcing them at runtime by themselves. This project uses them on every service/repository method signature, and combines them with Pydantic (which *does* enforce validation at runtime) for every request/response schema, so a caller and a reader both know exactly what shape of data flows through each layer.
-
-**Q4. What is the difference between a list and a tuple, and does this project use both?**
-A list is mutable and ordered; a tuple is immutable and ordered. The codebase mostly uses lists (e.g. query results from repositories) but tuples appear where a fixed, small, immutable grouping is returned, e.g. `get_student_with_user()` returning `(Student, User)`.
-
-**Q5. What is a Python generator, and where would FastAPI use one?**
-A generator produces values lazily via `yield` instead of building a full list in memory. FastAPI's dependency-injection system uses generator functions for resources needing setup/teardown — this project's `get_db()` dependency is a generator that yields a database session and guarantees it is closed afterward, even if the request raises an exception.
-
-**Q6. What is the Global Interpreter Lock (GIL) and why doesn't it block this project's concurrency model?**
-The GIL allows only one thread to execute Python bytecode at a time in the reference CPython interpreter. This project's concurrency comes from FastAPI's async event loop (cooperative concurrency for I/O-bound work like database queries and PDF generation dispatched via `run_in_threadpool`), not from CPU-bound multi-threading, so the GIL is not a practical bottleneck for this workload.
+**Headline facts to have memorized before you walk in:**
+- 82 REST endpoints across 11 backend domains
+- 26 database tables, 10 Alembic migrations, single head, zero schema drift
+- 549 automated tests, all passing (484 backend/pytest, 65 frontend/Vitest)
+- Four roles: Student, Teacher, Parent, Admin — RBAC + per-record ownership enforced server-side
+- Stack: FastAPI (Python 3.12), PostgreSQL, SQLAlchemy, Alembic, React 18 + TypeScript, TailwindCSS, React Query, JWT auth, ReportLab (PDF), openpyxl (Excel)
 
 ---
 
-## B. FastAPI (Q7–Q13)
+## 1. Project Overview (Q1–Q5)
 
-**Q7. What is FastAPI and why was it chosen for this project?**
-FastAPI is a modern, high-performance Python web framework for building APIs, built on Starlette and Pydantic. It was chosen (per the project's fixed technology stack) for its native async support, automatic request validation via Pydantic, and automatic interactive API documentation (Swagger UI) generated directly from the code.
+**Q1. In one or two sentences, what does your system do?**
+It's a role-based web platform that consolidates university operations — attendance, exams and results, fees, and class scheduling — into a single system of record, replacing the usual mix of spreadsheets, email, and disconnected finance tools, with every access-control decision enforced on the server.
 
-**Q8. How does FastAPI's dependency injection work, and give an example from this project.**
-A dependency is a callable declared as a parameter default via `Depends(...)`; FastAPI resolves it before the route function runs. This project uses it for the database session (`db: Session = Depends(get_db)`), the authenticated user (`current_user: User = Depends(get_current_user)`), and role checks (`dependencies=[Depends(require_roles("admin"))]`), keeping cross-cutting concerns out of the route function body.
+**Q2. Who are the users of this system, and how do their permissions differ?**
+Four roles: Student (views their own attendance, exams, results, fees, timetable), Teacher (marks attendance, builds/grades exams, submits results, requests schedule changes), Parent (views their linked child's data only, verified by an ownership check, not just a role check), and Admin (manages accounts, reference data, approves results and schedule changes, records payments, runs reports). Every endpoint enforces both the caller's role and, where relevant, ownership of the specific record requested.
 
-**Q9. How are request and response bodies validated in this project?**
-Every request body is typed as a Pydantic `BaseModel` subclass (a "schema"), and FastAPI automatically validates the incoming JSON against it before the route function executes, returning `422 Unprocessable Entity` with field-level errors on failure. Response models are also declared (`response_model=...`), which both documents and enforces the exact shape returned to the client, and ensures an ORM model is never accidentally leaked directly.
+**Q3. What is the current version of the system, and what changed most recently?**
+Version 2.4.1. The most recent change closed two proposal-compliance gaps: the Teacher's Profile page was relabeled from "Assigned Courses (this semester)" to "Teaching History" because the backend already returned the full cross-semester history — only the label was wrong; and the Parent Dashboard's "Upcoming Exams" widget, which previously showed "Not available," now shows real exam data scoped to the linked child, closing a genuine backend gap (the exam-listing endpoint had no Parent-ownership branch at all before this change).
 
-**Q10. How does this project generate its interactive API documentation?**
-FastAPI derives OpenAPI schema automatically from route declarations, Pydantic models, and docstrings, serving it at `/docs` (Swagger UI) and `/redoc`. This project explicitly disables all three (`/docs`, `/redoc`, `/openapi.json`) when `ENVIRONMENT=production`, so the full endpoint surface isn't publicly discoverable in a real deployment.
+**Q4. Why did you choose this project topic?**
+University administrative processes are a well-understood, real-world domain with clear, testable business rules (approval workflows, access control, derived calculations like GPA and attendance percentage), which makes it a strong vehicle for demonstrating full-stack engineering discipline — layered architecture, RBAC, automated testing — rather than just UI work.
 
-**Q11. How does this project handle errors consistently across 82 endpoints?**
-Through FastAPI's global exception handlers, registered once in `app/main.py`, which translate any raised exception (validation errors, `HTTPException`s raised by services, and unhandled exceptions) into one consistent JSON error shape, rather than each router formatting its own error responses.
-
-**Q12. What is `run_in_threadpool` and why does this project use it for PDF/Excel generation?**
-It's a FastAPI/Starlette utility that runs a synchronous, CPU-bound function in a background thread instead of blocking the async event loop. ReportLab (PDF) and openpyxl (Excel) generation are both synchronous, CPU-bound operations, so wrapping them in `run_in_threadpool` keeps the event loop free to serve other requests while a document is being built.
-
-**Q13. How would you version this API for a future breaking change, and how is that already supported?**
-By introducing a new URL prefix (e.g. `/api/v2`) alongside the existing one, so already-deployed frontend builds keep working against `/api/v1` unchanged. This project already versions every endpoint under `/api/v1` from day one specifically to make that future migration possible without a coordinated frontend/backend redeploy.
+**Q5. What was out of scope, and why does that matter for a viva?**
+A Parent-Teacher messaging module, scheduled/cron-based reminders (e.g. fee due-date alerts), and an overall cross-semester CGPA figure were all deliberately left unbuilt and are documented as such in `docs/Proposal_vs_Engineering_Additions.md` and the Limitations section of the project report. It matters because an examiner will respect "I chose not to build X because Y" far more than an undocumented gap discovered live — it shows the scope was actively managed, not just abandoned.
 
 ---
 
-## C. PostgreSQL (Q14–Q19)
+## 2. Problem Statement (Q6–Q8)
 
-**Q14. Why PostgreSQL over another relational database for this project?**
-PostgreSQL was fixed by the project's technology stack; it offers strong standards compliance, robust constraint/foreign-key enforcement (used extensively here), native UUID support (used as this project's primary-key type), and mature tooling that integrates cleanly with SQLAlchemy/Alembic.
+**Q6. State the problem this system solves.**
+Given a university managing student records, attendance, results, fees, and scheduling through a mixture of spreadsheets, email, and disconnected finance tools, design and implement a single web-based system that gives each role exactly the access they're authorized to have, makes every workflow explicit and auditable, enforces access control server-side, and ensures every reported figure is always computed from — and therefore consistent with — its underlying source records.
 
-**Q15. What is a foreign key, and what delete behavior does this project use by default?**
-A foreign key enforces that a column's value must exist as a primary key in another table, preventing orphaned references. This project defaults every foreign key to `ON DELETE RESTRICT` — you cannot delete a `department` while `course` rows still reference it — preserving historical data integrity rather than silently cascading deletions.
+**Q7. What three specific problems does fragmentation cause, according to your analysis?**
+Data duplication (the same fact recorded in more than one place can drift out of sync), weak accountability (no single audit trail for who approved a result or recorded a payment), and inconsistent access control (a shared spreadsheet has no way to guarantee a parent only sees their own child's record).
 
-**Q16. What is a unique constraint, and give a concrete example from this schema.**
-A unique constraint guarantees no two rows share the same value (or combination of values) in the constrained column(s). `attendance_record` has a composite unique constraint on `(student_id, class_session_id, attendance_date)`, which is the actual database-level guarantee that a student can't be marked attendance twice for the same class on the same day — not just an application-level check.
-
-**Q17. What is a database index, and name one used in this project along with its purpose.**
-An index is a data structure that speeds up lookups on a column at the cost of extra storage and slightly slower writes. `notification` has a composite index on `(user_id, is_read)`, because the notification panel's unread-count query filters on exactly those two columns for every request.
-
-**Q18. What is a database transaction, and how does this project use one?**
-A transaction groups multiple operations so they either all succeed (`COMMIT`) or all fail together (`ROLLBACK`), preserving consistency. Every service method that writes more than one row — e.g. auto-generating an invoice per eligible student when a fee structure is created — performs all of its writes within one SQLAlchemy session and commits once, so a partial failure never leaves half-created invoices behind.
-
-**Q19. How does this project verify its database schema stays in sync with its ORM models over time?**
-By running `alembic revision --autogenerate` against a fully-migrated database and checking the output is empty — if SQLAlchemy detects any difference between the current models and the actual database schema, it would generate a non-empty migration, which is treated as a CI failure (a documented, automated schema-drift check).
+**Q8. Examiner probe: Couldn't a university just use an existing product like Moodle or a commercial ERP instead of building this?**
+Yes, and that trade-off is addressed directly in the literature review. Moodle-class LMS platforms are strong for course content delivery but aren't designed as an institution-wide system of record for fees, attendance, and administrative scheduling together. Commercial ERPs like Banner or PeopleSoft are comprehensive but heavyweight, licensed, and architected for large-scale multi-institution deployment. This project occupies a deliberately narrower niche: a purpose-built system covering exactly the processes this institution needs, with RBAC as a first-class design constraint from day one rather than a bolt-on.
 
 ---
 
-## D. React (Q20–Q26)
+## 3. Objectives (Q9–Q11)
 
-**Q20. What is React, and what architectural style does this project's frontend follow?**
-React is a component-based JavaScript/TypeScript library for building user interfaces. This project's frontend is a feature-sliced single-page application: one component tree per screen (`pages/`), one typed data-fetching hook module per API domain (`features/`), and shared presentational components (`components/`).
+**Q9. List your project's primary objectives.**
+Replace fragmented tracking with one system of record; enforce RBAC and ownership at the API layer, never trusting the frontend alone; provide a complete workflow lifecycle for exams and results with server-validated transitions; compute derived figures live so they can never drift out of sync; deliver role-appropriate dashboards for all four roles; achieve verifiable correctness through automated testing; and produce a system that's independently deployable and continuously CI-verified.
 
-**Q21. What is a React Hook, and name a built-in one used heavily in this project.**
-A Hook is a function letting a function component use state, lifecycle, or context features. `useState` is used throughout for local UI state (e.g. a modal's open/closed flag, a form field's current value); `useEffect` is used for side effects like auto-selecting a Parent's first linked child once the children list loads.
+**Q10. Which objective was hardest to satisfy, and why?**
+Enforcing ownership — not just role — consistently across every Parent-facing endpoint. It's easy to check "is this user a Parent"; it's harder to guarantee that check is paired with "and are they linked to *this specific* student" on every single relevant endpoint. A later audit actually found one gap — the exam-listing endpoint had no Parent branch at all — which is direct evidence this objective required deliberate, repeated verification, not a one-time implementation.
 
-**Q22. What is React Query (TanStack Query) and why does this project use it instead of plain `useState` for API data?**
-React Query manages server-state: fetching, caching, background refetching, and loading/error states, keyed by a "query key." This project uses it exclusively for anything that comes from the API, because it solves cache invalidation and refetch-after-mutation declaratively (e.g. marking attendance invalidates the `["attendance"]` query key, which automatically refreshes every screen reading attendance data) rather than manually tracking loading flags and re-fetch calls by hand.
-
-**Q23. Explain how this project prevents "prop drilling" for authentication state.**
-Authentication state (current user, role, token presence) is held in a small React Context (`AuthContext`) provided once near the app root, so any component — including deeply nested route guards — can read it via `useAuth()` without passing it down through every intermediate component's props.
-
-**Q24. What is a controlled component, and where did this project need to convert an uncontrolled form to a controlled one?**
-A controlled component's value is driven by React state (`value` + `onChange`), versus an uncontrolled one that reads its value imperatively (e.g. via `FormData`) only at submit time. The Admin Timetable forms were converted from `FormData`-based reads to per-field `useState` specifically because the new `SearchableSelect` component has no native form-field participation (it isn't a real `<input>`/`<select>`), so `FormData` could never read its selected value.
-
-**Q25. How does this project keep four different user roles from requiring four separate frontend applications?**
-Shared screens (Dashboard, Timetable, Attendance, Results, Fee Centre) render one component tree that branches internally on `useAuth().user.role`, composing role-specific widgets/views conditionally, rather than maintaining a fully separate page tree per role — RBAC enforcement itself still happens server-side; this branching is purely a UX/composition choice.
-
-**Q26. What testing library does the frontend use, and what kind of behavior does it verify?**
-Vitest (a Vite-native test runner) combined with React Testing Library, which renders components into a simulated DOM (jsdom) and queries them the way a user would (by visible text/role), rather than by internal implementation details. Tests cover things like the exam timer computing its countdown from a server-recorded start time (not the client clock), and that approving a schedule change request actually calls the resolve mutation with the correct arguments.
+**Q11. Examiner probe: How would you measure whether you actually met the "verifiable correctness" objective?**
+By the size and shape of the test suite, not just its existence: 549 tests, but more specifically, every documented business rule and validation rule has a dedicated test, every RBAC/ownership boundary has an explicit *negative* test proving the wrong-role or wrong-owner case is rejected (not just that the correct case succeeds), and every workflow state machine is tested for both valid and invalid transitions. That structural coverage, not the raw count, is the actual evidence.
 
 ---
 
-## E. Authentication (Q27–Q32)
+## 4. FastAPI (Q12–Q17)
 
-**Q27. Describe this project's login flow end to end.**
-The client submits email/password to `POST /auth/login`; the server verifies the password against its bcrypt hash, and on success issues a short-lived JWT access token and a longer-lived refresh token. The access token is attached as `Authorization: Bearer <token>` on every subsequent request; when it expires, the client calls `POST /auth/refresh` to obtain a new pair without forcing a full re-login.
+**Q12. What is FastAPI and why did you choose it over Flask or Django?**
+FastAPI is a modern, async-capable Python web framework built on Starlette and Pydantic. It was chosen over Flask because it gives native async/await support and automatic request/response validation via Pydantic without extra libraries, and over Django because this project doesn't need Django's built-in ORM/admin/templating — SQLAlchemy and a separate SPA frontend were architectural choices made independently, so Django's batteries would have been unused weight.
 
-**Q28. Why are passwords hashed with bcrypt instead of stored in plaintext or hashed with a fast general-purpose hash like SHA-256?**
-Bcrypt is a deliberately slow, adaptive hashing algorithm with a built-in salt, designed specifically to resist brute-force and rainbow-table attacks even if the password hash database is stolen. A fast hash like SHA-256 is designed for speed, which is exactly the wrong property for password storage — it makes brute-forcing millions of guesses per second feasible.
+**Q13. How does FastAPI use Pydantic, and why does that matter for this project?**
+Every request body is validated against a Pydantic schema before it reaches business logic, and every response is also shaped by a Pydantic schema — routers never return raw ORM models directly. This matters for two reasons: it guarantees malformed input is rejected with a structured 422 error before any business logic runs, and it prevents accidentally leaking internal database fields (like a password hash) in an API response.
 
-**Q29. What happens in this system if a user's account is deactivated while they still hold a valid, unexpired token?**
-The authentication dependency re-checks the user's `is_active` flag from the database on every single request, not just at login — so a deactivated account is rejected (`403`) immediately on its very next request, even though the JWT itself is still cryptographically valid and unexpired.
+**Q14. Explain FastAPI's dependency injection system and give a concrete example from your project.**
+Dependencies are functions declared as parameters (via `Depends()`) that FastAPI resolves before the route handler runs. This project uses it for three things: database sessions (`get_db()`, a generator dependency that yields a session and guarantees cleanup), the currently authenticated user (decoding and validating the JWT), and RBAC role checks (`require_roles("admin")`), which can raise a 403 before the route body ever executes.
 
-**Q30. How does logout work given that JWTs are normally stateless?**
-`POST /auth/logout` invalidates the current session's refresh token server-side, so it can no longer be exchanged for a new access token — this is what makes the "logout" meaningful despite the access token itself being a self-contained, unrevocable-by-default artifact until it naturally expires (which is why the access token's lifetime is kept short).
+**Q15. Where does async/await matter in your backend, and where doesn't it?**
+It matters for I/O-bound work — database queries and, most visibly, background tasks like PDF/Excel generation and notification dispatch, which are scheduled via FastAPI's `BackgroundTasks` so the response returns immediately rather than blocking on report generation. It doesn't meaningfully matter for CPU-bound work, and this project has very little of that — no heavy computation happens inline in a request.
 
-**Q31. How is password change handled, and what validation applies?**
-`PUT /auth/password` requires the caller to already be authenticated and to supply their current password (re-verified against the stored hash) alongside the new one; the new password must differ from the current one and meet a minimum length/complexity policy, enforced by the service layer, not just the frontend form.
+**Q16. How does FastAPI generate API documentation, and is it exposed in production?**
+FastAPI auto-generates an OpenAPI schema from the route signatures and Pydantic schemas, served at `/docs` (Swagger UI), `/redoc`, and `/openapi.json`. In this project, those routes are explicitly gated behind an `is_production` check and disabled in production, since exposing the full API surface and schema shapes publicly is an unnecessary information-disclosure risk for a system handling student PII.
 
-**Q32. Why does this project rate-limit `POST /auth/login` specifically, and not every endpoint?**
-Login is the one endpoint an unauthenticated attacker can call repeatedly to brute-force a password, since every other endpoint already requires a valid token to reach. It's rate-limited to 5 attempts per 60-second window per client IP, closing off that specific brute-force vector without penalizing normal authenticated usage elsewhere.
-
----
-
-## F. JWT (Q33–Q38)
-
-**Q33. What is a JWT, structurally?**
-A JSON Web Token is three base64url-encoded segments separated by dots: a header (algorithm/type), a payload (claims — in this project, the user's ID and a token-type marker), and a signature computed over the first two segments using a secret key, which lets the server verify the token hasn't been tampered with.
-
-**Q34. Why does this project use two tokens (access + refresh) instead of one long-lived token?**
-A single long-lived token would mean a stolen token stays valid for a long time with no easy way to limit the damage. Splitting into a short-lived access token (limiting the exposure window if stolen) and a separate, rotatable refresh token (used only to mint new access tokens, and invalidated on logout) balances security against not forcing the user to re-enter credentials constantly.
-
-**Q35. What does "refresh token rotation" mean, and does this project implement it?**
-Rotation means each time a refresh token is used to obtain a new access token, the refresh token itself is also replaced with a new one, invalidating the old one — so a leaked, unused-yet refresh token has a limited window of usefulness. This project rotates the refresh token on every use.
-
-**Q36. How does the backend verify a JWT's authenticity, and what happens on a malformed or expired token?**
-It decodes the token using the shared `JWT_SECRET_KEY` and configured algorithm; the underlying JWT library itself checks the signature and the `exp` (expiry) claim. Any failure — bad signature, malformed structure, or expired token — raises a `JWTError`, which the authentication dependency catches and re-raises as `401 Unauthorized`.
-
-**Q37. Where should a JWT be stored on the client, and what are the tradeoffs?**
-Options are memory/in-JS-variable (safest against XSS but lost on page refresh), `localStorage` (persists across refresh but readable by any script on the page, i.e. vulnerable if an XSS bug exists), or an httpOnly cookie (invisible to JavaScript, but requires CSRF protection instead). This project's frontend stores tokens client-side to survive a page reload, which is the standard pragmatic tradeoff for an SPA that doesn't otherwise implement CSRF tokens.
-
-**Q38. Can a JWT be revoked before it expires?**
-Not the access token itself directly, by design — it's a self-contained, stateless credential. This project mitigates that by keeping access tokens short-lived (so an un-revocable window is small) and revoking the *refresh* token on logout, which prevents a *new* access token from being minted, even though any already-issued access token keeps working until its own expiry.
+**Q17. Examiner probe: If two requests hit the same database row at the same time, how does FastAPI/SQLAlchemy prevent a race condition?**
+FastAPI itself doesn't prevent this — it's a database-level concern. This project relies on PostgreSQL's transactional guarantees and unique constraints (e.g. the attendance table's duplicate-prevention constraint) so that a race condition surfaces as an `IntegrityError`, which the service layer catches and translates into a clean `409 Conflict` response rather than a raw 500 or silent duplicate row.
 
 ---
 
-## G. RBAC (Q39–Q44)
+## 5. React (Q18–Q22)
 
-**Q39. What is Role-Based Access Control, and what roles exist in this system?**
-RBAC restricts actions based on a user's assigned role rather than per-user permission lists. This system has four roles: Student, Teacher, Parent, and Admin, each with a distinct, non-overlapping set of intended capabilities.
+**Q18. Why React, and specifically why React 18?**
+React was chosen for its component model and the maturity of its ecosystem, particularly TanStack React Query for server-state management, which was a fixed requirement of the technology stack. React 18 specifically brings automatic batching and concurrent-rendering primitives, though this project doesn't lean heavily on the more advanced concurrent features — the main benefit realized is the stable, well-supported hooks API.
 
-**Q40. How is a role check actually enforced in this codebase — show the mechanism.**
-Via a `require_roles(...)` FastAPI dependency attached to a router, e.g. `dependencies=[Depends(require_roles("admin"))]` — it inspects the resolved current user's role and raises `403 Forbidden` if it isn't in the allowed set, before the route function body ever executes.
+**Q19. What is a React hook, and name a custom hook from your project.**
+A hook is a function starting with `use` that lets a function component tap into React's state/lifecycle features. This project wraps every API domain in a custom React Query hook — for example `useExams(params)`, which handles fetching, caching, and re-fetching the exam list, including an optional `studentId` parameter for Parent-scoped requests.
 
-**Q41. Why is role-only access control insufficient for some endpoints in this system — give a concrete example.**
-Because "the caller is a Parent" doesn't tell you *which* student's data they may see. `GET /attendance/me` requires the role check *and* a service-layer check that the requested `student_id` actually appears in a `parent_student_link` row belonging to that specific parent — omitting the second check would let any Parent view any student's data just by guessing an ID.
+**Q20. How does your frontend avoid prop-drilling or a heavy global state manager?**
+Server state (anything from the API) lives entirely in React Query's cache, accessed via feature hooks — never duplicated into component state or a Redux-style store. Client-only UI state (modals, active tab, form drafts) uses local component state or a lightweight context. Because most of the data on any given page *is* server state, this split alone removes most of the reason to reach for a heavier state manager.
 
-**Q42. Where in the layered architecture do ownership checks live, and why not in the router?**
-In the service layer, alongside the rest of the business logic — routers only shape HTTP request/response and delegate. Putting an ownership check in the router would scatter business rules across two layers and make it easy to accidentally add a new endpoint that forgets the check; centralizing it in services keeps the rule enforced everywhere that calls that service method.
+**Q21. How is routing and authentication guarding implemented?**
+`react-router-dom`'s `createBrowserRouter` defines routes; every protected route is wrapped in a `RouteGuard` component that checks for a valid token and redirects unauthenticated users to `/login`. This is explicitly documented as a UX convenience only — the real enforcement is server-side RBAC middleware, so even if a route guard were bypassed, the API would still reject an unauthorized request.
 
-**Q43. What HTTP status code does this system return when a resource exists but the caller isn't allowed to see it, and why might `404` sometimes be preferred over `403`?**
-Typically `403 Forbidden` for an authenticated-but-wrong-role/owner request. Some endpoints intentionally return `404 Not Found` instead when even confirming a resource *exists* would leak information to an unauthorized caller (e.g. one student probing whether another student's ID is valid) — this system uses that pattern for a Student attempting to access another student's exam.
-
-**Q44. How does this project's test suite specifically verify RBAC, beyond just testing the "happy path"?**
-Every RBAC/ownership boundary has an explicit **negative** test — e.g. a test that logs in as a Teacher and asserts that calling an Admin-only endpoint returns `403`, and a test that logs in as an unlinked Parent and asserts that requesting another child's attendance also returns `403` — proving the rejection actually happens, not just assuming it from the code.
+**Q22. Examiner probe: React Query caches API responses — how do you handle a mutation (e.g. approving a result) making that cache stale?**
+Every mutation hook calls `queryClient.invalidateQueries()` targeting the relevant query key on success — for example, approving a result invalidates the `["results"]` query key, so any component displaying results automatically refetches fresh data. This avoids manually pushing updated data into the cache by hand, which is more error-prone than just invalidating and letting React Query refetch.
 
 ---
 
-## H. APIs (Q45–Q51)
+## 6. TypeScript (Q23–Q26)
 
-**Q45. What architectural style does this project's API follow, and what does that mean in practice?**
-REST (Representational State Transfer) over HTTP/JSON — resources (students, exams, invoices) are addressed by URL, and operations on them map to HTTP methods (`GET` read, `POST` create, `PUT` update, `DELETE` remove), with statelessness meaning every request carries all the context (via the JWT) needed to process it, with no server-side session state required.
+**Q23. Why TypeScript instead of plain JavaScript for the frontend?**
+TypeScript catches an entire class of bugs — wrong property names, mismatched function signatures, `undefined` access — at compile time instead of at runtime in a user's browser. For a project with 82 backend endpoints and correspondingly complex response shapes, having the compiler verify that a component actually matches the shape the API returns is a significant reliability gain over plain JS.
 
-**Q46. How many endpoints does this system expose, and how are they organized?**
-82 REST endpoints across 11 domains — authentication, users, reference data, scheduling, attendance, exams, results, fees, notifications, reports, and health — each domain living in its own router file and versioned under `/api/v1`.
+**Q24. What TypeScript convention does this project enforce, and why?**
+No use of `any` — every API response and request payload has an explicit interface or type (for example, `ExamListItem`, `ExamCreateInput`). This is enforced by convention and ESLint; `any` would silently disable type-checking exactly where it matters most, at the API boundary.
 
-**Q47. What HTTP status codes does this API use, and what does each signal?**
-`200`/`201` success (200 for reads/updates, 201 for creates); `204` success with no response body (e.g. a delete); `401` missing/invalid/expired token; `403` valid token but insufficient role/ownership; `404` not found (or hidden); `409` a business-rule conflict (e.g. duplicate attendance, an already-resolved change request); `422` request validation failure; `500` an unexpected server error.
+**Q25. How do frontend types stay in sync with backend Pydantic schemas?**
+There is no automated codegen step in this project — TypeScript interfaces in `frontend/src/features/*/index.ts` are hand-written to mirror the backend Pydantic response schemas. This is a known manual-sync point; a mismatch would surface as a runtime shape error or a failed component test rather than a compile error, since TypeScript can't verify against a schema it's never seen.
 
-**Q48. How does this API handle pagination, and where is it used?**
-List endpoints (e.g. `GET /users/students`, `GET /exams`) accept `page` and `page_size` query parameters and return a consistent `PaginatedResponse` shape (`items`, `total`, `page`, `page_size`), so no list endpoint ever returns an unbounded result set regardless of how large the underlying table grows.
-
-**Q49. Give an example of an endpoint in this system that wasn't in the original project proposal but was added during implementation, and explain why.**
-`GET /schedule/change-requests` (the Admin approval queue listing) — the original scope included creating and resolving a change request, but implementation revealed there was no way for an Admin to actually *see* pending requests to act on them, so the endpoint was added and documented as a "Derived" addition with its justification.
-
-**Q50. How are file downloads (PDFs, Excel, CSV) exposed through this REST API?**
-As `GET` endpoints that return a binary `Response` with the appropriate `media_type` (`application/pdf`, the Excel MIME type, or `text/csv`) and a `Content-Disposition: attachment; filename="..."` header, generated on demand from live data at request time — nothing is pre-generated or stored on disk.
-
-**Q51. Why does this project prefer explicit response schemas over returning ORM models directly from an endpoint?**
-Returning an ORM model directly risks leaking internal columns never meant for the client (e.g. a password hash), couples the API's public contract to the database schema (so a column rename would silently break every consumer), and bypasses FastAPI's own response validation — an explicit Pydantic response schema controls exactly what's serialized.
+**Q26. Examiner probe: What's the difference between an `interface` and a `type` in TypeScript, and does it matter which this project uses?**
+Both can describe object shapes; `interface` supports declaration merging and is conventionally used for object/data shapes, while `type` is more flexible for unions, intersections, and mapped types. This project predominantly uses `interface` for API response/request shapes (e.g. `Exam`, `Question`) and `type` for narrower unions like `ExamStatus = "draft" | "scheduled" | "open" | "closed" | "published"`. It doesn't materially matter for correctness here, but using `type` for the status unions gives exhaustiveness checking in switch statements that `interface` couldn't.
 
 ---
 
-## I. SQLAlchemy (Q52–Q58)
+## 7. PostgreSQL (Q27–Q31)
 
-**Q52. What is SQLAlchemy, and what role does it play in this project?**
-SQLAlchemy is a Python SQL toolkit and Object-Relational Mapper. This project uses its ORM layer to define every database table as a Python class (a "model"), and its Core query-building API (`select(...)`) inside repository methods to write every query the application executes.
+**Q27. Why PostgreSQL over MySQL or a NoSQL database?**
+PostgreSQL was fixed by the project's technology stack requirements. Practically, it fits well here because the data is highly relational (students, courses, exams, results, fees all reference each other with strict foreign-key integrity requirements), and PostgreSQL's constraint enforcement, transactional guarantees, and mature ecosystem (used with SQLAlchemy/Alembic) are a natural fit for that. A NoSQL store would have pushed referential integrity into application code, which is exactly the kind of silent-drift risk this project was designed to avoid.
 
-**Q53. What is the "Repository Pattern," and how does this project apply it with SQLAlchemy?**
-The Repository Pattern isolates all data-access logic behind a dedicated class per domain, so the rest of the application never constructs a SQLAlchemy query directly. This project enforces that literally: `app/repositories/` is the *only* place any `select(...)`/`session.add(...)` call is written; services call repository methods and never touch the session directly.
+**Q28. What database-level constraints does your schema rely on, beyond foreign keys?**
+Unique constraints (e.g. one attendance record per student per class session per date, preventing duplicate marking), `NOT NULL` constraints on required fields, and `ON DELETE RESTRICT` on foreign keys from reference/catalog tables (department, course, room, semester) so a row still in use anywhere cannot be deleted.
 
-**Q54. What is the N+1 query problem, and how would you recognize/avoid it in this codebase?**
-It's the pattern of running one query to fetch a list, then one additional query per item to fetch each item's related data — e.g. fetching every attendance record's student name one query at a time instead of in one batch. This project explicitly avoids it via batch-lookup repository methods (e.g. `list_students_by_ids()`, used once per report rather than once per row) and via SQLAlchemy's `joinedload`/`selectinload` where relationships are accessed together.
+**Q29. Explain the difference between `ON DELETE RESTRICT` and `ON DELETE CASCADE`, and where each is (or isn't) used here.**
+`RESTRICT` blocks the delete if any row still references the target; `CASCADE` deletes the dependent rows automatically. This project deliberately uses `RESTRICT` for reference/catalog data (you shouldn't be able to delete a course that still has class sessions), and avoids `CASCADE` entirely for identity data — Users/Students/Teachers are never deleted at all, only deactivated via an `is_active` flag, specifically to prevent an accidental cascade from silently wiping historical results or attendance tied to that person.
 
-**Q55. What is the difference between `session.flush()` and `session.commit()`, and which does this project's repository layer use?**
-`flush()` sends pending SQL to the database (so autogenerated values like a UUID default become available) without ending the transaction; `commit()` ends the transaction, persisting the changes permanently. This project's convention is that repositories only ever `flush()`; only the service layer calls `commit()`, because the service owns the transaction boundary — a repository method might be one of several calls inside a single atomic business operation.
+**Q30. How does your project handle database migrations, and how many exist currently?**
+Every schema change is a reviewed, generated Alembic migration — never hand-edited after generation and never applied as manual DDL against a running database. There are 10 migrations currently, forming a single linear chain to one head revision, and CI includes an automated check that `alembic revision --autogenerate` produces an empty diff, proving the SQLAlchemy models and the migration history never drift apart.
 
-**Q56. How does this project translate a database-level constraint violation into a meaningful API error?**
-By catching SQLAlchemy's `IntegrityError` in the service layer immediately around the `commit()` call, rolling back the session, and raising an appropriate `HTTPException` (typically `409 Conflict`) with a human-readable message — e.g. attempting to mark duplicate attendance raises the database's unique-constraint violation, which is caught and reported as "Attendance already recorded for this date."
-
-**Q57. What is Alembic, and how does it relate to SQLAlchemy in this project?**
-Alembic is SQLAlchemy's migration tool — it generates and applies versioned, incremental schema changes. Every schema change in this project ships as a reviewed Alembic revision (10 exist, in a single linear chain), never as manual DDL run directly against a database, so the schema's history is fully reproducible from an empty database.
-
-**Q58. Explain a case in this project where a Pydantic-level validation rule was insufficient and had to be enforced in the service layer using SQLAlchemy data instead.**
-A `Semester`'s partial update (`SemesterUpdate`) allows supplying only one of `start_date`/`end_date`. Pydantic alone can't validate "start before end" on a partial payload, since it might only see one of the two fields — the service layer fetches the semester's *existing* row via SQLAlchemy, computes the effective new start/end (falling back to the existing value for whichever field wasn't supplied), and only then validates the order.
+**Q31. Examiner probe: If you needed to add a new NOT NULL column to a table with existing production data, how would you do it safely?**
+Not as a single migration that adds the column as `NOT NULL` directly, since that would fail against existing rows. The safe sequence is: add the column as nullable, backfill existing rows with a sensible default in the same or a follow-up migration, then add a second migration that alters the column to `NOT NULL` once every row is guaranteed populated. This project hasn't needed that exact sequence yet, but the same "never hand-edit a generated migration, always add a new one" discipline applies.
 
 ---
 
-## J. Database Design (Q59–Q65)
+## 8. SQLAlchemy (Q32–Q36)
 
-**Q59. How many tables does this schema have, and what normalization level does it target?**
-26 tables, normalized to Third Normal Form (3NF) — every non-key attribute depends on the whole primary key and nothing else, eliminating redundant, update-anomaly-prone data duplication.
+**Q32. What is an ORM, and what specific problem does SQLAlchemy solve here?**
+An ORM (Object-Relational Mapper) lets you interact with database rows as Python objects instead of writing raw SQL strings. SQLAlchemy specifically solves two problems in this project: it guarantees all queries are parameterized (closing off SQL injection as an attack surface by construction, since there is no raw string-interpolated SQL anywhere in the codebase), and it gives a consistent, typed way to express relationships (e.g. `Exam.questions`) that repositories query against.
 
-**Q60. Walk through the relationship between User and the four role profile tables.**
-`user` is the base identity table (email, password hash, role, active flag); `student`, `teacher`, `parent`, and `admin` are each a separate table in a 1:1 relationship with `user` via a `user_id` foreign key, holding only the profile fields relevant to that specific role, rather than one wide table with many always-partially-null columns.
+**Q33. Where do SQLAlchemy queries live in your architecture, and why is that boundary enforced?**
+Exclusively in the repository layer (`app/repositories/`) — services call repository methods, never the ORM session directly, and routers never touch the ORM at all. This boundary exists so business logic (in services) stays testable in isolation with repositories mocked/stubbed, and so a query's shape can change without services needing to know or care.
 
-**Q61. Why is `parent_student_link` a separate join table instead of a direct foreign key on `student` pointing to a `parent`?**
-Because the relationship is many-to-many, not one-to-many — a parent may be linked to multiple children, and (structurally) a student could have more than one linked parent. A direct FK on `student` could only express "one parent per student," which doesn't match that requirement.
+**Q34. What is the N+1 query problem, and how does this project avoid it?**
+It's when fetching a list of N parent records, then accessing a related collection on each one individually, triggers N additional queries instead of one. This project avoids it with SQLAlchemy's eager-loading options — `joinedload`/`selectinload` — applied wherever a relationship is known to be accessed together with its parent, such as an Exam with its Questions, or a Result with its Student and Course.
 
-**Q62. Why does `result` store `exam_id` as a nullable foreign key when `(student_id, course_id, semester_id)` is already the table's real business key?**
-`exam_id` exists purely for traceability and the Admin approval queue's grouping/display — it records which exam most recently produced or updated the result row. It's nullable and secondary specifically so that the uniqueness/business-key logic (one authoritative result per student/course/semester) never depends on it.
+**Q35. Explain the difference between `joinedload` and `selectinload`, and when you'd choose one over the other.**
+`joinedload` fetches the related rows in the same query via a SQL JOIN; `selectinload` issues a second, separate `SELECT ... WHERE id IN (...)` query for the related rows. `joinedload` is generally better for one-to-one or small one-to-many relationships to avoid a second round-trip; `selectinload` avoids result-set duplication (a JOIN against a one-to-many relationship multiplies parent rows) and is often better for larger collections.
 
-**Q63. Explain the difference in delete policy between reference/catalog data and identity data in this schema, and why they differ.**
-Department/Course/Room/Semester use hard `DELETE` with `ON DELETE RESTRICT` — they're catalog data, safe to remove once nothing references them, and adding soft-delete would need a schema change with no real benefit. User/Student/Teacher/Parent are never hard-deleted, only deactivated (`is_active = false`) — because they're identity/audit records with historical Attendance/Result/Payment rows depending on them, which must remain queryable and attributable even after the person leaves the institution.
-
-**Q64. How does this schema prevent two overlapping schedule entries in the same room?**
-Two layers: a database unique index on `(room_id, day_of_week, start_time)` catches exact-start-time duplicates, and a service-layer overlap check (`existing.start_time < new.end_time AND new.start_time < existing.end_time`) catches entries that overlap on offset, non-identical start times — which the unique index alone cannot detect.
-
-**Q65. Why are attendance percentage and GPA not stored as columns anywhere in this schema?**
-Because a stored, cached value can silently drift out of sync with the records it's derived from the moment any underlying row changes (a corrected attendance record, a newly published result) without also updating the cache. Both are computed live, at query time, directly from the underlying `attendance_record`/`result` rows every time they're requested.
+**Q36. Examiner probe: Your SQLAlchemy session is created per-request via a dependency. What happens to an in-progress transaction if the request handler raises an unhandled exception partway through?**
+The `get_db()` generator dependency's `finally` block still runs and closes the session; because no explicit `commit()` was reached before the exception, any pending changes are never persisted, and the session's implicit transaction is rolled back on close. This is exactly why business logic should only call `commit()` once a service's whole atomic unit of work has succeeded — an exception raised mid-service leaves the database in its prior, consistent state rather than half-written.
 
 ---
 
-## K. Testing (Q66–Q72)
+## 9. Alembic (Q37–Q40)
 
-**Q66. What is the difference between a unit test and an integration test, and how many of each does this project have?**
-A unit test exercises one unit of logic in isolation (here: a service method, with its repositories replaced by stubs, no real database) — 24 files exist for this. An integration test exercises the full stack together (a real HTTP request through FastAPI to a real, disposable PostgreSQL database and back) — 8 files exist for this. Together they total 477 backend tests.
+**Q37. What is Alembic, and how is it different from just running `CREATE TABLE` manually?**
+Alembic is SQLAlchemy's migration tool — it generates versioned, reversible Python scripts that describe schema changes, rather than applying raw DDL by hand. This gives a reviewable history of every schema change, a way to apply the same sequence of changes to any environment (dev, CI, production) deterministically, and a rollback path (`downgrade()`) if a migration needs to be undone.
 
-**Q67. Why does this project stub repositories in unit tests instead of mocking the database connection directly?**
-Stubbing at the repository boundary keeps the unit test focused on the service's actual business logic (the thing being tested) while completely avoiding any real I/O, and it matches the project's own layering — since services are defined to only ever call repositories, stubbing exactly that boundary is the natural seam.
+**Q38. How does Alembic detect what has changed between your SQLAlchemy models and the database?**
+`alembic revision --autogenerate` compares the current state of the SQLAlchemy `Base.metadata` (the models) against the actual database schema (introspected from the connected database) and generates a draft migration reflecting the difference. This project runs that command in CI specifically to assert the diff is empty — proof the committed migrations already fully describe the current models.
 
-**Q68. Why does this project use a disposable database for integration tests instead of mocking the ORM?**
-Because the value of an integration test is proving the full path really works — including real SQL constraint enforcement (unique constraints, foreign keys) that a mock could never accidentally violate. Using a real, throwaway PostgreSQL database (created, migrated, tested, and dropped) gets that assurance without ever risking a developer's actual data.
+**Q39. Why does your project forbid hand-editing a generated migration?**
+Because a hand-edited migration can silently diverge from what `--autogenerate` would actually produce from the models, reintroducing the exact model/schema drift problem migrations exist to prevent. If a generated migration is wrong or incomplete, the correct fix is to adjust the models and regenerate, not to patch the generated file directly.
 
-**Q69. Give an example of a negative test in this suite and explain what it proves that a positive test alone would not.**
-A test that logs in as a Teacher and asserts `POST /users/students` (Admin-only) returns `403`. A positive test (Admin succeeds) only proves the feature works for the intended user — it says nothing about whether an *unintended* user is actually blocked, which is the property RBAC exists to guarantee.
-
-**Q70. How does this project test a workflow state machine, such as the exam lifecycle?**
-By testing both valid and invalid transitions explicitly — e.g. asserting a draft exam can be edited/deleted and a published one cannot, and asserting that submitting results for an exam that isn't fully graded yet is rejected with `409` — rather than only testing the "happy path" sequence of transitions.
-
-**Q71. What does it mean for this project's CI to check for "schema drift," and why is that itself a kind of test?**
-It runs `alembic revision --autogenerate` against a fully-migrated database and fails the build if it detects any difference between the live schema and the current ORM models. It's effectively an automated test that the migration history and the code describing it have never silently diverged — a class of bug that wouldn't be caught by ordinary business-logic tests at all.
-
-**Q72. How would you test a bug fix like "a Teacher wasn't notified when their schedule change request was resolved" to prove it's actually fixed?**
-Write (or extend) a unit test that stubs the notification dispatcher and asserts it was called with the expected arguments (teacher's user ID, course name, decision) after calling `resolve_change_request` for both the approve and reject paths, plus an integration test that resolves a real request through the API and then asserts the resolving teacher's `GET /notifications` feed actually contains the new message — proving it end-to-end, not just at the unit boundary.
+**Q40. Examiner probe: Two developers each generate a migration independently, both based on the same prior head. What happens, and how would Alembic surface the problem?**
+Both migrations would set the same `down_revision`, creating two branches from one head — Alembic would detect multiple heads and refuse to run `upgrade head` unambiguously until they're merged (via `alembic merge` or by manually rebasing one migration's `down_revision` onto the other). This project's single-developer, milestone-based process hasn't hit this in practice, but it's the standard resolution path in a team setting.
 
 ---
 
-## L. Software Engineering (Q73–Q79)
+## 10. JWT (Q41–Q45)
 
-**Q73. What development methodology did this project follow?**
-A sequential, milestone-based process — requirements analysis and architecture design were written and reviewed before implementation began, and implementation proceeded through discrete milestones (foundations, users, scheduling, exams, attendance, grading, results, fees, notifications, dashboards, hardening), each reviewed and approved before the next started.
+**Q41. What is a JWT, and what three parts does it contain?**
+A JSON Web Token is a compact, URL-safe, digitally signed token consisting of a header (algorithm/type), a payload (claims — e.g. user ID, role, expiry), and a signature (computed over the header and payload using a secret key), separated by dots. The signature lets the server verify the token hasn't been tampered with, without needing a database lookup for every request.
 
-**Q74. What is the Single Responsibility Principle, and how is it reflected in this project's layering?**
-A unit of code should have one reason to change. This project's Router/Service/Repository split is a direct application: a router changes only if the HTTP contract changes, a service only if a business rule changes, a repository only if a query's shape changes — mixing them (e.g. business logic in a router) would give one file multiple, unrelated reasons to change.
+**Q42. How does your project use access tokens vs. refresh tokens?**
+Access tokens are short-lived and sent with every API request in the `Authorization` header; refresh tokens are longer-lived and used only to obtain a new access token once the old one expires. Refresh tokens are rotated on every use — each refresh both issues a new refresh token and invalidates the previous one, so a leaked, already-used refresh token becomes worthless.
 
-**Q75. What is technical debt, and how did this project manage the debt of scope changes discovered mid-implementation?**
-Technical debt is the implied cost of choosing an easy-but-incomplete solution now versus a more correct one later. This project's convention was to never silently accumulate it: any capability implementation revealed as missing (e.g. no endpoint let an Admin see pending schedule-change requests) was either built immediately and documented as a deliberate scope addition, or explicitly logged as an accepted, named limitation — never left as an undocumented gap.
+**Q43. Where is the JWT secret stored, and why does that matter?**
+In an environment variable, never committed to source control — `backend/.env` locally, and an actual secret manager/environment configuration in a real deployment. If the signing secret were hardcoded or committed, anyone with repository access could forge valid tokens for any user, completely bypassing authentication.
 
-**Q76. What is the purpose of a "Proposal vs. Engineering Additions" document, and why maintain one?**
-It's a running ledger of every capability built beyond the original written proposal, classified (e.g. a mechanical prerequisite vs. a design enhancement) and justified in the same change that introduced it. It exists so that, at any point, the actual delivered scope can be checked against the original proposal precisely, rather than the two silently drifting apart with no record of why.
+**Q44. What happens if a user's account is deactivated but they still hold a valid, unexpired access token?**
+The request is still rejected. RBAC middleware doesn't just trust the token's claims blindly — it checks the current `is_active` status of the user record on every request, so a deactivated account fails authorization immediately even with a technically-valid signature and un-expired token. This was a deliberate design decision, not an accidental side effect of the token's short lifetime.
 
-**Q77. What is a code review checklist, and does this project use one?**
-A checklist of properties to verify before considering a change complete (tests passing, no regressions, RBAC preserved, docs updated). This project uses a documented milestone-verification checklist, run and cross-checked against the governing design documents before any milestone is marked complete — a self-review step, not a substitute for actual sign-off.
-
-**Q78. What is the difference between verification and validation, and give an example of each from this project.**
-Verification asks "did we build the thing right?" (e.g. does `POST /attendance` actually enforce the documented duplicate-prevention rule — checked by tests). Validation asks "did we build the right thing?" (e.g. does the Parent portal actually give parents the visibility into "results & schedule" that the original proposal promised — checked by the production-readiness gap-closure audit against the proposal's stated intent).
-
-**Q79. Why does this project separate "what to build" (design documents) from "how it's coded" (a coding-conventions document), and what's the benefit?**
-Design documents (requirements, architecture, database design) describe the target system's shape; a separate conventions document governs the process and style of writing code to get there (layering rules, naming conventions, testing discipline). Separating them means a future contributor can look up *why* a feature exists in one place and *how* to add to it consistently in another, without either document trying to do both jobs at once.
+**Q45. Examiner probe: Why not just make access tokens long-lived and skip refresh tokens entirely?**
+A long-lived access token that leaks (e.g. via a compromised device, an XSS bug, or a logged request) stays valid — and exploitable — for its entire lifetime, with no way to shorten that window without a token-revocation mechanism, which JWTs don't natively support cheaply (that requires a server-side blocklist, defeating some of the point of a stateless token). Short-lived access tokens plus rotated refresh tokens bound the damage window of a leaked access token to minutes, while still avoiding a database round-trip on every single request.
 
 ---
 
-## M. Project Architecture (Q80–Q86)
+## 11. RBAC (Q46–Q50)
 
-**Q80. Describe this project's overall architecture in one sentence.**
-A decoupled client-server architecture: a React single-page application communicating exclusively over a versioned JSON REST API with a layered FastAPI backend (Router → Service → Repository), backed by PostgreSQL.
+**Q46. What is RBAC, and how is it enforced in your backend?**
+Role-Based Access Control restricts actions based on a user's assigned role. It's enforced via FastAPI dependency injection — a `require_roles("admin")`-style dependency runs before the route handler and raises a 403 if the caller's role isn't in the allowed set, so unauthorized requests never reach business logic at all.
 
-**Q81. Why was a layered monolith chosen over a microservices architecture for this project?**
-Given the project's scope (a single institution, a single deployable team, a single deadline), a monolith avoids distributed-systems complexity (network calls between services, eventual consistency, service-discovery) while the internal layering still keeps concerns cleanly separated and independently testable — microservices would add operational overhead without a matching benefit at this scale.
+**Q47. Why is role-only checking insufficient for endpoints like `GET /attendance/me` for a Parent?**
+Because "is a Parent" doesn't answer "a parent of *which* student." Without an additional check, any Parent account could request any student's data just by knowing or guessing a student ID. This project layers an ownership check on top of the role check: the service verifies a `parent_student_link` row actually exists connecting that specific parent to that specific student before returning any data.
 
-**Q82. Trace the full request lifecycle for `POST /attendance` from HTTP request to database write.**
-The request hits the FastAPI router; the JWT dependency resolves the current user; a `require_roles("teacher")` dependency checks the role; the Pydantic `AttendanceMarkRequest` schema validates the body; the router calls `attendance_service.mark_attendance()`; the service checks the teacher actually owns the class session, validates every student is enrolled and active, checks for duplicates, then calls `attendance_repo.create_record()` for each row; the repository issues the SQLAlchemy insert and flushes; the service commits the transaction and (after commit) dispatches any resulting notification.
+**Q48. Walk through what happens, step by step, when a Parent requests another parent's child's exam list.**
+The request passes authentication (valid token) and passes the role check (caller is a Parent, which is an allowed role for `GET /exams`). Then the service layer resolves the caller's parent profile and calls `parent_has_linked_student(parent_id, student_id)` against the requested `student_id` — since no link exists, this returns false, and the service raises a 403 Forbidden before any exam data is queried or returned.
 
-**Q83. Why does this project's frontend keep server state exclusively in React Query rather than duplicating it into component state?**
-Duplicating server data into local/component state creates two sources of truth that can drift apart (e.g. a stale cached count after another action changes it). React Query owns caching, refetching, and invalidation in one place, keyed consistently, so every component reading the same data always reflects the same, current value without manual synchronization code.
+**Q49. How is RBAC tested, specifically the negative cases?**
+Every RBAC/ownership boundary has an explicit negative integration test — for example, a Parent without a link to a given student calling the exams endpoint with that student's ID, asserting the response is 403, not just that a correctly-linked Parent's request succeeds. This project treats "prove the wrong case is rejected" as equally mandatory as "prove the right case works."
 
-**Q84. What does "independently deployable tiers" mean for this project, and why does it matter?**
-The frontend builds to a static asset bundle deployable from any CDN/static host; the backend is a stateless, containerized service deployable and scalable on its own. This matters because either tier can be redeployed, rolled back, or scaled without requiring the other to change in lockstep, as long as the versioned API contract between them is respected.
-
-**Q85. What is a cross-cutting concern, and name three implemented as middleware/dependencies in this project rather than duplicated per-router.**
-A cross-cutting concern is a piece of behavior needed by many otherwise-unrelated parts of the system. This project implements JWT authentication, role-based authorization, and global error handling as shared FastAPI dependencies/middleware applied uniformly, rather than each of the 11 routers reimplementing its own version of each.
-
-**Q86. If this system needed to scale to handle significantly more concurrent users, what is the one documented architectural limitation you'd need to address first, and why?**
-The login rate limiter is currently in-process memory, so multiple backend replicas behind a load balancer wouldn't share rate-limit state — an attacker could get 5 attempts per replica rather than 5 total. It's the one component in an otherwise horizontally-scalable, stateless backend that assumes a single process, and would need to move to a shared store (e.g. Redis) first.
+**Q50. Examiner probe: Client-side code also hides UI elements a user's role can't use — isn't that RBAC too, and is it redundant with the backend checks?**
+It's a UX convenience, explicitly not a security boundary, and the two aren't redundant — they serve different purposes. Hiding a button a Student can't use avoids a confusing dead-end click; it does nothing to stop a request crafted directly against the API (via curl, a modified frontend build, or browser dev tools) bypassing the UI entirely. Every actual authorization decision is made server-side; frontend hiding could be deleted entirely without changing what a user is *able* to do, only what's *convenient* to attempt.
 
 ---
 
-## N. Security (Q87–Q93)
+## 12. API Design (Q51–Q55)
 
-**Q87. List the main security measures implemented in this project.**
-Bcrypt password hashing; short-lived, rotating JWTs; server-side RBAC and ownership re-verification on every request; rate-limited login; Pydantic validation on every request body; exclusive use of the SQLAlchemy ORM (no raw SQL) to prevent injection; production-only disabling of API documentation endpoints; structured logging that never records passwords, raw tokens, or full payment details.
+**Q51. How is your API versioned, and why?**
+Every endpoint is under `/api/v1`, so a future breaking change (v2) can be introduced without immediately breaking existing clients — the version is part of the URL path rather than a header, which is simpler for this project's scale and easier to test/document.
 
-**Q88. How does this project protect against SQL injection?**
-By never constructing SQL from string-interpolated user input anywhere in the codebase — every single database query goes through the SQLAlchemy ORM/Core query-building API, which parameterizes values automatically, making injection via a crafted input string structurally impossible rather than merely discouraged by convention.
+**Q52. Give an example of how your API supports pagination, and why it's mandatory rather than optional.**
+List endpoints like `GET /exams` accept `page` and `page_size` query parameters and return a `PaginatedResponse` shape (`items`, `total`, `page`, `page_size`). It's mandatory because returning an unbounded result set (e.g. every exam a university has ever created) doesn't scale and creates an easy, accidental denial-of-service vector as data grows — this was treated as a necessary implementation default even though the original proposal's API spec didn't explicitly detail query parameters.
 
-**Q89. How does this project protect against a compromised/leaked API schema being used to probe for weaknesses in production?**
-By disabling `/docs`, `/redoc`, and `/openapi.json` automatically whenever `ENVIRONMENT=production`, via the existing `Settings.is_production` configuration property — the full endpoint surface and request/response schema are only discoverable in non-production environments (development, CI, grading/demo).
+**Q53. How are errors shaped consistently across your API?**
+Global exception handlers catch errors before they reach the client and format them into one consistent JSON error shape, rather than each router formatting its own ad hoc error response. 4xx errors are logged at lower severity; 5xx errors always log the full stack trace server-side but never leak internal details (like a raw exception message or stack trace) into the client-facing response body.
 
-**Q90. What data does this project explicitly avoid ever writing to logs, and why?**
-Passwords, raw JWTs, and full payment/financial details. Logging any of these would turn the log storage itself into a high-value target — anyone with log access (which is often broader than database access) could otherwise harvest credentials or session tokens directly.
+**Q54. Why does `GET /exams` accept an optional `student_id` query parameter instead of a separate endpoint like `/exams/parent-view`?**
+Because it's the same underlying resource — a list of exams — just scoped differently depending on the caller's role; adding a parallel endpoint would duplicate pagination, filtering, and response-shaping logic for no real benefit. This follows the same convention already used for `GET /attendance/me`, `GET /results/me`, `GET /fees/me`, and `GET /schedule/me`, all of which take an optional, ownership-checked `student_id` for the Parent case rather than branching into separate routes.
 
-**Q91. What is the difference between authentication and authorization, and where does each fail in this system with a different HTTP status code?**
-Authentication answers "who are you" — failing (missing/invalid/expired token) returns `401 Unauthorized`. Authorization answers "are you allowed to do this" — failing (valid identity, wrong role/ownership) returns `403 Forbidden`. Conflating the two into one status code would make it harder for a legitimate client to distinguish "log in again" from "you don't have permission," so this system keeps them distinct.
-
-**Q92. What secrets does this project require, and how are they managed?**
-`JWT_SECRET_KEY` (signs tokens) and `DATABASE_URL` (contains DB credentials) are the two sensitive values; both are supplied via environment variables (`backend/.env`, which is git-ignored) and never committed to source control — only a non-secret `.env.example` placeholder file is tracked, documenting which variables exist without exposing real values.
-
-**Q93. Describe a genuine security-relevant bug this project's own QA process found and fixed, and why it mattered.**
-An audit found `CourseCreate.credit_hours` and `RoomCreate.capacity` had no lower-bound validation, so a negative or zero value could be submitted and accepted. While not an authentication/authorization bypass, it's a data-integrity/input-validation gap that could corrupt downstream calculations (GPA is credit-hour-weighted) — fixed with a Pydantic `Field(ge=1)` constraint and covered by a new regression test, illustrating that security review in this project extends to validation correctness, not only access control.
+**Q55. Examiner probe: Your `GET /exams` endpoint added a new optional query parameter after the API had already shipped. How do you know this didn't break existing clients?**
+Because it's additive and optional — any client that doesn't send `student_id` behaves exactly as before (a Student or Admin request is unaffected), and the new behavior only activates for the Parent role, which previously had no valid branch at all and would have either been rejected or, worse, silently returned unfiltered data. Backward compatibility here isn't just claimed; it's covered by the pre-existing Student/Admin integration tests continuing to pass unmodified alongside the new Parent-specific tests.
 
 ---
 
-## O. Deployment (Q94–Q100)
+## 13. Database Design (Q56–Q60)
 
-**Q94. What containerization strategy does this project use?**
-Docker, with two purposes: a `docker-compose.yml` for local development (Postgres + a live-reloading backend + the Vite dev server, all bind-mounted for fast iteration), and separate, standalone `Dockerfile.backend`/`Dockerfile.frontend` for building production-style images independent of that dev-only compose setup.
+**Q56. Describe the high-level shape of your schema — how many tables, and what are the major entity groups?**
+26 tables, grouped into three families: core identity/reference data (user, student, teacher, parent, parent_student_link, department, course, room, semester), academic entities (class_session, enrollment, exam, question, exam_submission, question_grade, result), and operational entities (attendance, fee_structure, invoice, payment, notification, schedule_change_request).
 
-**Q95. Describe the production-style backend image, and how it differs from the local dev setup.**
-`Dockerfile.backend` is a `python:3.12-slim` image that installs pinned dependencies, copies the application source, and runs `uvicorn app.main:app` **without** `--reload` — a static, immutable image suitable for deployment. The local dev compose setup instead bind-mounts the source and runs `--reload`, trading image immutability for fast iteration speed.
+**Q57. Why is there a separate `parent_student_link` table instead of a `parent_id` column directly on the `student` table?**
+Because the relationship can be many-to-many in principle (a student could have more than one linked parent/guardian, and a parent can have more than one linked child), which a single foreign-key column on `student` can't represent. A join table is the standard relational modeling answer for that many-to-many shape, and it's also the exact table every Parent-ownership check in the codebase queries against.
 
-**Q96. How is the frontend intended to be deployed in production, and what does the production Dockerfile actually produce?**
-Per the architecture, as a static asset bundle served from a CDN/static host — no server-side rendering. `Dockerfile.frontend` is a multi-stage build: it runs `npm run build` in a Node stage, then copies only the compiled `dist/` output into an `nginx:alpine` image, which is one concrete way to serve that static bundle, not the only one.
+**Q58. Why does `result` also reference `exam_id`, when `(student_id, course_id, semester_id)` is already the business-uniqueness key?**
+This was a deliberate, documented design addition beyond the original schema: `POST /results/{examId}/submit` submits results per-exam, and the Admin result-approval queue groups pending results by exam name for review — without a stored `exam_id`, there'd be no way to know which exam most recently produced or updated a given result row once the request completed. It's nullable and `ON DELETE RESTRICT`, and it doesn't change the actual uniqueness key, which remains `(student_id, course_id, semester_id)`.
 
-**Q97. What does this project's CI verify on every push, and why run it in CI rather than relying on developers to run it locally?**
-Backend CI applies all Alembic migrations to a disposable Postgres service container, checks for schema drift, and runs the full pytest suite; frontend CI type-checks, lints, runs the Vitest suite, and confirms the production build succeeds. Running it in CI guarantees every change is checked under identical, reproducible conditions before merge, regardless of whether an individual contributor remembered (or was able) to run the full suite locally.
+**Q59. How does your schema prevent a student from being marked present twice for the same class session on the same day?**
+A unique constraint spanning `(student_id, class_session_id, date)` on the attendance table. The service layer also checks before inserting, but the database constraint is the actual guarantee — if a race condition slipped past the service-level check, the database would reject the duplicate insert with an `IntegrityError`, which is caught and translated into a 409 Conflict response.
 
-**Q98. Why does this project's CI run migrations against a disposable database rather than reusing one persistent CI database across runs?**
-A persistent database could accumulate state across runs (leftover rows, a stale schema state) that masks a real bug or produces a flaky pass/fail. A fresh, disposable database per run guarantees every CI execution starts from the exact same known-empty state, matching how a real first-time deployment would also apply migrations to a brand-new database.
+**Q60. Examiner probe: Why do Users/Students/Teachers get deactivated instead of deleted, while Departments/Courses/Rooms get hard-deleted?**
+Identity records have deep historical dependents — a deleted Student would orphan or force-cascade-delete years of attendance, exam submissions, and results that are legally/academically meaningful even after that student leaves. Reference/catalog data doesn't carry that same weight — a Room or Course is metadata describing where/what, not a historical record itself, and `ON DELETE RESTRICT` already prevents deleting one still actively referenced. Different entities warranted different deletion policies rather than one blanket rule.
 
-**Q99. What environment-specific configuration changes between development and production, and how is that controlled?**
-The single `ENVIRONMENT` variable — set to `production`, it disables the interactive API docs endpoints. Alongside it, `DATABASE_URL`, `JWT_SECRET_KEY`, and `FRONTEND_ORIGIN` (CORS) must all be set to real production values rather than the development placeholders, and `alembic upgrade head` is expected to run as an explicit deployment step before the new backend version starts accepting traffic.
+---
 
-**Q100. If asked to deploy this system for real institutional use tomorrow, what is the single most important documented gap you would close first, and why?**
-The in-memory login rate limiter, if deploying behind multiple backend replicas — it's the one place the system's otherwise-stateless, horizontally-scalable design has a single-process assumption baked in, and it's specifically a security control (brute-force protection), so under-provisioning it silently weakens actual account security rather than just being a performance nitpick.
+## 14. Normalization (Q61–Q64)
+
+**Q61. What normal form is your schema designed to, and give one concrete example.**
+The schema is designed to Third Normal Form (3NF) — every non-key attribute depends on the whole primary key and nothing but the key. For example, `course_name` and `credit_hours` live only on the `course` table, not repeated on every `class_session` or `enrollment` row that references a course; a class session stores a `course_id` foreign key, not a copy of the course's name.
+
+**Q62. Give an example of a value your schema deliberately does *not* store, that a less-normalized design might store as a column.**
+Attendance percentage and GPA. A denormalized design might store `attendance_percentage` as a column on `student`, updated whenever an attendance record changes. This schema never does that — those figures are always computed live, at query time, from the underlying `attendance` and `result` rows, specifically so they can never silently drift out of sync with the records that produce them.
+
+**Q63. What's the trade-off of computing attendance percentage and GPA live instead of storing them denormalized?**
+The trade-off is query cost versus consistency risk. Storing them would make reads cheaper (no aggregation needed) but introduces a real risk: every code path that changes an attendance or result record would need to remember to recompute and update the stored figure, and any path that forgets produces a silently wrong number a user sees and trusts. This project prioritized correctness over that read-performance optimization, and explicitly documents that if performance ever requires caching, it should be a deliberate, separately-decided tradeoff — not a default.
+
+**Q64. Examiner probe: Isn't storing `exam_id` on the `result` table (Q58 above) itself a denormalization, since it's not part of the business key?**
+Yes, technically — it's an attribute that doesn't strictly belong to the `(student, course, semester)` key. It was accepted anyway because it serves a specific, load-bearing purpose (grouping the Admin approval queue by exam, and recording result provenance) that couldn't be satisfied by a pure 3NF design without a more expensive join back through `class_session`/`exam` at query time, and it doesn't reintroduce any consistency risk, since it's set once at submission time and never needs to be kept in sync with anything else afterward. Every deliberate deviation from strict normalization in this schema is documented with its specific justification, rather than done ad hoc.
+
+---
+
+## 15. Testing (Q65–Q70)
+
+**Q65. What is the overall shape of your test suite?**
+549 automated tests total: 484 backend (pytest) and 65 frontend (Vitest), all currently passing. The backend splits further into 24 unit-test files (service-layer logic, repositories stubbed, no database required) and 8 integration-test files (full request → database → response cycle against a real, disposable PostgreSQL database).
+
+**Q66. What's the difference between your unit tests and integration tests, concretely?**
+Unit tests call a service method directly with mocked repository objects, asserting on business logic in isolation — e.g. "does `list_exams()` raise 403 for a Parent with no linked student" without touching a real database. Integration tests go through FastAPI's test client, hitting the actual router, service, repository, and a real disposable PostgreSQL database, asserting the full HTTP response — e.g. "does a GET request from an unlinked Parent actually return a 403 status code."
+
+**Q67. Why "disposable" database, specifically — why not just use the developer's real database for integration tests?**
+To guarantee tests are deterministic and never corrupt or depend on real data — each integration test run creates a fresh database, applies every Alembic migration, runs the suite, and can be torn down afterward. Testing against a developer's actual working database risks tests passing or failing based on incidental leftover state, and risks accidentally deleting or mutating real data during a test run.
+
+**Q68. What is a "negative test," and why does your convention require one for every RBAC/ownership boundary?**
+A negative test asserts that an unauthorized action is actually rejected — e.g. a Teacher attempting to approve their own submitted result gets a 403 — rather than only testing that the authorized action succeeds. It's required because a security boundary that's never tested for the failure case can silently regress (a future refactor could accidentally loosen a check) without any test catching it, since the "happy path" tests would keep passing regardless.
+
+**Q69. How is CI structured, and what does it actually verify beyond "the tests pass"?**
+Two GitHub Actions workflows, `backend-ci.yml` and `frontend-ci.yml`, run on every push and pull request. Beyond running pytest/Vitest, backend CI also runs an automated schema-drift check (`alembic revision --autogenerate` must produce an empty diff), meaning CI would fail if a developer changed a SQLAlchemy model without generating the corresponding migration — a class of bug that unit/integration tests alone wouldn't necessarily catch.
+
+**Q70. Examiner probe: Your integration tests hit a real database — doesn't that make your test suite slow and fragile compared to an all-mocked approach?**
+It's slower than an all-mocked suite, yes, but the trade-off was deliberate: mocked repository tests can't catch real database-constraint violations (like the attendance duplicate-prevention unique constraint) or query-shape bugs (an incorrect join or a missing eager-load), which are exactly the class of bug that matters most for a data-integrity-sensitive system. The unit tests already cover the fast, isolated business-logic cases; integration tests exist specifically to catch what mocking can't, and running them against a disposable (not shared, not persistent) database keeps them reliable rather than fragile.
+
+---
+
+## 16. Git (Q71–Q74)
+
+**Q71. What branching/commit convention did you follow?**
+Feature branches map to milestones or a coherent slice of one (e.g. `feat/m6-exam-builder`), not arbitrary daily snapshots. Commit messages are imperative, present-tense, and scoped to one logical change (e.g. "Add exam grading endpoint," not "fixed stuff"), and reference the relevant milestone or requirement ID where useful.
+
+**Q72. Why is mixing a schema migration with unrelated feature code in the same commit forbidden in your workflow?**
+Because it makes the history harder to audit and harder to revert safely — if a feature needs rolling back but its commit also carries an unrelated Alembic migration, reverting the commit either takes the migration with it (potentially destructive) or requires manually untangling the two. Keeping migrations in their own commits keeps schema history independently reviewable and revertible.
+
+**Q73. What's checked immediately before every commit in your workflow, and why?**
+`git status`, every time, no exceptions — inspecting the actual diff, not just filenames. This specifically guards against accidentally staging a local developer configuration file (`.env`, IDE settings, personal secrets) that isn't an intended part of the current task; the policy is to stop and ask for confirmation rather than commit anything unexpected.
+
+**Q74. Examiner probe: Why never force-push or amend a shared/published commit in this project's convention?**
+Amending or force-pushing a commit that's already been pushed and potentially pulled elsewhere rewrites history other people (or other clones) may already be relying on — anyone who already has the old commit can end up with a diverged, hard-to-reconcile history, or silently lose commits built on top of the rewritten one. Creating a new commit to fix a problem is always safe; rewriting a published one is not, which is why this project's convention treats it as a near-never operation.
+
+---
+
+## 17. GitHub (Q75–Q77)
+
+**Q75. How does your repository demonstrate the milestone-based development process, not just claim it?**
+Through its tag history: eleven milestone tags (`v0.1-milestone0` through `v1.1-milestone10`), a `v2.0.0` tag marking the final milestone-program release, and four further hardening-pass tags (`v2.1` through `v2.4.1`, the current version) — each representing a reviewed checkpoint, visible directly in `git tag` output, not just described after the fact.
+
+**Q76. What does your CI configuration actually run on GitHub, and on what trigger?**
+Two workflows — `backend-ci.yml` and `frontend-ci.yml` — triggered on every push and every pull request. They run linting, type-checking, and the full pytest/Vitest suites respectively, plus the backend's schema-drift check, giving independent, automated proof the codebase is in a working state on every change, not just on the developer's own machine.
+
+**Q77. Examiner probe: What's logged in `docs/Proposal_vs_Engineering_Additions.md`, and why does that document need to exist at all?**
+Every endpoint, page, middleware, utility, or UI component added that wasn't explicitly required by the original proposal, classified as Required (the proposal implies it but omitted it from its own endpoint table), Derived (a mechanical prerequisite for something the proposal does require), or Design Enhancement (pure engineering judgment, not proposal-driven), each with an explicit disposition. It exists so the project's actual delivered scope versus its original proposal is always precisely, honestly auditable — an examiner can check any given feature against this document rather than having to trust an undocumented claim that "this was always the plan."
+
+---
+
+## 18. Reporting (Q78–Q81)
+
+**Q78. What report/document formats does your system generate, and with what libraries?**
+PDF (via ReportLab) and Excel (via openpyxl), both pure-Python libraries with no external binary dependency to install. Covers attendance reports (PDF/Excel/CSV), transcripts (PDF), and fee invoices/receipts (PDF).
+
+**Q79. Why does PDF/Excel generation run as a background task instead of inline in the request?**
+Because generating a multi-page report is comparatively slow relative to a typical API response, and running it inline would make the requesting client wait on that generation time, occupying a request thread the whole while. Dispatching it as a background task lets the response return quickly (e.g. immediately acknowledging the export request or, in this project's pattern, generating and streaming the file via a dedicated background-task-backed endpoint) rather than blocking the request-response cycle.
+
+**Q80. How does the fee invoice PDF become a "receipt" without a separate generator?**
+The exact same `invoice_generator.py` module checks the invoice's `status` field at generation time and swaps the document's label from "Fee Invoice" to "Fee Receipt" once `status == "paid"` — same layout, same code path, one conditional label, rather than maintaining a second near-duplicate generator module for what is fundamentally the same document at a different point in its lifecycle.
+
+**Q81. Examiner probe: The transcript PDF includes a custom-drawn institutional seal — why draw it programmatically instead of using a logo image asset?**
+Because no real institution logo/seal image asset exists for this academic project, and embedding a placeholder or unlicensed graphic would have been worse than not having one. It's drawn using ReportLab's existing canvas primitives (concentric circles, curved text, a star) already in use elsewhere in the same file, so it added no new dependency and is explicitly documented as a temporary measure, to be replaced if a real institutional asset is ever supplied.
+
+---
+
+## 19. Architecture (Q82–Q86)
+
+**Q82. Describe your overall system architecture in one sentence.**
+A decoupled two-tier architecture — a React + TypeScript single-page frontend communicating over a versioned REST API with a FastAPI backend that is itself strictly layered into Router, Service, and Repository tiers, backed by PostgreSQL.
+
+**Q83. What exactly is each backend layer responsible for, and what is it explicitly forbidden from doing?**
+Routers shape requests/responses and delegate immediately to services — forbidden from containing business logic or direct ORM queries. Services own business rules and workflow state transitions — forbidden from touching the ORM session directly; they call repositories. Repositories own all SQLAlchemy queries — forbidden from containing business logic or authorization decisions.
+
+**Q84. Why enforce this layering as a strict convention rather than letting each domain organize itself pragmatically?**
+Because without an enforced boundary, "pragmatic" tends to mean "a query snuck into a router because it was faster to write that way," which is exactly how business logic ends up scattered and untestable in isolation. With the boundary enforced, a service's business logic can be unit-tested with repositories mocked, entirely independent of whether the database or even a router exists — that testability is the actual payoff of the discipline, not just tidiness.
+
+**Q85. How does the frontend mirror this same layering philosophy?**
+Pages correspond to screens, Feature hooks (React Query) are the only thing that talks to the API for a given domain, and Components render UI and call hooks — never fetch/axios directly. It's the same principle as the backend's Router/Service/Repository split, translated to the frontend: each layer has one job, and a layer never reaches past its neighbor to do another layer's job.
+
+**Q86. Examiner probe: If you were told tomorrow to add a GraphQL API alongside the REST one, how much of your architecture would you need to change?**
+The Service and Repository layers would need no changes at all — they're already fully decoupled from the transport/HTTP concerns that live in the Router layer. Only a new set of GraphQL resolvers would need writing, calling into the exact same service methods the REST routers already call. That's the direct, demonstrable payoff of the layering: the business logic doesn't know or care what protocol invoked it.
+
+---
+
+## 20. Deployment (Q87–Q90)
+
+**Q87. How is the backend intended to be deployed, and how is that verified?**
+As a containerized service — the backend runs via Docker Compose alongside PostgreSQL, and this is verified by actually running the documented setup process end-to-end (not just described), with CI verifying both the backend and frontend halves of the stack independently on every change.
+
+**Q88. How is the frontend deployed differently from the backend, and why?**
+As static assets — the production build (`npm run build`) outputs a static bundle that can be served from any static host or CDN, since it's a client-rendered SPA with no server-side rendering requirement. This is architecturally simpler and cheaper to scale than the backend, which needs an actual running process to serve the API.
+
+**Q89. What environment-specific configuration differs between development and production, and how is it managed?**
+Database connection strings, JWT secrets, and the `is_production` flag (which gates `/docs`/`/redoc`/`/openapi.json`) are all environment variables, never hardcoded or committed — `.env.example` documents the placeholders, and actual values live in a developer-local `.env` file (dev) or a secret manager (production), never in source control.
+
+**Q90. Examiner probe: What would break first if you tried to horizontally scale the backend to multiple replicas right now, and why?**
+The login rate limiter — it's implemented as in-process memory, so each replica would track its own independent request counts, meaning an attacker could get roughly N times the allowed login attempts by spreading requests across N replicas (or just by hitting different replicas via a load balancer). This is a documented, known limitation, not a discovered surprise — the documented fix is a shared, Redis-backed rate limiter, which was scoped as a future improvement rather than built now, since a single-instance deployment doesn't need it.
+
+---
+
+## 21. Security (Q91–Q96)
+
+**Q91. How are passwords stored, and why not just hash with SHA-256?**
+Hashed with bcrypt, a strong adaptive hashing algorithm, never stored or logged in plaintext. Bcrypt (unlike SHA-256, which is a fast general-purpose hash) is deliberately slow and configurable via a work factor, making brute-force and rainbow-table attacks computationally expensive even if the password hash database were ever leaked — a fast hash like SHA-256 offers no such resistance.
+
+**Q92. What specifically prevents SQL injection in this codebase?**
+All database access goes through the SQLAlchemy ORM with parameterized queries — there is no raw string-interpolated SQL anywhere in the codebase. Parameters are always passed as bound values, never concatenated into a query string, which is what actually closes off SQL injection, not just "using an ORM" in the abstract (an ORM used with raw string interpolation would still be vulnerable).
+
+**Q93. What rate limiting exists, and what threat does it mitigate?**
+`POST /auth/login` is rate-limited, mitigating credential-stuffing and brute-force password-guessing attacks — without it, an attacker could attempt unlimited password guesses against any known email address at whatever speed their network allows. This was explicitly flagged as an unspecified gap in the original proposal (`Requirement_Analysis.md` §14) and closed with a reasonable, documented default.
+
+**Q94. How does the API avoid leaking sensitive information in error responses or logs?**
+5xx responses always log the full stack trace server-side but never leak internals (stack traces, raw exception messages, internal file paths) into the client-facing response body — the client sees a generic, consistent error shape. Structured logs never include sensitive data like passwords, raw JWTs, or full payment details, per the project's logging conventions.
+
+**Q95. What is the actual attack this project defends against by never returning ORM models directly from a router?**
+Accidental over-exposure of internal fields — an ORM model might carry a password hash, an internal `is_active` flag, or a foreign key a client shouldn't see, and if a router returned it directly (e.g. via a naive `return db_user`), any field added to that model in the future would automatically leak into the API response with no explicit review. Requiring every response to pass through a Pydantic schema forces an explicit, reviewed allowlist of exactly what's returned, every time.
+
+**Q96. Examiner probe: JWTs are stored where on the frontend, and what attack does that choice need to defend against?**
+In `localStorage` (`frontend/src/auth/tokenStorage.ts` — access token, refresh token, and user info each under their own key). Storing tokens in `localStorage` is convenient and survives a page refresh, but it's readable by any JavaScript running on the page, which means an XSS vulnerability anywhere in the frontend could exfiltrate a user's tokens. The mitigating factors here are React's default JSX escaping (which prevents naive injection of attacker-controlled HTML/script), short-lived access tokens (limiting the exploitation window), and rotated refresh tokens (limiting reuse of a stolen refresh token) — but this is a real, acknowledged trade-off versus an httpOnly cookie, which JavaScript can't read at all but which introduces its own CSRF-protection requirements.
+
+---
+
+## 22. Performance (Q97–Q99)
+
+**Q97. What's the single biggest performance discipline enforced across this codebase?**
+Avoiding N+1 query patterns via SQLAlchemy eager-loading, combined with mandatory pagination on every list endpoint — together these prevent the two most common ways a data-heavy CRUD system quietly degrades as data grows: unbounded result sets, and one query silently becoming dozens.
+
+**Q98. Why compute attendance percentage and GPA live instead of caching them, given that's slower per-request?**
+This is a deliberate correctness-over-raw-speed trade-off, covered in more depth under Normalization (Q63) — caching risks a stale, silently-wrong number if any code path that changes the underlying records forgets to invalidate the cache, and for figures a student's academic standing might depend on, that risk was judged to outweigh the performance cost, which in practice is a straightforward aggregation query, not an expensive one at this data scale.
+
+**Q99. Examiner probe: At what scale would your "always compute live" policy for attendance/GPA start to become an actual performance problem, and what would you do about it?**
+It would start to matter once a single student's attendance/result history spans enough semesters and class sessions that the aggregation query itself becomes measurably slow — likely in the tens of thousands of rows per student range, well beyond this project's realistic scale. At that point, the documented, deliberate escalation path (already stated in project conventions) is to introduce caching as an explicit, reviewed tradeoff — e.g. a materialized view or a cached column invalidated on write — rather than defaulting to it prematurely for a problem that doesn't exist yet at this system's actual scale.
+
+---
+
+## 23. Future Scope (Q100–Q103)
+
+**Q100. What's the single most impactful improvement you'd prioritize next, and why?**
+A shared, Redis-backed rate limiter, because it's the most concrete blocker to horizontal scaling identified in this project (see Q90) — every other future-scope item is an additive feature, but this one is a correctness gap that would actively get worse, not just stay static, if the system were deployed at any real scale.
+
+**Q101. What would it take to add an overall cross-semester CGPA figure?**
+`GET /results/me` currently returns only per-semester GPA and doesn't retain per-course credit-hours in that response, so an accurate cumulative figure can't be computed client-side without either a new backend aggregate endpoint or extending the existing response to include the credit-hours data needed to weight a cross-semester average correctly — a Student/Parent Results page currently shows an explicit "Not available" placeholder rather than risk an inaccurate client-side approximation.
+
+**Q102. Why was a Parent-Teacher messaging module explicitly scoped out rather than attempted in a minimal form?**
+Because it was never part of the original proposal at all — it isn't a gap in an existing feature, it's new domain scope (new tables, new endpoints, new UI, a new notification pattern), and the project's convention is that new scope requires an explicit decision to build, not an assumption smuggled in during an unrelated pass. Building even a minimal version would have meant inventing requirements no design document had actually specified.
+
+**Q103. Examiner probe: If you had one more month, would you build the future-scope items, or spend it hardening what already exists — and how would you decide?**
+I'd spend it hardening rather than adding scope, and the deciding factor is that every documented future-scope item is additive — the system functions completely and correctly without any of them — whereas hardening (broader load/performance testing under realistic data volumes, a security-focused penetration-test-style pass, and closing the shared-rate-limiter gap specifically) reduces risk in what's already shipped and already promised to work. Given a fixed amount of time, reducing risk in delivered functionality is a better use of it than adding functionality nobody has yet asked to be prioritized.
