@@ -600,3 +600,101 @@ class TestGetResults:
             "/api/v1/exams/00000000-0000-0000-0000-000000000000/results", headers=_headers(token)
         )
         assert response.status_code == 403
+
+
+class TestListExamsParentAccess:
+    """Gap closure: proposal §5 promises Parents "upcoming exam dates" for
+    their linked child — GET /exams scoped by an ownership-checked
+    student_id, same convention as GET /attendance/me, /results/me,
+    /fees/me, /schedule/me."""
+
+    def test_parent_without_student_id_rejected(self, client, make_parent_user):
+        make_parent_user("parent@example.com", "parent-password")
+        token = _login(client, "parent@example.com", "parent-password")
+        response = client.get("/api/v1/exams", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_parent_without_link_rejected(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
+    ):
+        _teacher, student, _class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        make_parent_user("parent@example.com", "parent-password")  # not linked
+        token = _login(client, "parent@example.com", "parent-password")
+
+        response = client.get(f"/api/v1/exams?student_id={student.id}", headers=_headers(token))
+        assert response.status_code == 403
+
+    def test_linked_parent_sees_open_exam_but_not_draft(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        link_parent_student,
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        create_response = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(str(class_session.id)), headers=_headers(teacher_token)
+        )
+        exam_id = create_response.json()["id"]
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        # Still a draft — hidden from the Parent, same as from the Student.
+        draft_list = client.get(f"/api/v1/exams?student_id={student.id}", headers=_headers(parent_token))
+        assert draft_list.status_code == 200
+        assert exam_id not in [e["id"] for e in draft_list.json()["items"]]
+
+        client.put(f"/api/v1/exams/{exam_id}", json={"status": "open"}, headers=_headers(teacher_token))
+
+        open_list = client.get(f"/api/v1/exams?student_id={student.id}", headers=_headers(parent_token))
+        assert open_list.status_code == 200
+        listed_exam = next(e for e in open_list.json()["items"] if e["id"] == exam_id)
+        assert listed_exam["course_name"] == "Intro to CS"
+
+    def test_parent_never_sees_unrelated_students_exams(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        make_course,
+        make_semester,
+        link_parent_student,
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _other_user, other_student = make_student_user("other-student@example.com", "other-password")
+        # Distinct course/code and semester — make_class_session's own
+        # make_course()/make_semester() defaults ("CS101"/"Fall 2026")
+        # would otherwise collide with the ones already created above for
+        # `class_session`.
+        other_course = make_course(name="Other Course", code="CS102")
+        other_semester = make_semester(name="Other Semester")
+        other_class_session = make_class_session(teacher=teacher, course=other_course, semester=other_semester)
+        make_enrollment(other_student, other_class_session)
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        other_exam = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(str(other_class_session.id)), headers=_headers(teacher_token)
+        ).json()
+        client.put(f"/api/v1/exams/{other_exam['id']}", json={"status": "open"}, headers=_headers(teacher_token))
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(f"/api/v1/exams?student_id={student.id}", headers=_headers(parent_token))
+        assert response.status_code == 200
+        assert other_exam["id"] not in [e["id"] for e in response.json()["items"]]

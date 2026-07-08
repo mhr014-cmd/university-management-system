@@ -3,8 +3,9 @@
 // GET /results/me, and GET /attendance/me, all with a student_id, verified
 // server-side against parent_student_link (attendance access added in the
 // post-M11 gap-closure pass — see Requirement_Traceability_Matrix.md).
-// Upcoming Exams still renders an honest "Not available" state — no
-// endpoint exposes exam schedules to the Parent role.
+// Upcoming Exams (gap closure) reuses GET /exams with the same student_id
+// Parent-scoping convention, now that exam_service.list_exams() has a
+// Parent branch — see Proposal_vs_Engineering_Additions.md.
 //
 // GET /users/me/children (added in the production-polish audit) now
 // enumerates a Parent's linked children, so the child is selected from a
@@ -15,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Award, Bell, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
 import { useMyAttendance } from "../../features/attendance";
+import { useExams } from "../../features/exams";
 import { useMyFees } from "../../features/fees";
 import { useNotifications } from "../../features/notifications";
 import { useMyResults } from "../../features/results";
@@ -22,7 +24,7 @@ import { useMyChildren } from "../../features/users";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { inputClass } from "../../components/ui/classNames";
-import { DashboardCard, NotAvailableCard } from "./DashboardCard";
+import { DashboardCard } from "./DashboardCard";
 
 export function ParentDashboard() {
   const { data: childrenData, isLoading: childrenLoading, isError: childrenError } = useMyChildren();
@@ -39,11 +41,20 @@ export function ParentDashboard() {
   const { data: fees, isError: feesError } = useMyFees({ studentId: selectedStudentId || undefined });
   const { data: results, isError: resultsError } = useMyResults({ studentId: selectedStudentId || undefined });
   const { data: attendance, isError: attendanceError } = useMyAttendance({ studentId: selectedStudentId });
+  const { data: exams, isError: examsError } = useExams({ studentId: selectedStudentId });
 
   const mostRecentSemester = results?.semesters[0];
   const nextDueInvoice = (fees?.invoices ?? [])
     .filter((i) => i.status !== "paid")
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
+
+  // Upcoming = not yet closed/published, with a scheduled date to show —
+  // same client-side-computed-summary precedent as Teacher Dashboard's
+  // Pending Grading widget (no dedicated "upcoming" filter on the backend).
+  const upcomingExams = (exams?.items ?? [])
+    .filter((e) => e.scheduled_at && (e.status === "scheduled" || e.status === "open"))
+    .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))
+    .slice(0, 5);
 
   return (
     <div className="space-y-4">
@@ -115,7 +126,34 @@ export function ParentDashboard() {
             )}
           </DashboardCard>
         )}
-        <NotAvailableCard title="Upcoming Exams" icon={CalendarClock} />
+        {!selectedStudentId ? (
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+            <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
+          </DashboardCard>
+        ) : examsError ? (
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+            <p className="text-sm text-red-600 dark:text-red-400">Not linked, or exam data unavailable.</p>
+          </DashboardCard>
+        ) : upcomingExams.length === 0 ? (
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+            <p className="text-sm text-slate-400 dark:text-slate-500">No upcoming exams scheduled.</p>
+          </DashboardCard>
+        ) : (
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+            <ul className="space-y-1.5">
+              {upcomingExams.map((exam) => (
+                <li key={exam.id} className="flex items-baseline justify-between text-sm">
+                  <span className="text-slate-700 dark:text-slate-300">
+                    {exam.title} <span className="text-slate-400 dark:text-slate-500">({exam.course_name})</span>
+                  </span>
+                  <span className="shrink-0 pl-2 text-xs text-slate-500 dark:text-slate-400">
+                    {new Date(exam.scheduled_at as string).toLocaleDateString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </DashboardCard>
+        )}
       </div>
 
       <Card>

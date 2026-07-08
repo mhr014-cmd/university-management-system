@@ -113,6 +113,10 @@ def _admin_user():
     return User(id=uuid.uuid4(), email="a@example.com", role="admin")
 
 
+def _parent_user():
+    return User(id=uuid.uuid4(), email="p@example.com", role="parent")
+
+
 class TestCreateExam:
     def test_rule6_teacher_must_be_assigned_to_class_session(self, service, stub_repos, session):
         exam_repo, schedule_repo, user_repo = stub_repos
@@ -556,3 +560,48 @@ class TestListExams:
         items, _total = service.list_exams(session, _teacher_user(), 1, 20)
 
         assert items[0].course_name == "Unknown Class"
+
+
+class TestListExamsParentAccess:
+    """Gap closure: proposal §5 promises Parents "upcoming exam dates" for
+    their linked child. Mirrors the Student branch exactly, except the
+    target student is resolved from an ownership-checked student_id rather
+    than the caller's own profile — same Parent-scoping convention as
+    attendance_service.get_me / result_service.get_my_results /
+    fee_service.get_my_fees / schedule_service.get_me."""
+
+    def test_parent_without_student_id_rejected(self, service, stub_repos, session):
+        _exam_repo, _schedule_repo, user_repo = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+
+        with pytest.raises(HTTPException) as exc:
+            service.list_exams(session, _parent_user(), 1, 20)
+        assert exc.value.status_code == 403
+
+    def test_parent_without_link_rejected(self, service, stub_repos, session):
+        _exam_repo, _schedule_repo, user_repo = stub_repos
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = False
+
+        with pytest.raises(HTTPException) as exc:
+            service.list_exams(session, _parent_user(), 1, 20, student_id=uuid.uuid4())
+        assert exc.value.status_code == 403
+
+    def test_parent_with_link_sees_child_exams_with_drafts_hidden(self, service, stub_repos, session):
+        exam_repo, schedule_repo, user_repo = stub_repos
+        student_id = uuid.uuid4()
+        class_session_ids = [uuid.uuid4()]
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = True
+        schedule_repo.list_class_session_ids_for_student.return_value = class_session_ids
+        published_exam = make_exam(status="published")
+        draft_exam = make_exam(status="draft")
+        exam_repo.list_exams.return_value = ([published_exam, draft_exam], 2)
+        schedule_repo.get_course_names_for_class_sessions.return_value = {}
+
+        items, total = service.list_exams(session, _parent_user(), 1, 20, student_id=student_id)
+
+        assert total == 1
+        assert items[0].id == published_exam.id
+        call_kwargs = exam_repo.list_exams.call_args.kwargs
+        assert call_kwargs["class_session_ids"] == class_session_ids

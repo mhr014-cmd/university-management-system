@@ -355,3 +355,14 @@ A full-project audit (Teacher/Parent portals, Admin approval workflows, notifica
 **Disposition:** Permanent for everything built; the five items above are documented as remaining optional future enhancements, not silently dropped.
 
 ---
+
+## Post-M11 PARTIAL-Item Closure (2026-07-08)
+
+Following an engineering review of five previously-identified PARTIAL-compliance items, two were approved for implementation now; the other three (fee due-date reminders, Exam Builder preview, Teacher department/semester attendance reports) were left as-is per that review.
+
+### `GET /exams` Parent scoping (`student_id` query parameter)
+**Where:** `backend/app/routers/exams.py` (`student_id` query param on `list_exams`), `backend/app/services/exam_service.py` (`list_exams` — new Parent branch), `frontend/src/features/exams/index.ts` (`useExams` accepts optional `studentId`), `frontend/src/pages/Dashboard/ParentDashboard.tsx` (Upcoming Exams widget, replacing the previous `NotAvailableCard` placeholder).
+**Classification: Derived.** The proposal (Section 5, "Results & schedule") promises Parents visibility into their child's exam schedule, but `GET /exams` had no Parent branch at all — a Parent request previously fell through to the same unfiltered branch used by Admin, which would have returned every exam in the university (a latent data-exposure gap, not just a missing UI). Closed using the exact Parent-scoping convention already established for `GET /attendance/me`, `GET /results/me`, `GET /fees/me`, and `GET /schedule/me` above (ownership-verified `student_id` via `parent_student_link`) — no new endpoint path, no schema/migration change. Draft exams are filtered out for the Parent branch, matching the existing Student-branch rule that drafts are never shown to non-Teacher/Admin roles.
+**Disposition:** Permanent.
+
+---

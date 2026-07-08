@@ -81,6 +81,7 @@ class ExamService:
         *,
         class_session_id: uuid.UUID | None = None,
         status_filter: str | None = None,
+        student_id: uuid.UUID | None = None,
     ) -> tuple[list[ExamListItem], int]:
         if current_user.role == "teacher":
             teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
@@ -105,6 +106,30 @@ class ExamService:
             )
             # UI_Wireframes.md Section 4: "Draft" exams are never shown on
             # the Student-facing list.
+            exams = [e for e in exams if e.status != "draft"]
+            total = len(exams)
+        elif current_user.role == "parent":
+            # Gap closure: proposal §5 promises Parents "upcoming exam
+            # dates" for their linked child. Mirrors the Student branch
+            # above exactly, except the target student is resolved from an
+            # ownership-checked student_id rather than the caller's own
+            # profile — same Parent-scoping convention already used by
+            # attendance_service.get_me / result_service.get_my_results /
+            # fee_service.get_my_fees / schedule_service.get_me.
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            if student_id is None or not user_repo.parent_has_linked_student(session, parent.id, student_id):
+                raise _forbidden("You may only view exams for a linked student.")
+            class_session_ids = schedule_repo.list_class_session_ids_for_student(session, student_id)
+            exams, total = exam_repo.list_exams(
+                session,
+                page,
+                page_size,
+                class_session_id=class_session_id,
+                status=status_filter,
+                class_session_ids=class_session_ids,
+            )
+            # Same draft-hiding rule as the Student branch — a Parent must
+            # never see an exam their child wouldn't see themselves.
             exams = [e for e in exams if e.status != "draft"]
             total = len(exams)
         else:

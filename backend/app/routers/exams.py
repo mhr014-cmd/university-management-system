@@ -34,11 +34,21 @@ def list_exams(
     status_filter: str | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    # Parent-scoping (gap closure): required for Parent, ignored for every
+    # other role — same convention as GET /attendance/me, /results/me,
+    # /fees/me, /schedule/me.
+    student_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     items, total = exam_service.list_exams(
-        db, current_user, page, page_size, class_session_id=class_session_id, status_filter=status_filter
+        db,
+        current_user,
+        page,
+        page_size,
+        class_session_id=class_session_id,
+        status_filter=status_filter,
+        student_id=student_id,
     )
     return PaginatedResponse(items=items, total=total, page=page, page_size=page_size)
 

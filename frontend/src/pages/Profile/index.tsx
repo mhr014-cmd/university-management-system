@@ -315,22 +315,23 @@ function AcademicHistorySection() {
   );
 }
 
-// Teacher — Profile & courses: "view assigned courses and departments" —
+// Teacher — Profile & courses: "see their full teaching history" —
 // reuses GET /schedule/me (Timetable's own data source), deduplicated by
-// course. Labeled honestly as this semester's assignments — no endpoint
-// exposes teaching history across past semesters, so that part of the
-// proposal's feature isn't claimed here.
+// course. GET /schedule/me for a Teacher returns every schedule entry
+// they've ever been assigned (schedule_repository.list_entries_for_teacher
+// has no semester filter), so this is already the full teaching history,
+// not just the current semester.
 function AssignedCoursesSection() {
   const { data, isLoading } = useMySchedule();
   const courseNames = Array.from(new Set((data?.entries ?? []).map((e) => e.course_name))).sort();
 
   return (
     <Card>
-      <CardTitle>Assigned Courses (this semester)</CardTitle>
+      <CardTitle>Teaching History</CardTitle>
       {isLoading ? (
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading assigned courses...</p>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Loading teaching history...</p>
       ) : courseNames.length === 0 ? (
-        <EmptyState title="No assigned courses yet" description="Courses you're teaching this semester will appear here once scheduled." />
+        <EmptyState title="No assigned courses yet" description="Courses you teach will appear here once scheduled." />
       ) : (
         <ul className="mt-2 list-inside list-disc text-sm text-slate-700 dark:text-slate-300">
           {courseNames.map((name) => (

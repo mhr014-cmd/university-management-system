@@ -155,7 +155,15 @@ interface PaginatedResponse<T> {
   page_size: number;
 }
 
-export function useExams(params?: { classSessionId?: string; status?: string; page?: number; pageSize?: number }) {
+export function useExams(params?: {
+  classSessionId?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+  // Parent-scoping (gap closure): required for Parent, ignored for every
+  // other role — same convention as useMyAttendance/useMyResults/useMyFees.
+  studentId?: string;
+}) {
   return useQuery({
     queryKey: ["exams", params],
     queryFn: async () =>
@@ -166,9 +174,13 @@ export function useExams(params?: { classSessionId?: string; status?: string; pa
             status: params?.status,
             page: params?.page ?? 1,
             page_size: params?.pageSize ?? 20,
+            student_id: params?.studentId,
           },
         })
       ).data,
+    // Don't fire a guaranteed-403 request before a Parent has picked a
+    // child — same gating as useMyAttendance's Parent path.
+    enabled: params?.studentId !== "",
   });
 }
 
