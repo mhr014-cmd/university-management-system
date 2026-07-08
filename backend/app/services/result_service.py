@@ -50,6 +50,8 @@ from app.schemas.result import (
     ResultSubmitRequest,
     ResultSubmitResponse,
     ResultsMeResponse,
+    TeacherExamResultsResponse,
+    TeacherResultEntry,
 )
 
 result_repo = ResultRepository()
@@ -379,3 +381,54 @@ class ResultService:
         semester_entries = _build_semester_entries(session, results)
         student_name = f"{student.first_name} {student.last_name}"
         return student_name, semester_entries
+
+    # --- GET /results/exam/{examId} (final-verification-pass addition, -----
+    # Feature 1: Teacher Results View) ----------------------------------------
+    # Read-only: lets the exam's creating Teacher see the approval status
+    # (submitted/published/rejected) of the results they submitted for that
+    # exam. Reuses the existing Result model/table exactly as-is — no new
+    # column, no new table, same ownership check (Domain Rule 14) already
+    # used by submit_results above.
+
+    def get_results_for_exam(
+        self, session: Session, current_user: User, exam_id: uuid.UUID
+    ) -> TeacherExamResultsResponse:
+        teacher = user_repo.get_teacher_profile_by_user_id(session, current_user.id)
+
+        exam = exam_repo.get_exam(session, exam_id)
+        if exam is None:
+            raise _not_found("Exam not found")
+        if exam.created_by_teacher_id != teacher.id:
+            raise _forbidden("You are not the creator of this exam.")
+
+        class_session = schedule_repo.get_class_session(session, exam.class_session_id)
+        course = course_repo.get(session, class_session.course_id) if class_session is not None else None
+
+        rows = result_repo.list_for_exam(session, exam_id)
+        entries = []
+        for row in rows:
+            student_with_user = user_repo.get_student_with_user(session, row.student_id)
+            student_name = (
+                f"{student_with_user[0].first_name} {student_with_user[0].last_name}"
+                if student_with_user is not None
+                else "Unknown Student"
+            )
+            entries.append(
+                TeacherResultEntry(
+                    result_id=row.id,
+                    student_id=row.student_id,
+                    student_name=student_name,
+                    grade_letter=row.grade_letter,
+                    grade_point=float(row.grade_point) if row.grade_point is not None else None,
+                    status=row.status,
+                    submitted_at=row.submitted_at,
+                    approved_at=row.approved_at,
+                )
+            )
+
+        return TeacherExamResultsResponse(
+            exam_id=exam_id,
+            exam_title=exam.title,
+            course_name=course.name if course is not None else "",
+            results=entries,
+        )

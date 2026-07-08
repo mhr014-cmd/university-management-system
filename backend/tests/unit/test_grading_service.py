@@ -113,6 +113,20 @@ def _admin_user():
     return User(id=uuid.uuid4(), email="a@example.com", role="admin")
 
 
+def _student_user():
+    return User(id=uuid.uuid4(), email="s@example.com", role="student")
+
+
+def _parent_user():
+    return User(id=uuid.uuid4(), email="p@example.com", role="parent")
+
+
+def make_student(**overrides) -> Student:
+    defaults = dict(id=uuid.uuid4(), user_id=uuid.uuid4(), department_id=uuid.uuid4(), first_name="S", last_name="Student")
+    defaults.update(overrides)
+    return Student(**defaults)
+
+
 class TestGradeSubmission:
     def test_exam_not_found_raises_404(self, service, stub_repos, session):
         exam_repo, *_ = stub_repos
@@ -387,3 +401,146 @@ class TestGetResults:
         result = service.get_results(session, _admin_user(), exam.id)
 
         assert result.submissions[0].student_name == "Unknown Student"
+
+
+class TestGetMySubmissionDetail:
+    """Feature 2 (final-verification-pass addition): Student Feedback View.
+
+    Read-only, no grading changes. awarded_marks/feedback are only
+    revealed once exam.status == "published" — the same BR-001 gate
+    exam_service.get_exam() already applies for a Student's own exam view.
+    """
+
+    def test_exam_not_found_raises_404(self, service, stub_repos, session):
+        exam_repo, *_ = stub_repos
+        exam_repo.get_exam.return_value = None
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _student_user(), uuid.uuid4())
+        assert exc.value.status_code == 404
+
+    def test_teacher_role_forbidden(self, service, stub_repos, session):
+        exam_repo, *_ = stub_repos
+        exam_repo.get_exam.return_value = make_exam()
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _teacher_user(), uuid.uuid4())
+        assert exc.value.status_code == 403
+
+    def test_admin_role_forbidden(self, service, stub_repos, session):
+        # Deliberately narrower than get_submission_detail — this endpoint
+        # is Student/Parent-only, not Teacher/Admin, per Feature 2's scope.
+        exam_repo, *_ = stub_repos
+        exam_repo.get_exam.return_value = make_exam()
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _admin_user(), uuid.uuid4())
+        assert exc.value.status_code == 403
+
+    def test_student_submission_not_found_raises_404(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam(status="published")
+        exam_repo.get_exam.return_value = exam
+        student = make_student()
+        user_repo.get_student_profile_by_user_id.return_value = student
+        exam_repo.get_submission_by_exam_student.return_value = None
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _student_user(), exam.id)
+        assert exc.value.status_code == 404
+
+    def test_student_sees_only_their_own_submission(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam(status="published")
+        exam_repo.get_exam.return_value = exam
+        student = make_student()
+        user_repo.get_student_profile_by_user_id.return_value = student
+        submission = make_submission(exam_id=exam.id, student_id=student.id)
+        exam_repo.get_submission_by_exam_student.return_value = submission
+        exam_repo.list_questions_for_exam.return_value = []
+        exam_repo.list_answers_for_submission.return_value = []
+        exam_repo.list_grades_for_submission.return_value = []
+
+        result = service.get_my_submission_detail(session, _student_user(), exam.id)
+
+        assert result.student_id == student.id
+        # Ownership-scoping: the repository call is keyed to the caller's
+        # own resolved student id, never a client-supplied one.
+        exam_repo.get_submission_by_exam_student.assert_called_once_with(session, exam.id, student.id)
+
+    def test_parent_without_student_id_forbidden(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam_repo.get_exam.return_value = make_exam()
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _parent_user(), uuid.uuid4(), student_id=None)
+        assert exc.value.status_code == 403
+
+    def test_parent_without_link_forbidden(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam_repo.get_exam.return_value = make_exam()
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = False
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_my_submission_detail(session, _parent_user(), uuid.uuid4(), student_id=uuid.uuid4())
+        assert exc.value.status_code == 403
+
+    def test_parent_with_link_sees_linked_childs_submission(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam(status="published")
+        exam_repo.get_exam.return_value = exam
+        user_repo.get_parent_profile_by_user_id.return_value = MagicMock(id=uuid.uuid4())
+        user_repo.parent_has_linked_student.return_value = True
+        target_student_id = uuid.uuid4()
+        submission = make_submission(exam_id=exam.id, student_id=target_student_id)
+        exam_repo.get_submission_by_exam_student.return_value = submission
+        exam_repo.list_questions_for_exam.return_value = []
+        exam_repo.list_answers_for_submission.return_value = []
+        exam_repo.list_grades_for_submission.return_value = []
+
+        result = service.get_my_submission_detail(session, _parent_user(), exam.id, student_id=target_student_id)
+        assert result.student_id == target_student_id
+
+    def test_feedback_hidden_before_exam_published(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam(status="closed")  # graded, but not yet published
+        exam_repo.get_exam.return_value = exam
+        student = make_student()
+        user_repo.get_student_profile_by_user_id.return_value = student
+        submission = make_submission(exam_id=exam.id, student_id=student.id)
+        exam_repo.get_submission_by_exam_student.return_value = submission
+
+        question = make_question(exam_id=exam.id)
+        exam_repo.list_questions_for_exam.return_value = [question]
+        answer = make_answer(submission_id=submission.id, question_id=question.id)
+        exam_repo.list_answers_for_submission.return_value = [answer]
+        grade = make_grade(answer_id=answer.id, awarded_marks=9, feedback="Nice work")
+        exam_repo.list_grades_for_submission.return_value = [grade]
+
+        result = service.get_my_submission_detail(session, _student_user(), exam.id)
+
+        # The student's own answer text is always visible...
+        assert result.questions[0].answer_text == answer.answer_text
+        # ...but marks/feedback stay hidden until the exam is published.
+        assert result.questions[0].awarded_marks is None
+        assert result.questions[0].feedback is None
+
+    def test_feedback_revealed_once_exam_published(self, service, stub_repos, session):
+        exam_repo, user_repo = stub_repos
+        exam = make_exam(status="published")
+        exam_repo.get_exam.return_value = exam
+        student = make_student()
+        user_repo.get_student_profile_by_user_id.return_value = student
+        submission = make_submission(exam_id=exam.id, student_id=student.id)
+        exam_repo.get_submission_by_exam_student.return_value = submission
+
+        question = make_question(exam_id=exam.id)
+        exam_repo.list_questions_for_exam.return_value = [question]
+        answer = make_answer(submission_id=submission.id, question_id=question.id)
+        exam_repo.list_answers_for_submission.return_value = [answer]
+        grade = make_grade(answer_id=answer.id, awarded_marks=9, feedback="Nice work")
+        exam_repo.list_grades_for_submission.return_value = [grade]
+
+        result = service.get_my_submission_detail(session, _student_user(), exam.id)
+
+        assert result.questions[0].awarded_marks == 9.0
+        assert result.questions[0].feedback == "Nice work"

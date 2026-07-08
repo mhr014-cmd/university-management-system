@@ -12,14 +12,23 @@
 // "Draft" exams are never shown to Students — enforced server-side in
 // ExamService.list_exams, not re-implemented here (CLAUDE.md Section 7:
 // client-side hiding is UX only).
+//
+// Audit fix (critical A1): GET /exams requires student_id for a Parent
+// caller, but this page never offered a Parent a way to pick a linked
+// child, so a Parent following the Dashboard's "Upcoming Exams" card hit
+// a 403 that rendered as a permanent "Loading exams..." spinner. Reuses
+// the exact "Linked Child" selector pattern already used by
+// Attendance/FeeCentre/ResultsView/Timetable (useMyChildren, auto-select
+// the first/only child) — no new component, no backend change.
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileQuestion, Plus } from "lucide-react";
+import { FileQuestion, Plus, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { useMySchedule } from "../../features/schedule";
 import { useExams } from "../../features/exams";
 import type { ExamStatus } from "../../features/exams";
+import { useMyChildren } from "../../features/users";
 import { Badge, type BadgeTone } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -39,14 +48,73 @@ const examStatusTone: Record<ExamStatus, BadgeTone> = {
 
 export default function ExamListPage() {
   const { user } = useAuth();
+  if (user?.role === "parent") {
+    return <ParentExamList />;
+  }
+  return <ExamListContent />;
+}
+
+// Same child-selector convention as FeeCentre's ParentFeeCentre /
+// ResultsView's ParentResultsView / Attendance's ParentAttendanceView.
+function ParentExamList() {
+  const { data: childrenData, isLoading: childrenLoading, isError: childrenError } = useMyChildren();
+  const children = useMemo(() => childrenData?.children ?? [], [childrenData]);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+
+  useEffect(() => {
+    if (!selectedStudentId && children.length > 0) {
+      setSelectedStudentId(children[0].id);
+    }
+  }, [children, selectedStudentId]);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="mb-2 flex items-center gap-2">
+          <Users className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Linked Child</p>
+        </div>
+        {childrenLoading ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading your linked children...</p>
+        ) : childrenError ? (
+          <p className="text-sm text-red-600 dark:text-red-400">Unable to load linked children.</p>
+        ) : children.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No children linked yet"
+            description="Contact an administrator to link a child's record to your account."
+          />
+        ) : (
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            className={inputClass}
+          >
+            {children.map((child) => (
+              <option key={child.id} value={child.id}>
+                {child.first_name} {child.last_name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Card>
+
+      {selectedStudentId && <ExamListContent studentId={selectedStudentId} />}
+    </div>
+  );
+}
+
+function ExamListContent({ studentId }: { studentId?: string }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [classSessionId, setClassSessionId] = useState("");
   const [status, setStatus] = useState("");
 
-  const { data: schedule } = useMySchedule();
+  const { data: schedule } = useMySchedule(studentId);
   const { data, isLoading } = useExams({
     classSessionId: classSessionId || undefined,
     status: status || undefined,
+    studentId,
   });
 
   const uniqueClassSessions = Array.from(
@@ -56,6 +124,10 @@ export default function ExamListPage() {
   const handleRowClick = (examId: string, examStatus: ExamStatus) => {
     if (user?.role === "student") {
       if (examStatus === "open") navigate(`/exams/${examId}/room`);
+      // Feature 2 (final-verification-pass addition): once an exam is
+      // published, its per-question feedback (already saved by the
+      // Teacher via Grading) becomes visible — see ExamFeedback page.
+      else if (examStatus === "published") navigate(`/exams/${examId}/feedback`);
       return;
     }
     if (user?.role === "teacher") {

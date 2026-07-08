@@ -22,6 +22,7 @@ import { useMe, useUpdateMe } from "../../features/users";
 import { useChangePassword } from "../../features/auth";
 import { useMyResults } from "../../features/results";
 import { useMySchedule } from "../../features/schedule";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card, CardTitle } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -163,7 +164,10 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Profile</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Profile</h1>
+        <Badge tone="blue">{me.role}</Badge>
+      </div>
 
       <Card>
         <form onSubmit={handleProfileSubmit} className="space-y-4">

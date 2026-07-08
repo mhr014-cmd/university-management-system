@@ -602,6 +602,200 @@ class TestGetResults:
         assert response.status_code == 403
 
 
+class TestGetMySubmissionDetail:
+    """Feature 2 (final-verification-pass addition): Student Feedback View
+    — GET /exams/{examId}/my-submission. Read-only, no grading changes.
+    A Student sees only their own submission; a linked Parent may view a
+    child's, per the existing ownership convention; feedback/awarded_marks
+    stay hidden until the exam is published (same BR-001 gate as
+    GET /exams/{id})."""
+
+    def _create_open_exam(self, client, teacher_token, class_session_id):
+        create_response = client.post(
+            "/api/v1/exams", json=_mcq_exam_payload(class_session_id), headers=_headers(teacher_token)
+        )
+        exam = create_response.json()
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "open"}, headers=_headers(teacher_token))
+        return exam
+
+    def _submit_and_grade(self, client, exam, teacher_token, student_token, *, feedback="Well done"):
+        mcq_question = next(q for q in exam["questions"] if q["question_type"] == "mcq")
+        correct_option = next(o for o in mcq_question["options"] if o["is_correct"])
+        client.post(f"/api/v1/exams/{exam['id']}/start", headers=_headers(student_token))
+        client.post(
+            f"/api/v1/exams/{exam['id']}/submit",
+            json={"answers": [{"question_id": mcq_question["id"], "selected_option_id": correct_option["id"]}]},
+            headers=_headers(student_token),
+        )
+
+        results = client.get(f"/api/v1/exams/{exam['id']}/results", headers=_headers(teacher_token)).json()
+        submission_id = results["submissions"][0]["submission_id"]
+        detail = client.get(
+            f"/api/v1/exams/{exam['id']}/submissions/{submission_id}", headers=_headers(teacher_token)
+        ).json()
+        # _mcq_exam_payload has 2 questions (mcq + short_answer) but this
+        # helper only answers the mcq one — skip the unanswered question
+        # (answer_id None) rather than sending an invalid grade for it.
+        grades = [
+            {"answer_id": q["answer_id"], "awarded_marks": q["marks"], "feedback": feedback}
+            for q in detail["questions"]
+            if q["answer_id"] is not None
+        ]
+        client.post(
+            f"/api/v1/exams/{exam['id']}/grade",
+            json={"submission_id": submission_id, "grades": grades},
+            headers=_headers(teacher_token),
+        )
+
+    def test_requires_student_or_parent_role(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(teacher_token))
+        assert response.status_code == 403
+
+    def test_student_sees_own_submission(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+        self._submit_and_grade(client, exam, teacher_token, student_token)
+
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(student_token))
+        assert response.status_code == 200
+        assert response.json()["student_id"] == str(student.id)
+
+    def test_feedback_hidden_before_exam_published(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+        self._submit_and_grade(client, exam, teacher_token, student_token, feedback="Great job")
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "closed"}, headers=_headers(teacher_token))
+
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(student_token))
+        assert response.status_code == 200
+        body = response.json()
+        assert all(q["feedback"] is None for q in body["questions"])
+        assert all(q["awarded_marks"] is None for q in body["questions"])
+
+    def test_feedback_visible_after_exam_published(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+        self._submit_and_grade(client, exam, teacher_token, student_token, feedback="Great job")
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "closed"}, headers=_headers(teacher_token))
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "published"}, headers=_headers(teacher_token))
+
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(student_token))
+        assert response.status_code == 200
+        body = response.json()
+        assert body["questions"][0]["feedback"] == "Great job"
+        assert body["questions"][0]["awarded_marks"] == 5.0
+
+    def test_student_cannot_view_another_students_submission(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+        self._submit_and_grade(client, exam, teacher_token, student_token)
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "closed"}, headers=_headers(teacher_token))
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "published"}, headers=_headers(teacher_token))
+
+        _other_user, other_student = make_student_user("other-student@example.com", "other-password")
+        other_token = _login(client, "other-student@example.com", "other-password")
+
+        # The other student never submitted this exam at all — their own
+        # (nonexistent) submission is what's resolved, not the first
+        # student's, so this 404s rather than leaking someone else's data.
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(other_token))
+        assert response.status_code == 404
+
+    def test_parent_without_student_id_rejected(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        make_parent_user("parent@example.com", "parent-password")
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+
+        response = client.get(f"/api/v1/exams/{exam['id']}/my-submission", headers=_headers(parent_token))
+        assert response.status_code == 403
+
+    def test_parent_without_link_rejected(
+        self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        make_parent_user("parent@example.com", "parent-password")  # not linked
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+
+        response = client.get(
+            f"/api/v1/exams/{exam['id']}/my-submission?student_id={student.id}", headers=_headers(parent_token)
+        )
+        assert response.status_code == 403
+
+    def test_linked_parent_sees_childs_submission_and_feedback(
+        self,
+        client,
+        make_teacher_user,
+        make_student_user,
+        make_parent_user,
+        make_class_session,
+        make_enrollment,
+        link_parent_student,
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        _parent_user, parent = make_parent_user("parent@example.com", "parent-password")
+        link_parent_student(parent, student)
+
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = self._create_open_exam(client, teacher_token, str(class_session.id))
+        self._submit_and_grade(client, exam, teacher_token, student_token, feedback="Nicely explained")
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "closed"}, headers=_headers(teacher_token))
+        client.put(f"/api/v1/exams/{exam['id']}", json={"status": "published"}, headers=_headers(teacher_token))
+
+        parent_token = _login(client, "parent@example.com", "parent-password")
+        response = client.get(
+            f"/api/v1/exams/{exam['id']}/my-submission?student_id={student.id}", headers=_headers(parent_token)
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["student_id"] == str(student.id)
+        assert body["questions"][0]["feedback"] == "Nicely explained"
+
+
 class TestListExamsParentAccess:
     """Gap closure: proposal §5 promises Parents "upcoming exam dates" for
     their linked child — GET /exams scoped by an ownership-checked

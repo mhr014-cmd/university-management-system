@@ -56,6 +56,37 @@ def _conflict(detail: str) -> HTTPException:
 
 
 class GradingService:
+    # Shared by get_submission_detail (Teacher/Admin) and
+    # get_my_submission_detail (Student/Parent, final-verification-pass
+    # addition below) — identical question/answer/grade assembly either
+    # way; only whether awarded_marks/feedback are revealed differs.
+    def _build_question_details(
+        self, session: Session, exam_id: uuid.UUID, submission_id: uuid.UUID, *, reveal: bool
+    ) -> list[SubmissionQuestionDetail]:
+        questions = exam_repo.list_questions_for_exam(session, exam_id)
+        answers_by_question = {a.question_id: a for a in exam_repo.list_answers_for_submission(session, submission_id)}
+        grades_by_answer = {g.answer_id: g for g in exam_repo.list_grades_for_submission(session, submission_id)}
+
+        question_details = []
+        for question in questions:
+            answer = answers_by_question.get(question.id)
+            grade = grades_by_answer.get(answer.id) if answer is not None else None
+            question_details.append(
+                SubmissionQuestionDetail(
+                    question_id=question.id,
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    marks=float(question.marks),
+                    order_index=question.order_index,
+                    answer_id=answer.id if answer is not None else None,
+                    answer_text=answer.answer_text if answer is not None else None,
+                    selected_option_id=answer.selected_option_id if answer is not None else None,
+                    awarded_marks=float(grade.awarded_marks) if grade is not None and reveal else None,
+                    feedback=grade.feedback if grade is not None and reveal else None,
+                )
+            )
+        return question_details
+
     # --- GET /exams/{id}/submissions/{submission_id} (Derived — see -------
     # docs/Proposal_vs_Engineering_Additions.md) -----------------------------
 
@@ -77,28 +108,57 @@ class GradingService:
         if submission is None or submission.exam_id != exam_id:
             raise _not_found("Submission not found")
 
-        questions = exam_repo.list_questions_for_exam(session, exam_id)
-        answers_by_question = {a.question_id: a for a in exam_repo.list_answers_for_submission(session, submission.id)}
-        grades_by_answer = {g.answer_id: g for g in exam_repo.list_grades_for_submission(session, submission.id)}
+        # Teacher/Admin always see awarded_marks/feedback in full — unchanged
+        # from before this method was factored to share _build_question_details.
+        question_details = self._build_question_details(session, exam_id, submission.id, reveal=True)
 
-        question_details = []
-        for question in questions:
-            answer = answers_by_question.get(question.id)
-            grade = grades_by_answer.get(answer.id) if answer is not None else None
-            question_details.append(
-                SubmissionQuestionDetail(
-                    question_id=question.id,
-                    question_text=question.question_text,
-                    question_type=question.question_type,
-                    marks=float(question.marks),
-                    order_index=question.order_index,
-                    answer_id=answer.id if answer is not None else None,
-                    answer_text=answer.answer_text if answer is not None else None,
-                    selected_option_id=answer.selected_option_id if answer is not None else None,
-                    awarded_marks=float(grade.awarded_marks) if grade is not None else None,
-                    feedback=grade.feedback if grade is not None else None,
-                )
-            )
+        return ExamSubmissionDetailResponse(
+            submission_id=submission.id,
+            exam_id=submission.exam_id,
+            student_id=submission.student_id,
+            status=submission.status,
+            questions=question_details,
+        )
+
+    # --- GET /exams/{id}/my-submission (final-verification-pass addition) --
+    # Feature 2: exposes the per-question feedback Teachers already save via
+    # POST /exams/{id}/grade to the Student who owns the submission, and to
+    # a linked Parent (same student_id ownership-scoping convention already
+    # used by GET /attendance/me, /results/me, /fees/me, /exams). Read-only;
+    # no grading logic changes. awarded_marks/feedback are only revealed
+    # once exam.status == "published" — the exact same BR-001 gate
+    # exam_service.get_exam() already applies for a Student's own view of
+    # this exam, applied here identically for symmetry.
+
+    def get_my_submission_detail(
+        self,
+        session: Session,
+        current_user: User,
+        exam_id: uuid.UUID,
+        *,
+        student_id: uuid.UUID | None = None,
+    ) -> ExamSubmissionDetailResponse:
+        exam = exam_repo.get_exam(session, exam_id)
+        if exam is None:
+            raise _not_found("Exam not found")
+
+        if current_user.role == "student":
+            student = user_repo.get_student_profile_by_user_id(session, current_user.id)
+            target_student_id = student.id
+        elif current_user.role == "parent":
+            parent = user_repo.get_parent_profile_by_user_id(session, current_user.id)
+            if student_id is None or not user_repo.parent_has_linked_student(session, parent.id, student_id):
+                raise _forbidden("You may only view feedback for a linked student.")
+            target_student_id = student_id
+        else:
+            raise _forbidden("Only the submitting Student or a linked Parent may view this submission.")
+
+        submission = exam_repo.get_submission_by_exam_student(session, exam_id, target_student_id)
+        if submission is None:
+            raise _not_found("Submission not found")
+
+        reveal = exam.status == "published"
+        question_details = self._build_question_details(session, exam_id, submission.id, reveal=reveal)
 
         return ExamSubmissionDetailResponse(
             submission_id=submission.id,

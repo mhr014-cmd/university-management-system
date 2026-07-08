@@ -3,15 +3,15 @@
 // All data sourced from existing endpoints already used elsewhere
 // (ExamList, Attendance, FeeCentre, ResultsView) — no new backend scope.
 
-import { Link } from "react-router-dom";
 import { Award, CalendarClock, PieChart, Wallet } from "lucide-react";
 import { useExams } from "../../features/exams";
 import { useMyAttendance } from "../../features/attendance";
 import { useMyFees } from "../../features/fees";
 import { useMyResults } from "../../features/results";
+import { RecentNotificationsCard } from "../../components/RecentNotificationsCard";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { PageLoader } from "../../components/ui/PageLoader";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { DashboardCard } from "./DashboardCard";
 
 export function StudentDashboard() {
@@ -33,7 +33,7 @@ export function StudentDashboard() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+      <DashboardCard title="Upcoming Exams" icon={CalendarClock} to="/exams">
         {upcoming.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">No upcoming exams.</p>
         ) : (
@@ -46,12 +46,10 @@ export function StudentDashboard() {
             ))}
           </ul>
         )}
-        <Link to="/exams" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
-          View all
-        </Link>
+        <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">View all</span>
       </DashboardCard>
 
-      <DashboardCard title="Attendance %" icon={PieChart}>
+      <DashboardCard title="Attendance %" icon={PieChart} to="/attendance">
         {attendance ? (
           <>
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -62,14 +60,12 @@ export function StudentDashboard() {
             )}
           </>
         ) : (
-          <PageLoader />
+          <Skeleton className="h-8 w-20" />
         )}
-        <Link to="/attendance" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
-          View all
-        </Link>
+        <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">View all</span>
       </DashboardCard>
 
-      <DashboardCard title="Fee Status" icon={Wallet}>
+      <DashboardCard title="Fee Status" icon={Wallet} to="/fees">
         {fees ? (
           <>
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -80,14 +76,14 @@ export function StudentDashboard() {
             )}
           </>
         ) : (
-          <PageLoader />
+          <Skeleton className="h-8 w-24" />
         )}
-        <Link to="/fees" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
+        <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">
           View Fee Centre
-        </Link>
+        </span>
       </DashboardCard>
 
-      <Card className="sm:col-span-3">
+      <Card to="/results" hoverable className="sm:col-span-3">
         <div className="mb-2 flex items-center gap-2">
           <Award className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
@@ -117,10 +113,14 @@ export function StudentDashboard() {
             </tbody>
           </table>
         )}
-        <Link to="/results" className="mt-2 inline-block text-sm font-medium text-slate-900 hover:underline dark:text-slate-100">
+        <span className="mt-2 inline-block text-sm font-medium text-slate-900 dark:text-slate-100">
           View full results →
-        </Link>
+        </span>
       </Card>
+
+      <div className="sm:col-span-3">
+        <RecentNotificationsCard />
+      </div>
     </div>
   );
 }

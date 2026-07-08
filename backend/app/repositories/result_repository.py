@@ -110,6 +110,9 @@ class ResultRepository:
             stmt = stmt.where(Result.status == status)
         return list(session.scalars(stmt))
 
+    def list_for_exam(self, session: Session, exam_id: uuid.UUID) -> list[Result]:
+        return list(session.scalars(select(Result).where(Result.exam_id == exam_id)))
+
     def list_by_status(self, session: Session, status: str) -> list[Result]:
         return list(session.scalars(select(Result).where(Result.status == status).order_by(Result.submitted_at.desc())))
 

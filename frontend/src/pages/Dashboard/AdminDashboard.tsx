@@ -6,11 +6,11 @@
 // to GET /users/students and GET /users/teachers (approved Finding D) —
 // no new endpoint or schema change was needed.
 
-import { Link } from "react-router-dom";
 import { AlertTriangle, ClipboardCheck, FileBarChart, Users as UsersIcon } from "lucide-react";
 import { usePendingResults } from "../../features/results";
 import { useOverdueAccounts } from "../../features/fees";
 import { useStudents, useTeachers } from "../../features/users";
+import { RecentNotificationsCard } from "../../components/RecentNotificationsCard";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { DashboardCard } from "./DashboardCard";
@@ -36,39 +36,28 @@ export function AdminDashboard() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <DashboardCard title="Pending Result Approvals" icon={ClipboardCheck}>
+        <DashboardCard title="Pending Result Approvals" icon={ClipboardCheck} to="/admin/result-approval">
           <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{pendingApprovalsCount}</p>
-          <Link
-            to="/admin/result-approval"
-            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
-          >
-            Review
-          </Link>
+          <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">Review</span>
         </DashboardCard>
 
-        <DashboardCard title="Overdue Fees" icon={AlertTriangle}>
+        <DashboardCard title="Overdue Fees" icon={AlertTriangle} to="/admin/fee-dashboard">
           <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
             {overdue?.overdue_accounts.length ?? 0}
           </p>
-          <Link
-            to="/admin/fee-dashboard"
-            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
-          >
+          <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">
             View Fee Dashboard
-          </Link>
+          </span>
         </DashboardCard>
 
-        <DashboardCard title="Reports" icon={FileBarChart}>
-          <Link
-            to="/admin/reports"
-            className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100"
-          >
+        <DashboardCard title="Reports" icon={FileBarChart} to="/admin/reports">
+          <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">
             Generate reports
-          </Link>
+          </span>
         </DashboardCard>
       </div>
 
-      <Card>
+      <Card to="/admin/users" hoverable>
         <div className="mb-2 flex items-center gap-2">
           <UsersIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Recent User Signups</p>
@@ -100,10 +89,10 @@ export function AdminDashboard() {
             </tbody>
           </table>
         )}
-        <Link to="/admin/users" className="mt-2 inline-block text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-400 dark:hover:text-slate-100">
-          Manage users
-        </Link>
+        <span className="mt-2 inline-block text-sm font-medium text-slate-600 dark:text-slate-400">Manage users</span>
       </Card>
+
+      <RecentNotificationsCard />
     </div>
   );
 }

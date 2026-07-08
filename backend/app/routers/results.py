@@ -20,6 +20,7 @@ from app.schemas.result import (
     ResultSubmitRequest,
     ResultSubmitResponse,
     ResultsMeResponse,
+    TeacherExamResultsResponse,
 )
 from app.services.result_service import ResultService
 
@@ -50,6 +51,19 @@ def submit_results(
     db: Session = Depends(get_db),
 ):
     return result_service.submit_results(db, current_user, exam_id, payload)
+
+
+@router.get(
+    "/exam/{exam_id}",
+    response_model=TeacherExamResultsResponse,
+    dependencies=[_require_teacher],
+)
+def get_results_for_exam(
+    exam_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return result_service.get_results_for_exam(db, current_user, exam_id)
 
 
 @router.get("/pending", response_model=PendingResultsResponse, dependencies=[_require_admin])

@@ -483,3 +483,81 @@ class TestGetTranscriptData:
         student_name, semesters = service.get_transcript_data(session, _admin_user(), target_student.id)
         assert student_name == "S Student"
         assert semesters == []
+
+
+class TestGetResultsForExam:
+    """Feature 1 (final-verification-pass addition): Teacher Results View."""
+
+    def test_exam_not_found_raises_404(self, service, stub_repos, session):
+        _result_repo, exam_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_teacher_profile_by_user_id.return_value = make_teacher()
+        exam_repo.get_exam.return_value = None
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_results_for_exam(session, _teacher_user(), uuid.uuid4())
+        assert exc.value.status_code == 404
+
+    def test_non_creator_teacher_forbidden(self, service, stub_repos, session):
+        _result_repo, exam_repo, _schedule_repo, user_repo, *_ = stub_repos
+        teacher = make_teacher()
+        user_repo.get_teacher_profile_by_user_id.return_value = teacher
+        exam = make_exam(created_by_teacher_id=uuid.uuid4())  # a different teacher's exam
+        exam_repo.get_exam.return_value = exam
+
+        with pytest.raises(HTTPException) as exc:
+            service.get_results_for_exam(session, _teacher_user(), exam.id)
+        assert exc.value.status_code == 403
+
+    def test_student_role_forbidden(self, service, stub_repos, session):
+        # No @router-level RBAC in a unit test — the service itself must
+        # never assume current_user is a Teacher just because it looks up
+        # a teacher profile; require_roles("teacher") is what actually
+        # blocks a Student in production, exercised by the integration
+        # test instead. This test only documents that a Student calling
+        # this service method (bypassing the router) still can't succeed,
+        # since get_teacher_profile_by_user_id would return None for a
+        # Student and AttributeError, not silently authorize them.
+        _result_repo, exam_repo, _schedule_repo, user_repo, *_ = stub_repos
+        user_repo.get_teacher_profile_by_user_id.return_value = None
+        exam_repo.get_exam.return_value = make_exam()
+
+        with pytest.raises(AttributeError):
+            service.get_results_for_exam(session, _student_user(), uuid.uuid4())
+
+    def test_success_returns_results_with_student_names_and_status(self, service, stub_repos, session):
+        result_repo, exam_repo, schedule_repo, user_repo, course_repo, _semester_repo = stub_repos
+        teacher = make_teacher()
+        user_repo.get_teacher_profile_by_user_id.return_value = teacher
+        exam = make_exam(created_by_teacher_id=teacher.id, title="Midterm")
+        exam_repo.get_exam.return_value = exam
+        class_session = make_class_session()
+        schedule_repo.get_class_session.return_value = class_session
+        course = make_course(name="Database Systems")
+        course_repo.get.return_value = course
+
+        student = make_student(first_name="Sami", last_name="Islam")
+        published_result = make_result(student_id=student.id, status="published", grade_letter="A", grade_point=4.0)
+        result_repo.list_for_exam.return_value = [published_result]
+        user_repo.get_student_with_user.return_value = (student, MagicMock())
+
+        response = service.get_results_for_exam(session, _teacher_user(), exam.id)
+
+        assert response.exam_title == "Midterm"
+        assert response.course_name == "Database Systems"
+        assert len(response.results) == 1
+        assert response.results[0].student_name == "Sami Islam"
+        assert response.results[0].status == "published"
+        assert response.results[0].grade_letter == "A"
+
+    def test_no_results_yet_returns_empty_list(self, service, stub_repos, session):
+        result_repo, exam_repo, schedule_repo, user_repo, course_repo, _semester_repo = stub_repos
+        teacher = make_teacher()
+        user_repo.get_teacher_profile_by_user_id.return_value = teacher
+        exam = make_exam(created_by_teacher_id=teacher.id)
+        exam_repo.get_exam.return_value = exam
+        schedule_repo.get_class_session.return_value = make_class_session()
+        course_repo.get.return_value = make_course()
+        result_repo.list_for_exam.return_value = []
+
+        response = service.get_results_for_exam(session, _teacher_user(), exam.id)
+        assert response.results == []

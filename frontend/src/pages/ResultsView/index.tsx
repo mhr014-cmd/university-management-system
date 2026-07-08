@@ -55,6 +55,37 @@ function passFail(gradePoint: number): "Pass" | "Fail" {
   return gradePoint > 0 ? "Pass" : "Fail";
 }
 
+// Enterprise-polish pass: a per-semester GPA chart, built entirely from
+// the `semesters` array ResultsPanel already receives (every semester's
+// GPA is fetched up front to populate the semester dropdown) — no new
+// endpoint, no chart library, just a small set of CSS-height bars.
+function SemesterGpaChart({ semesters }: { semesters: { semester_id: string; semester_name: string; gpa: number }[] }) {
+  if (semesters.length < 2) return null;
+  const maxGpa = Math.max(4, ...semesters.map((s) => s.gpa));
+  const ordered = [...semesters].reverse(); // semesters arrive most-recent-first; chart reads chronologically
+
+  return (
+    <Card>
+      <p className="mb-3 text-sm font-medium text-slate-700 dark:text-slate-300">GPA by Semester</p>
+      <div className="flex items-end gap-3">
+        {ordered.map((s) => (
+          <div key={s.semester_id} className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{s.gpa.toFixed(2)}</span>
+            <div
+              className="w-full max-w-8 rounded-t-sm bg-slate-900 transition-[height] duration-500 ease-out dark:bg-slate-100"
+              style={{ height: `${Math.max(4, (s.gpa / maxGpa) * 64)}px` }}
+              aria-hidden="true"
+            />
+            <span className="max-w-[4.5rem] truncate text-[11px] text-slate-500 dark:text-slate-400" title={s.semester_name}>
+              {s.semester_name}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function ResultsPanel({
   studentId,
   semesterId,
@@ -93,6 +124,7 @@ function ResultsPanel({
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">Overall CGPA: Not available</p>
           </div>
+          <SemesterGpaChart semesters={semesters} />
           <Card className="overflow-x-auto p-0">
             <table className="w-full text-left text-sm">
               <thead>
@@ -169,7 +201,7 @@ function ParentResultsView() {
   }, [children, selectedStudentId]);
 
   const { data, isLoading } = useMyResults({
-    studentId: selectedStudentId || undefined,
+    studentId: selectedStudentId,
     semesterId: semesterId || undefined,
   });
 

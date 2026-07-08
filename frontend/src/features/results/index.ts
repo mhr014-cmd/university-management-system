@@ -90,6 +90,9 @@ export function useMyResults(params?: { semesterId?: string; studentId?: string 
           params: { semester_id: params?.semesterId, student_id: params?.studentId },
         })
       ).data,
+    // Don't fire a guaranteed-403 request before a Parent has picked a
+    // child — same gating as useMyAttendance/useMySchedule/useExams.
+    enabled: params?.studentId !== "",
   });
 }
 
@@ -149,6 +152,35 @@ export function useResultsReport(params?: { departmentId?: string; semesterId?: 
           },
         })
       ).data,
+  });
+}
+
+// Feature 1 (final-verification-pass addition): Teacher Results View —
+// GET /results/exam/{examId}, teacher-only, scoped server-side to exams
+// the caller created.
+export interface TeacherResultEntry {
+  result_id: string;
+  student_id: string;
+  student_name: string;
+  grade_letter: string | null;
+  grade_point: number | null;
+  status: ResultStatus;
+  submitted_at: string;
+  approved_at: string | null;
+}
+
+export interface TeacherExamResultsResponse {
+  exam_id: string;
+  exam_title: string;
+  course_name: string;
+  results: TeacherResultEntry[];
+}
+
+export function useExamResultsForTeacher(examId?: string) {
+  return useQuery({
+    queryKey: ["results", "exam", examId],
+    queryFn: async () => (await apiClient.get<TeacherExamResultsResponse>(`/results/exam/${examId}`)).data,
+    enabled: Boolean(examId),
   });
 }
 

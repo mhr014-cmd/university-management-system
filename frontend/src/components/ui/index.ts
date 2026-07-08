@@ -7,6 +7,8 @@ export { PasswordInput } from "./PasswordInput";
 export { ToastProvider, useToast } from "./Toast";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { Pagination } from "./Pagination";
+export { ProgressBar, progressBarTone } from "./ProgressBar";
+export { Skeleton } from "./Skeleton";
 export { ReportLayout } from "./ReportLayout";
 export { ReportToolbar } from "./ReportToolbar";
 export { SearchableSelect, type SearchableSelectOption } from "./SearchableSelect";

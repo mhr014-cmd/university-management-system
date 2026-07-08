@@ -21,7 +21,6 @@ from app.models.room import Room
 from app.models.schedule_change_request import ScheduleChangeRequest
 from app.models.schedule_entry import ScheduleEntry
 from app.models.student import Student
-from app.models.teacher import Teacher
 
 
 class ScheduleRepository:

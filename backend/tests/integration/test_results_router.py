@@ -394,6 +394,100 @@ class TestGetMyResults:
         assert response.status_code == 403
 
 
+class TestGetResultsForExam:
+    """Feature 1 (final-verification-pass addition): Teacher Results View
+    — GET /results/exam/{examId}. Read-only; a Teacher can check the
+    approval status of results they've submitted for their own exams."""
+
+    def test_requires_teacher_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        response = client.get(
+            "/api/v1/results/exam/00000000-0000-0000-0000-000000000000", headers=_headers(token)
+        )
+        assert response.status_code == 403
+
+    def test_non_creator_teacher_forbidden(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+
+        make_teacher_user("other-teacher@example.com", "other-password")
+        other_teacher_token = _login(client, "other-teacher@example.com", "other-password")
+
+        response = client.get(f"/api/v1/results/exam/{exam['id']}", headers=_headers(other_teacher_token))
+        assert response.status_code == 403
+
+    def test_exam_not_found_returns_404(self, client, make_teacher_user):
+        make_teacher_user("teacher@example.com", "teacher-password")
+        token = _login(client, "teacher@example.com", "teacher-password")
+        response = client.get(
+            "/api/v1/results/exam/00000000-0000-0000-0000-000000000000", headers=_headers(token)
+        )
+        assert response.status_code == 404
+
+    def test_no_results_submitted_yet_returns_empty_list(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+
+        response = client.get(f"/api/v1/results/exam/{exam['id']}", headers=_headers(teacher_token))
+        assert response.status_code == 200
+        assert response.json()["results"] == []
+
+    def test_teacher_sees_submitted_status_before_admin_approval(
+        self, client, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+        payload = {"results": [{"student_id": str(student.id), "grade_letter": "B", "grade_point": 3.0}]}
+        client.post(f"/api/v1/results/{exam['id']}/submit", json=payload, headers=_headers(teacher_token))
+
+        response = client.get(f"/api/v1/results/exam/{exam['id']}", headers=_headers(teacher_token))
+        assert response.status_code == 200
+        body = response.json()
+        assert body["exam_title"] == "Final"
+        assert len(body["results"]) == 1
+        assert body["results"][0]["status"] == "submitted"
+        assert body["results"][0]["grade_letter"] == "B"
+        assert body["results"][0]["student_name"]
+
+    def test_teacher_sees_published_status_after_admin_approval(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        exam = _build_published_exam(client, teacher_token, student_token, str(class_session.id))
+        payload = {"results": [{"student_id": str(student.id), "grade_letter": "A", "grade_point": 4.0}]}
+        client.post(f"/api/v1/results/{exam['id']}/submit", json=payload, headers=_headers(teacher_token))
+        pending = client.get("/api/v1/results/pending", headers=_headers(admin_token)).json()
+        result_id = pending["items"][0]["results"][0]["result_id"]
+        client.post(f"/api/v1/results/{result_id}/approve", json={"decision": "approve"}, headers=_headers(admin_token))
+
+        response = client.get(f"/api/v1/results/exam/{exam['id']}", headers=_headers(teacher_token))
+        assert response.status_code == 200
+        assert response.json()["results"][0]["status"] == "published"
+
+
 class TestGetPendingResults:
     def test_requires_admin_role(self, client, make_teacher_user):
         make_teacher_user("teacher@example.com", "correct-password")

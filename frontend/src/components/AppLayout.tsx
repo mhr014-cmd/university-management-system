@@ -69,6 +69,8 @@ export function AppLayout() {
       ? [{ to: "/exams", label: "Exams" }]
       : []),
     ...(user?.role === "student" || user?.role === "parent" ? [{ to: "/results", label: "Results" }] : []),
+    // Feature 1 (final-verification-pass addition): Teacher Results View.
+    ...(user?.role === "teacher" ? [{ to: "/teacher/results", label: "Results" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/result-approval", label: "Result Approval" }] : []),
     ...(user?.role === "student" || user?.role === "parent" ? [{ to: "/fees", label: "Fee Centre" }] : []),
     ...(user?.role === "admin" ? [{ to: "/admin/fee-dashboard", label: "Fee Dashboard" }] : []),

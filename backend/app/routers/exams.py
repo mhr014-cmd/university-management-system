@@ -26,6 +26,7 @@ grading_service = GradingService()
 _require_teacher = Depends(require_roles("teacher"))
 _require_student = Depends(require_roles("student"))
 _require_teacher_or_admin = Depends(require_roles("teacher", "admin"))
+_require_student_or_parent = Depends(require_roles("student", "parent"))
 
 
 @router.get("", response_model=PaginatedResponse[ExamListItem])
@@ -112,6 +113,22 @@ def get_submission_detail(
     db: Session = Depends(get_db),
 ):
     return grading_service.get_submission_detail(db, current_user, exam_id, submission_id)
+
+
+@router.get(
+    "/{exam_id}/my-submission",
+    response_model=ExamSubmissionDetailResponse,
+    dependencies=[_require_student_or_parent],
+)
+def get_my_submission_detail(
+    exam_id: uuid.UUID,
+    # Parent-scoping (same convention as GET /exams, /attendance/me,
+    # /results/me, /fees/me): required for Parent, ignored for Student.
+    student_id: uuid.UUID | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return grading_service.get_my_submission_detail(db, current_user, exam_id, student_id=student_id)
 
 
 @router.post("/{exam_id}/grade", response_model=ExamGradeResponse, dependencies=[_require_teacher])

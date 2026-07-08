@@ -32,6 +32,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { ProgressBar } from "../../components/ui/ProgressBar";
 import { ReportToolbar } from "../../components/ui/ReportToolbar";
 import { inputClass } from "../../components/ui/classNames";
 
@@ -301,12 +302,7 @@ function AttendanceContent({ studentId, showHeading = true }: { studentId?: stri
       <Card>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">Overall: {data.overall_percentage}%</span>
-          <div className="h-2 w-40 rounded-full bg-slate-200 dark:bg-slate-700">
-            <div
-              className="h-2 rounded-full bg-slate-900 dark:bg-slate-100"
-              style={{ width: `${Math.min(data.overall_percentage, 100)}%` }}
-            />
-          </div>
+          <ProgressBar value={data.overall_percentage} />
           {data.low_attendance_warning && (
             <span className="flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
               <AlertTriangle className="h-3 w-3" aria-hidden="true" />

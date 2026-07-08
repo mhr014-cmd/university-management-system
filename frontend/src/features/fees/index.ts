@@ -129,6 +129,9 @@ export function useMyFees(params?: { semesterId?: string; studentId?: string }) 
           params: { semester_id: params?.semesterId, student_id: params?.studentId },
         })
       ).data,
+    // Don't fire a guaranteed-403 request before a Parent has picked a
+    // child — same gating as useMyAttendance/useMySchedule/useExams.
+    enabled: params?.studentId !== "",
   });
 }
 

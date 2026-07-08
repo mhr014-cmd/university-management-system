@@ -96,3 +96,28 @@ class PendingResultQueueEntry(BaseModel):
 
 class PendingResultsResponse(BaseModel):
     items: list[PendingResultQueueEntry]
+
+
+# --- GET /results/exam/{examId} (final-verification-pass addition, ------
+# Feature 1: Teacher Results View) ----------------------------------------
+
+
+class TeacherResultEntry(BaseModel):
+    result_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    # Nullable on the Result model itself (Database_Design.md §6.21); in
+    # practice always set by submit_results, but matched here rather than
+    # assumed, same as PendingResultDetailEntry above.
+    grade_letter: str | None
+    grade_point: float | None
+    status: ResultStatus
+    submitted_at: datetime
+    approved_at: datetime | None
+
+
+class TeacherExamResultsResponse(BaseModel):
+    exam_id: uuid.UUID
+    exam_title: str
+    course_name: str
+    results: list[TeacherResultEntry]

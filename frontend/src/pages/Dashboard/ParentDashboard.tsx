@@ -13,14 +13,13 @@
 // manually-typed Student ID.
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Award, Bell, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
+import { Award, CalendarClock, PieChart, Users, Wallet } from "lucide-react";
 import { useMyAttendance } from "../../features/attendance";
 import { useExams } from "../../features/exams";
 import { useMyFees } from "../../features/fees";
-import { useNotifications } from "../../features/notifications";
 import { useMyResults } from "../../features/results";
 import { useMyChildren } from "../../features/users";
+import { RecentNotificationsCard } from "../../components/RecentNotificationsCard";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { inputClass } from "../../components/ui/classNames";
@@ -38,8 +37,8 @@ export function ParentDashboard() {
     }
   }, [children, selectedStudentId]);
 
-  const { data: fees, isError: feesError } = useMyFees({ studentId: selectedStudentId || undefined });
-  const { data: results, isError: resultsError } = useMyResults({ studentId: selectedStudentId || undefined });
+  const { data: fees, isError: feesError } = useMyFees({ studentId: selectedStudentId });
+  const { data: results, isError: resultsError } = useMyResults({ studentId: selectedStudentId });
   const { data: attendance, isError: attendanceError } = useMyAttendance({ studentId: selectedStudentId });
   const { data: exams, isError: examsError } = useExams({ studentId: selectedStudentId });
 
@@ -90,15 +89,15 @@ export function ParentDashboard() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {!selectedStudentId ? (
-          <DashboardCard title="Fee Status" icon={Wallet}>
+          <DashboardCard title="Fee Status" icon={Wallet} to="/fees">
             <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
           </DashboardCard>
         ) : feesError ? (
-          <DashboardCard title="Fee Status" icon={Wallet}>
+          <DashboardCard title="Fee Status" icon={Wallet} to="/fees">
             <p className="text-sm text-red-600 dark:text-red-400">Not linked, or fee data unavailable.</p>
           </DashboardCard>
         ) : (
-          <DashboardCard title="Fee Status" icon={Wallet}>
+          <DashboardCard title="Fee Status" icon={Wallet} to="/fees">
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               {fees?.outstanding_balance.toFixed(2) ?? "—"}
             </p>
@@ -109,15 +108,15 @@ export function ParentDashboard() {
         )}
 
         {!selectedStudentId ? (
-          <DashboardCard title="Attendance %" icon={PieChart}>
+          <DashboardCard title="Attendance %" icon={PieChart} to="/attendance">
             <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
           </DashboardCard>
         ) : attendanceError ? (
-          <DashboardCard title="Attendance %" icon={PieChart}>
+          <DashboardCard title="Attendance %" icon={PieChart} to="/attendance">
             <p className="text-sm text-red-600 dark:text-red-400">Not linked, or attendance data unavailable.</p>
           </DashboardCard>
         ) : (
-          <DashboardCard title="Attendance %" icon={PieChart}>
+          <DashboardCard title="Attendance %" icon={PieChart} to="/attendance">
             <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               {attendance?.overall_percentage.toFixed(1) ?? "—"}%
             </p>
@@ -127,19 +126,19 @@ export function ParentDashboard() {
           </DashboardCard>
         )}
         {!selectedStudentId ? (
-          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock} to="/exams">
             <p className="text-sm text-slate-400 dark:text-slate-500">Select a child above.</p>
           </DashboardCard>
         ) : examsError ? (
-          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock} to="/exams">
             <p className="text-sm text-red-600 dark:text-red-400">Not linked, or exam data unavailable.</p>
           </DashboardCard>
         ) : upcomingExams.length === 0 ? (
-          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock} to="/exams">
             <p className="text-sm text-slate-400 dark:text-slate-500">No upcoming exams scheduled.</p>
           </DashboardCard>
         ) : (
-          <DashboardCard title="Upcoming Exams" icon={CalendarClock}>
+          <DashboardCard title="Upcoming Exams" icon={CalendarClock} to="/exams">
             <ul className="space-y-1.5">
               {upcomingExams.map((exam) => (
                 <li key={exam.id} className="flex items-baseline justify-between text-sm">
@@ -156,7 +155,7 @@ export function ParentDashboard() {
         )}
       </div>
 
-      <Card>
+      <Card to={selectedStudentId ? "/results" : undefined} hoverable={Boolean(selectedStudentId)}>
         <div className="mb-2 flex items-center gap-2">
           <Award className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Recent Results</p>
@@ -194,47 +193,5 @@ export function ParentDashboard() {
 
       <RecentNotificationsCard />
     </div>
-  );
-}
-
-// Gap closure (production-readiness audit): the Notifications feature
-// already existed (GET /notifications, generic across every role) but had
-// no dashboard-level presence for Parent, only the standalone
-// Notifications page. Reuses the existing hook, no new endpoint.
-function RecentNotificationsCard() {
-  const { data, isLoading } = useNotifications({ pageSize: 5 });
-
-  return (
-    <Card>
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Latest Notifications</p>
-        </div>
-        <Link to="/notifications" className="text-xs font-medium text-slate-600 hover:underline dark:text-slate-300">
-          View all
-        </Link>
-      </div>
-      {isLoading ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p>
-      ) : !data || data.items.length === 0 ? (
-        <EmptyState icon={Bell} title="No notifications yet" />
-      ) : (
-        <ul className="space-y-2">
-          {data.items.map((notification) => (
-            <li key={notification.id} className="flex items-start gap-2 text-sm">
-              <span
-                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                  notification.is_read ? "border border-slate-400" : "bg-slate-900 dark:bg-slate-100"
-                }`}
-              />
-              <span className={notification.is_read ? "text-slate-500 dark:text-slate-400" : "font-medium text-slate-900 dark:text-slate-100"}>
-                {notification.message}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
   );
 }

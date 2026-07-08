@@ -16,8 +16,10 @@ import AttendancePage from "../pages/Attendance";
 import AttendanceMarkerPage from "../pages/Teacher/AttendanceMarker";
 import ExamListPage from "../pages/ExamList";
 import ExamRoomPage from "../pages/ExamRoom";
+import ExamFeedbackPage from "../pages/ExamFeedback";
 import ExamBuilderPage from "../pages/Teacher/ExamBuilder";
 import GradingInterfacePage from "../pages/Teacher/GradingInterface";
+import TeacherResultsPage from "../pages/Teacher/Results";
 import ResultsViewPage from "../pages/ResultsView";
 import ResultApprovalPage from "../pages/Admin/ResultApproval";
 import FeeCentrePage from "../pages/FeeCentre";
@@ -78,6 +80,10 @@ export const router = createBrowserRouter([
             element: <ExamRoomPage />,
           },
           {
+            path: "/exams/:examId/feedback",
+            element: <ExamFeedbackPage />,
+          },
+          {
             path: "/teacher/exam-builder",
             element: <ExamBuilderPage />,
           },
@@ -92,6 +98,10 @@ export const router = createBrowserRouter([
           {
             path: "/results",
             element: <ResultsViewPage />,
+          },
+          {
+            path: "/teacher/results",
+            element: <TeacherResultsPage />,
           },
           {
             path: "/admin/result-approval",

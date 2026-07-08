@@ -10,7 +10,7 @@
 // (both already Parent-accessible) with a linked-child selector.
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Printer, Receipt, Users, Wallet } from "lucide-react";
+import { CheckCircle2, Clock, Download, Printer, Receipt, TriangleAlert, Users, Wallet } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { InvoiceStatus, useMyFees, useDownloadInvoice } from "../../features/fees";
 import { useMyChildren } from "../../features/users";
@@ -50,6 +50,14 @@ function FeesPanel({ studentId }: { studentId?: string }) {
     .filter((i) => i.status !== "paid")
     .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
 
+  // Enterprise-polish pass: paid/pending/overdue summary, derived entirely
+  // from the invoices array GET /fees/me already returns — no new field,
+  // no new request.
+  const paidInvoices = data.invoices.filter((i) => i.status === "paid");
+  const pendingInvoices = data.invoices.filter((i) => i.status === "unpaid" || i.status === "partially_paid");
+  const overdueInvoices = data.invoices.filter((i) => i.status === "overdue");
+  const sumAmount = (list: typeof data.invoices) => list.reduce((sum, i) => sum + i.amount, 0);
+
   return (
     <div data-print-region className="space-y-4">
       <div className="flex justify-end" data-print-hidden>
@@ -68,6 +76,47 @@ function FeesPanel({ studentId }: { studentId?: string }) {
         </p>
         {nextDue && <p className="text-sm text-slate-500 dark:text-slate-400">Due: {nextDue.due_date}</p>}
       </Card>
+
+      {data.invoices.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card>
+            <div className="mb-1 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" aria-hidden="true" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">Paid</p>
+            </div>
+            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              {sumAmount(paidInvoices).toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {paidInvoices.length} invoice{paidInvoices.length === 1 ? "" : "s"}
+            </p>
+          </Card>
+          <Card>
+            <div className="mb-1 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">Pending</p>
+            </div>
+            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              {sumAmount(pendingInvoices).toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {pendingInvoices.length} invoice{pendingInvoices.length === 1 ? "" : "s"}
+            </p>
+          </Card>
+          <Card>
+            <div className="mb-1 flex items-center gap-2">
+              <TriangleAlert className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden="true" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">Overdue</p>
+            </div>
+            <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              {sumAmount(overdueInvoices).toFixed(2)}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {overdueInvoices.length} invoice{overdueInvoices.length === 1 ? "" : "s"}
+            </p>
+          </Card>
+        </div>
+      )}
 
       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Payment History</h2>
       {data.payments.length === 0 ? (

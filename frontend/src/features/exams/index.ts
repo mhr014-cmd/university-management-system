@@ -275,6 +275,24 @@ export function useSubmissionDetail(examId?: string, submissionId?: string) {
   });
 }
 
+// Feature 2 (final-verification-pass addition): Student Feedback View —
+// GET /exams/{examId}/my-submission, Student-or-Parent only, resolved
+// server-side to the caller's own (or, for a Parent, the ownership-checked
+// linked child's) submission. Reuses the same ExamSubmissionDetail shape
+// already used by the Teacher-facing useSubmissionDetail above.
+export function useMySubmissionDetail(examId?: string, params?: { studentId?: string }) {
+  return useQuery({
+    queryKey: ["exams", examId, "my-submission", params?.studentId],
+    queryFn: async () =>
+      (
+        await apiClient.get<ExamSubmissionDetail>(`/exams/${examId}/my-submission`, {
+          params: { student_id: params?.studentId },
+        })
+      ).data,
+    enabled: Boolean(examId) && params?.studentId !== "",
+  });
+}
+
 export function useExamResults(examId?: string) {
   return useQuery({
     queryKey: ["exams", examId, "results"],
