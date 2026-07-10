@@ -184,6 +184,7 @@ function ExamListContent({ studentId }: { studentId?: string }) {
                 <th className="px-4 py-2.5">Class</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Date</th>
+                {user?.role === "teacher" && <th className="px-4 py-2.5">Action</th>}
               </tr>
             </thead>
             <tbody>
@@ -199,6 +200,24 @@ function ExamListContent({ studentId }: { studentId?: string }) {
                     <Badge tone={examStatusTone[exam.status]}>{exam.status}</Badge>
                   </td>
                   <td className="px-4 py-2.5">{exam.scheduled_at ? new Date(exam.scheduled_at).toLocaleString() : "—"}</td>
+                  {user?.role === "teacher" && (
+                    <td className="px-4 py-2.5">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRowClick(exam.id, exam.status);
+                        }}
+                      >
+                        {exam.status === "draft" || exam.status === "scheduled"
+                          ? "Edit"
+                          : exam.status === "published"
+                            ? "View Results"
+                            : "Grade"}
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

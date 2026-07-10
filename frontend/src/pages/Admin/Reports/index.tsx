@@ -16,8 +16,8 @@ import {
   useExportAttendanceReportExcel,
   useExportAttendanceReportPdf,
 } from "../../../features/attendance";
-import { useResultsReport } from "../../../features/results";
-import { useFeesReport } from "../../../features/fees";
+import { useResultsReport, useExportResultsReportExcel, useExportResultsReportPdf } from "../../../features/results";
+import { useFeesReport, useExportFeesReportExcel, useExportFeesReportPdf } from "../../../features/fees";
 import { Card } from "../../../components/ui/Card";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { PageLoader } from "../../../components/ui/PageLoader";
@@ -50,6 +50,10 @@ export default function AdminReportsPage() {
   const feesReport = useFeesReport(filters);
   const exportAttendancePdf = useExportAttendanceReportPdf();
   const exportAttendanceExcel = useExportAttendanceReportExcel();
+  const exportResultsPdf = useExportResultsReportPdf();
+  const exportResultsExcel = useExportResultsReportExcel();
+  const exportFeesPdf = useExportFeesReportPdf();
+  const exportFeesExcel = useExportFeesReportExcel();
 
   return (
     <div className="space-y-4">
@@ -150,84 +154,194 @@ export default function AdminReportsPage() {
         </ReportLayout>
       )}
 
-      {tab === "results" &&
-        (resultsReport.isLoading || !resultsReport.data ? (
-          <PageLoader />
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Card>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Pass Count</p>
-                <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {resultsReport.data.pass_count}
-                </p>
-              </Card>
-              <Card>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Fail Count</p>
-                <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {resultsReport.data.fail_count}
-                </p>
-              </Card>
-              <Card>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Average GPA</p>
-                <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                  {resultsReport.data.average_gpa.toFixed(2)}
-                </p>
-              </Card>
-            </div>
-            {resultsReport.data.grade_distribution.length === 0 ? (
-              <EmptyState icon={FileBarChart} title="No published results in this scope" />
-            ) : (
-              <Card className="overflow-x-auto p-0">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <th className="px-4 py-2.5">Grade Letter</th>
-                      <th className="px-4 py-2.5">Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resultsReport.data.grade_distribution.map((entry) => (
-                      <tr
-                        key={entry.grade_letter}
-                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                      >
-                        <td className="px-4 py-2.5">{entry.grade_letter}</td>
-                        <td className="px-4 py-2.5">{entry.count}</td>
+      {tab === "results" && (
+        <ReportLayout
+          title="Results Report"
+          subtitle="Pass/fail counts, average GPA, and grade distribution for the selected department, semester, or student."
+          toolbar={
+            <ReportToolbar
+              onExportPdf={() =>
+                exportResultsPdf.mutate(filters, {
+                  onError: () => showError("Could not generate the PDF export. Please try again."),
+                })
+              }
+              onExportExcel={() =>
+                exportResultsExcel.mutate(filters, {
+                  onError: () => showError("Could not generate the Excel export. Please try again."),
+                })
+              }
+              isExportingPdf={exportResultsPdf.isPending}
+              isExportingExcel={exportResultsExcel.isPending}
+            />
+          }
+        >
+          {resultsReport.isLoading || !resultsReport.data ? (
+            <PageLoader />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Pass Count</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {resultsReport.data.pass_count}
+                  </p>
+                </Card>
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Fail Count</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {resultsReport.data.fail_count}
+                  </p>
+                </Card>
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Average GPA</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {resultsReport.data.average_gpa.toFixed(2)}
+                  </p>
+                </Card>
+              </div>
+              {resultsReport.data.grade_distribution.length === 0 ? (
+                <EmptyState icon={FileBarChart} title="No published results in this scope" />
+              ) : (
+                <Card className="overflow-x-auto p-0">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="px-4 py-2.5">Grade Letter</th>
+                        <th className="px-4 py-2.5">Count</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            )}
-          </div>
-        ))}
+                    </thead>
+                    <tbody>
+                      {resultsReport.data.grade_distribution.map((entry) => (
+                        <tr
+                          key={entry.grade_letter}
+                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                        >
+                          <td className="px-4 py-2.5">{entry.grade_letter}</td>
+                          <td className="px-4 py-2.5">{entry.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              )}
+              {resultsReport.data.details.length === 0 ? (
+                <EmptyState icon={FileBarChart} title="No published results in this scope" />
+              ) : (
+                <Card className="overflow-x-auto p-0">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="px-4 py-2.5">Student</th>
+                        <th className="px-4 py-2.5">Course</th>
+                        <th className="px-4 py-2.5">Exam</th>
+                        <th className="px-4 py-2.5">Grade</th>
+                        <th className="px-4 py-2.5">GPA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resultsReport.data.details.map((entry, index) => (
+                        <tr
+                          key={`${entry.student_id}-${entry.course_name}-${index}`}
+                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                        >
+                          <td className="px-4 py-2.5">{entry.student_name}</td>
+                          <td className="px-4 py-2.5">{entry.course_name}</td>
+                          <td className="px-4 py-2.5">{entry.exam_title ?? "—"}</td>
+                          <td className="px-4 py-2.5">{entry.grade_letter}</td>
+                          <td className="px-4 py-2.5">{entry.grade_point.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              )}
+            </div>
+          )}
+        </ReportLayout>
+      )}
 
-      {tab === "fees" &&
-        (feesReport.isLoading || !feesReport.data ? (
-          <PageLoader />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Card>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Collected</p>
-              <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                {feesReport.data.total_collected.toFixed(2)}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding</p>
-              <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                {feesReport.data.total_outstanding.toFixed(2)}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Overdue</p>
-              <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                {feesReport.data.total_overdue.toFixed(2)}
-              </p>
-            </Card>
-          </div>
-        ))}
+      {tab === "fees" && (
+        <ReportLayout
+          title="Fees Report"
+          subtitle="Collected, outstanding, and overdue totals for the selected department, semester, or student."
+          toolbar={
+            <ReportToolbar
+              onExportPdf={() =>
+                exportFeesPdf.mutate(filters, {
+                  onError: () => showError("Could not generate the PDF export. Please try again."),
+                })
+              }
+              onExportExcel={() =>
+                exportFeesExcel.mutate(filters, {
+                  onError: () => showError("Could not generate the Excel export. Please try again."),
+                })
+              }
+              isExportingPdf={exportFeesPdf.isPending}
+              isExportingExcel={exportFeesExcel.isPending}
+            />
+          }
+        >
+          {feesReport.isLoading || !feesReport.data ? (
+            <PageLoader />
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Collected</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {feesReport.data.total_collected.toFixed(2)}
+                  </p>
+                </Card>
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Outstanding</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {feesReport.data.total_outstanding.toFixed(2)}
+                  </p>
+                </Card>
+                <Card>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Overdue</p>
+                  <p className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                    {feesReport.data.total_overdue.toFixed(2)}
+                  </p>
+                </Card>
+              </div>
+              {feesReport.data.details.length === 0 ? (
+                <EmptyState icon={FileBarChart} title="No invoices in this scope" />
+              ) : (
+                <Card className="overflow-x-auto p-0">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 z-[1] bg-white dark:bg-slate-800/50">
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="px-4 py-2.5">Student</th>
+                        <th className="px-4 py-2.5">Fee Name</th>
+                        <th className="px-4 py-2.5">Amount</th>
+                        <th className="px-4 py-2.5">Paid</th>
+                        <th className="px-4 py-2.5">Outstanding</th>
+                        <th className="px-4 py-2.5">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feesReport.data.details.map((entry, index) => (
+                        <tr
+                          key={`${entry.student_id}-${entry.fee_name}-${index}`}
+                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                        >
+                          <td className="px-4 py-2.5">{entry.student_name}</td>
+                          <td className="px-4 py-2.5">{entry.fee_name}</td>
+                          <td className="px-4 py-2.5">{entry.amount.toFixed(2)}</td>
+                          <td className="px-4 py-2.5">{entry.paid.toFixed(2)}</td>
+                          <td className="px-4 py-2.5">{entry.outstanding.toFixed(2)}</td>
+                          <td className="px-4 py-2.5">{entry.due_date}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              )}
+            </div>
+          )}
+        </ReportLayout>
+      )}
     </div>
   );
 }

@@ -136,6 +136,7 @@ export interface SubmissionQuestionDetail {
   answer_id: string | null;
   answer_text: string | null;
   selected_option_id: string | null;
+  selected_option_text: string | null;
   awarded_marks: number | null;
   feedback: string | null;
 }

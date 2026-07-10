@@ -67,10 +67,17 @@ class GradingService:
         answers_by_question = {a.question_id: a for a in exam_repo.list_answers_for_submission(session, submission_id)}
         grades_by_answer = {g.answer_id: g for g in exam_repo.list_grades_for_submission(session, submission_id)}
 
+        # Single batch lookup for every MCQ option's display text — not one
+        # query per question — matching the get_results()/student_name
+        # batch-lookup convention above, so this stays free of N+1 queries.
+        options = exam_repo.list_options_for_questions(session, [q.id for q in questions])
+        option_text_by_id = {o.id: o.option_text for o in options}
+
         question_details = []
         for question in questions:
             answer = answers_by_question.get(question.id)
             grade = grades_by_answer.get(answer.id) if answer is not None else None
+            selected_option_id = answer.selected_option_id if answer is not None else None
             question_details.append(
                 SubmissionQuestionDetail(
                     question_id=question.id,
@@ -80,7 +87,8 @@ class GradingService:
                     order_index=question.order_index,
                     answer_id=answer.id if answer is not None else None,
                     answer_text=answer.answer_text if answer is not None else None,
-                    selected_option_id=answer.selected_option_id if answer is not None else None,
+                    selected_option_id=selected_option_id,
+                    selected_option_text=option_text_by_id.get(selected_option_id) if selected_option_id else None,
                     awarded_marks=float(grade.awarded_marks) if grade is not None and reveal else None,
                     feedback=grade.feedback if grade is not None and reveal else None,
                 )

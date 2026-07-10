@@ -6,7 +6,7 @@ Full request -> DB -> response cycle against a disposable test database
 (see tests/conftest.py). Requires TEST_DATABASE_URL — skipped otherwise.
 """
 
-from tests.conftest import requires_test_database
+from tests.conftest import decode_file_envelope, requires_test_database
 
 pytestmark = requires_test_database
 
@@ -134,6 +134,44 @@ class TestGetResultsReport:
         assert {"grade_letter": "A", "count": 1} in body["grade_distribution"]
 
 
+class TestExportResultsReport:
+    def test_requires_admin_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        assert client.get("/api/v1/results/reports/pdf", headers=_headers(token)).status_code == 403
+        assert client.get("/api/v1/results/reports/excel", headers=_headers(token)).status_code == 403
+
+    def test_pdf_and_excel_reflect_the_same_filtered_data_as_the_json_report(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        admin_token = _login(client, "admin@example.com", "correct-password")
+        teacher_token = _login(client, "teacher@example.com", "teacher-password")
+        student_token = _login(client, "student@example.com", "student-password")
+        _build_published_result(client, teacher_token, student_token, admin_token, str(class_session.id), student.id)
+
+        params = {"student_id": str(student.id)}
+        json_body = client.get("/api/v1/results/reports", params=params, headers=_headers(admin_token)).json()
+        assert json_body["pass_count"] == 1
+
+        pdf_response = client.get("/api/v1/results/reports/pdf", params=params, headers=_headers(admin_token))
+        assert pdf_response.status_code == 200
+        pdf_bytes, pdf_content_type, pdf_filename = decode_file_envelope(pdf_response)
+        assert pdf_bytes.startswith(b"%PDF")
+        assert pdf_content_type == "application/pdf"
+        assert pdf_filename.endswith(".pdf")
+
+        excel_response = client.get("/api/v1/results/reports/excel", params=params, headers=_headers(admin_token))
+        assert excel_response.status_code == 200
+        excel_bytes, excel_content_type, excel_filename = decode_file_envelope(excel_response)
+        assert excel_bytes.startswith(b"PK")  # .xlsx is a zip archive
+        assert excel_content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert excel_filename.endswith(".xlsx")
+
+
 class TestGetFeesReport:
     def test_requires_admin_role(self, client, make_student_user):
         make_student_user("student@example.com", "correct-password")
@@ -167,6 +205,52 @@ class TestGetFeesReport:
         assert body["total_collected"] == 4000.0
         assert body["total_outstanding"] == 6000.0
         assert body["total_overdue"] == 6000.0
+
+
+class TestExportFeesReport:
+    def test_requires_admin_role(self, client, make_student_user):
+        make_student_user("student@example.com", "correct-password")
+        token = _login(client, "student@example.com", "correct-password")
+        assert client.get("/api/v1/fees/reports/pdf", headers=_headers(token)).status_code == 403
+        assert client.get("/api/v1/fees/reports/excel", headers=_headers(token)).status_code == 403
+
+    def test_pdf_and_excel_reflect_the_same_filtered_data_as_the_json_report(
+        self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
+    ):
+        make_admin_user("admin@example.com", "correct-password")
+        teacher, student, class_session = _setup_enrolled_student(
+            make_teacher_user, make_student_user, make_class_session, make_enrollment
+        )
+        admin_token = _login(client, "admin@example.com", "correct-password")
+
+        fs = client.post(
+            "/api/v1/fees",
+            json={"semester_id": str(class_session.semester_id), "name": "Tuition", "amount": 10000, "due_date": "2020-01-01"},
+            headers=_headers(admin_token),
+        ).json()
+        client.post(
+            "/api/v1/fees/payments",
+            json={"student_id": str(student.id), "fee_structure_id": fs["id"], "amount": 4000, "payment_date": "2026-06-01T00:00:00Z"},
+            headers=_headers(admin_token),
+        )
+
+        params = {"student_id": str(student.id)}
+        json_body = client.get("/api/v1/fees/reports", params=params, headers=_headers(admin_token)).json()
+        assert json_body["total_collected"] == 4000.0
+
+        pdf_response = client.get("/api/v1/fees/reports/pdf", params=params, headers=_headers(admin_token))
+        assert pdf_response.status_code == 200
+        pdf_bytes, pdf_content_type, pdf_filename = decode_file_envelope(pdf_response)
+        assert pdf_bytes.startswith(b"%PDF")
+        assert pdf_content_type == "application/pdf"
+        assert pdf_filename.endswith(".pdf")
+
+        excel_response = client.get("/api/v1/fees/reports/excel", params=params, headers=_headers(admin_token))
+        assert excel_response.status_code == 200
+        excel_bytes, excel_content_type, excel_filename = decode_file_envelope(excel_response)
+        assert excel_bytes.startswith(b"PK")
+        assert excel_content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert excel_filename.endswith(".xlsx")
 
 
 class TestNotifyOverdueAccounts:

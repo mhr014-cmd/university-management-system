@@ -70,9 +70,12 @@ function FeedbackPanel({ examId, studentId }: { examId: string; studentId?: stri
                     {question.awarded_marks !== null ? `${question.awarded_marks} / ${question.marks}` : `— / ${question.marks}`}
                   </Badge>
                 </div>
-                {question.answer_text && (
+                {(question.answer_text ?? question.selected_option_text) && (
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    Your answer: <span className="text-slate-800 dark:text-slate-200">{question.answer_text}</span>
+                    Your answer:{" "}
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {question.answer_text ?? question.selected_option_text}
+                    </span>
                   </p>
                 )}
                 {question.feedback ? (

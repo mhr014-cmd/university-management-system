@@ -10,6 +10,7 @@ against — an unfamiliar database. Never point this at a developer's real
 local database; it is dropped and recreated (schema-level) between test runs.
 """
 
+import base64
 import os
 
 import pytest
@@ -18,6 +19,14 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
+
+def decode_file_envelope(response) -> tuple[bytes, str, str]:
+    """Decode a generated-file endpoint's base64 JSON envelope (see
+    app/core/file_response.py) into (content_bytes, content_type, filename)
+    for assertions in tests."""
+    body = response.json()
+    return base64.b64decode(body["data_base64"]), body["content_type"], body["filename"]
 
 requires_test_database = pytest.mark.skipif(
     TEST_DATABASE_URL is None,

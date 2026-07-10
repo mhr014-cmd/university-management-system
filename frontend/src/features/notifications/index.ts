@@ -29,6 +29,14 @@ export function useNotifications(params?: { isRead?: boolean; page?: number; pag
           params: { is_read: params?.isRead, page: params?.page ?? 1, page_size: params?.pageSize ?? 20 },
         })
       ).data,
+    // No WebSocket/live-push channel exists in this project — the
+    // notification bell (AppLayout) is a persistent component that never
+    // remounts, so without this it would never see a notification
+    // dispatched by another user's action (e.g. Admin's "Send Bulk
+    // Overdue Notice" creating a fee_due notification for an affected
+    // Student) until a manual page reload. Same refetchInterval
+    // convention already used by lib/useHealthCheck.ts.
+    refetchInterval: 30_000,
   });
 }
 

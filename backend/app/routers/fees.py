@@ -4,10 +4,11 @@ API router: fees (see docs/API_Contract.md Section 6).
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from app.core.file_response import file_json_response
 from app.db.session import get_db
 from app.middleware.auth import get_current_user
 from app.middleware.rbac import require_roles
@@ -111,8 +112,8 @@ async def get_invoice(
     # own docstring) — the filename mirrors that so a downloaded file's
     # name matches what's printed on the document itself.
     filename = "receipt.pdf" if invoice_data["status"] == "paid" else "invoice.pdf"
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    # Base64 JSON envelope — see app/core/file_response.py and
+    # routers/attendance.py's get_attendance_reports_pdf for why a raw
+    # application/pdf response is avoided (third-party download-manager
+    # interception, confirmed via live runtime debugging).
+    return file_json_response(pdf_bytes, "application/pdf", filename)

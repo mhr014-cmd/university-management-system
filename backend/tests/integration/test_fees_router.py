@@ -6,7 +6,7 @@ Full request -> DB -> response cycle against a disposable test database
 (see tests/conftest.py). Requires TEST_DATABASE_URL — skipped otherwise.
 """
 
-from tests.conftest import requires_test_database
+from tests.conftest import decode_file_envelope, requires_test_database
 
 pytestmark = requires_test_database
 
@@ -355,10 +355,11 @@ class TestGetInvoice:
 
         response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(student_token))
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/pdf"
-        assert response.content.startswith(b"%PDF")
+        content, content_type, filename = decode_file_envelope(response)
+        assert content_type == "application/pdf"
+        assert content.startswith(b"%PDF")
         # Unpaid invoice — filename/document should say "invoice", not "receipt".
-        assert response.headers["content-disposition"] == 'attachment; filename="invoice.pdf"'
+        assert filename == "invoice.pdf"
 
     def test_unlinked_parent_cannot_download_invoice(
         self, client, make_admin_user, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
@@ -415,7 +416,8 @@ class TestGetInvoice:
         parent_token = _login(client, "parent@example.com", "parent-password")
         response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(parent_token))
         assert response.status_code == 200
-        assert response.content.startswith(b"%PDF")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"%PDF")
 
     def test_paid_invoice_labeled_as_receipt(
         self, client, make_admin_user, make_teacher_user, make_student_user, make_class_session, make_enrollment
@@ -451,7 +453,8 @@ class TestGetInvoice:
 
         response = client.get(f"/api/v1/fees/invoices/{invoice_id}", headers=_headers(student_token))
         assert response.status_code == 200
-        assert response.headers["content-disposition"] == 'attachment; filename="receipt.pdf"'
+        _content, _content_type, filename = decode_file_envelope(response)
+        assert filename == "receipt.pdf"
 
 
 def _login_and_headers(client, email, password):

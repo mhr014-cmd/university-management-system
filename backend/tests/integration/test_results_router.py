@@ -7,7 +7,7 @@ Full request -> DB -> response cycle against a disposable test database
 (see tests/conftest.py). Requires TEST_DATABASE_URL — skipped otherwise.
 """
 
-from tests.conftest import requires_test_database
+from tests.conftest import decode_file_envelope, requires_test_database
 
 pytestmark = requires_test_database
 
@@ -550,8 +550,9 @@ class TestTranscript:
 
         response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(student_token))
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/pdf"
-        assert response.content.startswith(b"%PDF")
+        content, content_type, _filename = decode_file_envelope(response)
+        assert content_type == "application/pdf"
+        assert content.startswith(b"%PDF")
 
     def test_empty_transcript_returns_200_not_409(self, client, make_student_user):
         _student_user, student = make_student_user("student@example.com", "student-password")
@@ -559,7 +560,8 @@ class TestTranscript:
 
         response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(token))
         assert response.status_code == 200
-        assert response.content.startswith(b"%PDF")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"%PDF")
 
     def test_unlinked_parent_cannot_download_transcript(
         self, client, make_teacher_user, make_student_user, make_parent_user, make_class_session, make_enrollment
@@ -594,7 +596,8 @@ class TestTranscript:
 
         response = client.get(f"/api/v1/results/{student.id}/transcript", headers=_headers(parent_token))
         assert response.status_code == 200
-        assert response.content.startswith(b"%PDF")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"%PDF")
 
 
 class TestResultPublishedParentNotification:

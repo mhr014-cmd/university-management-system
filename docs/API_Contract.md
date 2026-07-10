@@ -513,6 +513,7 @@
       "answer_id": "uuid",
       "answer_text": "string | null",
       "selected_option_id": "uuid | null",
+      "selected_option_text": "string | null",
       "awarded_marks": "number | null",
       "feedback": "string | null"
     }
@@ -1325,14 +1326,23 @@ No other automatic triggers exist (Domain Rule 19 — automatic notifications ar
   ],
   "pass_count": "integer",
   "fail_count": "integer",
-  "average_gpa": "number"
+  "average_gpa": "number",
+  "details": [
+    { "student_id": "uuid", "student_name": "string", "course_name": "string", "exam_title": "string | null", "grade_letter": "string", "grade_point": "number" }
+  ]
 }
 ```
 - **Validation:** `department_id`/`semester_id`/`student_id` if provided must reference existing rows.
 - **Possible Errors:** invalid filter IDs (422); caller is not Admin (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
-- **Database Tables Used:** `result`, `course`, `department`, `semester`, `student`.
-- **Business Rules:** BR-002 — only `published` results are included in report aggregates. `pass_count`/`fail_count` is determined by `grade_point > 0` (pass) vs. `grade_point == 0` (fail), since `grade_letter` is Teacher-supplied free text with no fixed enum (Milestone 10 engineering decision — see `Proposal_vs_Engineering_Additions.md`). `average_gpa` (Milestone 10, additive field, Finding A) is the same credit-hour-weighted GPA formula already implemented for `GET /results/me` (§5.x) — computed once in `result_service.compute_credit_weighted_gpa` and reused here, never duplicated, per this milestone's approved Finding A.
+- **Database Tables Used:** `result`, `course`, `department`, `semester`, `student`, `exam`.
+- **Business Rules:** BR-002 — only `published` results are included in report aggregates. `pass_count`/`fail_count` is determined by `grade_point > 0` (pass) vs. `grade_point == 0` (fail), since `grade_letter` is Teacher-supplied free text with no fixed enum (Milestone 10 engineering decision — see `Proposal_vs_Engineering_Additions.md`). `average_gpa` (Milestone 10, additive field, Finding A) is the same credit-hour-weighted GPA formula already implemented for `GET /results/me` (§5.x) — computed once in `result_service.compute_credit_weighted_gpa` and reused here, never duplicated, per this milestone's approved Finding A. `details` (consistency-audit gap closure, additive field) — one row per underlying published `result`, reusing the same rows the summary aggregates already fetched — see `Proposal_vs_Engineering_Additions.md`.
+
+#### 9.1a `GET /results/reports/pdf`, `GET /results/reports/excel` *(Derived Engineering Addition)*
+- **Purpose:** Same data as §9.1, rendered as a downloadable PDF or Excel report (Print/PDF/Excel export parity with the Attendance report — see `Proposal_vs_Engineering_Additions.md`).
+- **Authentication Required:** Yes. **User Roles:** Admin. **Request:** identical query params to §9.1.
+- **Response Body (200):** base64 JSON envelope — `{ "filename": "string", "content_type": "string", "data_base64": "string" }` (see `app/core/file_response.py`; avoids third-party download-manager interception of a raw `application/pdf`/xlsx response).
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
 
 ### 9.2 `GET /fees/reports`
 
@@ -1346,14 +1356,23 @@ No other automatic triggers exist (Domain Rule 19 — automatic notifications ar
   "scope": { "department_id": "uuid | null", "semester_id": "uuid | null", "student_id": "uuid | null" },
   "total_collected": "number",
   "total_outstanding": "number",
-  "total_overdue": "number"
+  "total_overdue": "number",
+  "details": [
+    { "student_id": "uuid", "student_name": "string", "fee_name": "string", "amount": "number", "paid": "number", "outstanding": "number", "due_date": "date", "status": "string" }
+  ]
 }
 ```
 - **Validation:** `department_id`/`semester_id`/`student_id` if provided must reference existing rows.
 - **Possible Errors:** invalid filter IDs (422); caller is not Admin (403).
 - **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
 - **Database Tables Used:** `payment`, `fee_structure`, `invoice`, `department`, `semester`, `student`.
-- **Business Rules:** NFR-016 (computed on demand, not cached).
+- **Business Rules:** NFR-016 (computed on demand, not cached). `details` (consistency-audit gap closure, additive field) — one row per invoice, reusing the same `(Invoice, FeeStructure)` pairs the summary totals already fetched — see `Proposal_vs_Engineering_Additions.md`.
+
+#### 9.2a `GET /fees/reports/pdf`, `GET /fees/reports/excel` *(Derived Engineering Addition)*
+- **Purpose:** Same data as §9.2, rendered as a downloadable PDF or Excel report (Print/PDF/Excel export parity with the Attendance report — see `Proposal_vs_Engineering_Additions.md`).
+- **Authentication Required:** Yes. **User Roles:** Admin. **Request:** identical query params to §9.2.
+- **Response Body (200):** base64 JSON envelope, same shape as §9.1a.
+- **Status Codes:** 200 OK, 401 Unauthorized, 403 Forbidden, 422 Unprocessable Entity.
 
 ---
 

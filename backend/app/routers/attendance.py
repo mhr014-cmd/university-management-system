@@ -9,10 +9,11 @@ app/services/attendance_service.py, never here, per CLAUDE.md §6.
 import uuid
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from app.core.file_response import file_json_response
 from app.csv.attendance_report import generate_attendance_report_csv
 from app.db.session import get_db
 from app.excel.attendance_report import generate_attendance_report_excel
@@ -131,11 +132,13 @@ async def get_attendance_reports_pdf(
     )
     pdf_bytes = await run_in_threadpool(generate_attendance_report_pdf, scope_labels, report.summary)
     filename = _export_filename("pdf")
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    # Returned as a base64 JSON envelope, not a raw application/pdf response
+    # — see app/core/file_response.py's docstring for why (confirmed via
+    # live runtime debugging: third-party download managers intercept a raw
+    # application/pdf response at the network layer regardless of
+    # Content-Disposition, re-requesting it without the JS-held bearer
+    # token and producing a spurious 401 + their own credential prompt).
+    return file_json_response(pdf_bytes, "application/pdf", filename)
 
 
 @router.get("/reports/excel", dependencies=[_require_admin_or_parent])
@@ -154,10 +157,9 @@ async def get_attendance_reports_excel(
     )
     excel_bytes = await run_in_threadpool(generate_attendance_report_excel, scope_labels, report.summary)
     filename = _export_filename("xlsx")
-    return Response(
-        content=excel_bytes,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    # Base64 JSON envelope — see get_attendance_reports_pdf above.
+    return file_json_response(
+        excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename
     )
 
 
@@ -177,11 +179,8 @@ async def get_attendance_reports_csv(
     )
     csv_bytes = await run_in_threadpool(generate_attendance_report_csv, scope_labels, report.summary)
     filename = _export_filename("csv")
-    return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    # Base64 JSON envelope — see get_attendance_reports_pdf above.
+    return file_json_response(csv_bytes, "text/csv", filename)
 
 
 @router.get(

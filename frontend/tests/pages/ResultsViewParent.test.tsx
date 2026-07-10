@@ -9,6 +9,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, beforeEach, expect, it, vi } from "vitest";
 import ResultsViewPage from "../../src/pages/ResultsView";
+import { ToastProvider } from "../../src/components/ui/Toast";
 
 vi.mock("../../src/auth/AuthContext", () => ({
   useAuth: () => ({ user: { role: "parent" }, isAuthenticated: true, login: vi.fn(), logout: vi.fn() }),
@@ -44,25 +45,33 @@ vi.mock("../../src/features/results", () => ({
   useDownloadTranscript: () => ({ mutate: mutateDownloadTranscript, isPending: false }),
 }));
 
+function renderPage() {
+  return render(
+    <ToastProvider>
+      <ResultsViewPage />
+    </ToastProvider>,
+  );
+}
+
 describe("ResultsViewPage — Parent", () => {
   beforeEach(() => {
     mutateDownloadTranscript.mockReset();
   });
 
   it("auto-selects the first linked child and shows their results", () => {
-    render(<ResultsViewPage />);
+    renderPage();
 
     expect(screen.getByText("Intro to CS")).toBeInTheDocument();
     expect(screen.getByText("GPA this semester: 3.50")).toBeInTheDocument();
   });
 
   it("shows an honest 'Not available' placeholder for overall CGPA", () => {
-    render(<ResultsViewPage />);
+    renderPage();
     expect(screen.getByText(/Overall CGPA: Not available/i)).toBeInTheDocument();
   });
 
   it("derives Pass/Fail per course from grade_point", () => {
-    render(<ResultsViewPage />);
+    renderPage();
     const passRow = screen.getByText("Intro to CS").closest("tr") as HTMLElement;
     const failRow = screen.getByText("Calculus").closest("tr") as HTMLElement;
     expect(passRow).toHaveTextContent("Pass");
@@ -71,7 +80,7 @@ describe("ResultsViewPage — Parent", () => {
 
   it("lets the parent switch children via the Linked Child selector", async () => {
     const user = userEvent.setup();
-    render(<ResultsViewPage />);
+    renderPage();
 
     const select = screen.getByDisplayValue("John Smith");
     await user.selectOptions(select, "student-2");
@@ -81,10 +90,10 @@ describe("ResultsViewPage — Parent", () => {
 
   it("downloads the transcript for the selected child", async () => {
     const user = userEvent.setup();
-    render(<ResultsViewPage />);
+    renderPage();
 
     await user.click(screen.getByRole("button", { name: /download transcript/i }));
 
-    expect(mutateDownloadTranscript).toHaveBeenCalledWith("student-1");
+    expect(mutateDownloadTranscript).toHaveBeenCalledWith("student-1", expect.anything());
   });
 });

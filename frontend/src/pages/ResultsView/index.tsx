@@ -39,6 +39,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { useToast } from "../../components/ui/Toast";
 import { inputClass } from "../../components/ui/classNames";
 
 export default function ResultsViewPage() {
@@ -97,9 +98,26 @@ function ResultsPanel({
   onSemesterChange: (id: string) => void;
   semesters: { semester_id: string; semester_name: string; gpa: number; courses: { course_id: string; course_name: string; grade_letter: string; grade_point: number }[] }[];
 }) {
+  const { showError } = useToast();
   const downloadTranscript = useDownloadTranscript();
   const selected = semesterId ? semesters.find((s) => s.semester_id === semesterId) : semesters[0];
   const hasAnyPublishedResults = semesters.length > 0;
+
+  // Defensive gap closure: the button is already `disabled` below when
+  // there's nothing to export, but this guard makes that invariant
+  // explicit at the click-handler level too (not just relying on the DOM
+  // `disabled` attribute) and — for the has-results path — this mutation
+  // previously had no onError at all, so any failure looked like an
+  // indefinite hang (isPending clears, but nothing else visibly happens).
+  const handleDownloadTranscript = () => {
+    if (!hasAnyPublishedResults) {
+      showError("No published results are available to generate a transcript.");
+      return;
+    }
+    downloadTranscript.mutate(studentId, {
+      onError: () => showError("Could not generate the transcript. Please try again."),
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -155,7 +173,7 @@ function ResultsPanel({
 
       <div className="flex justify-center pt-2">
         <Button
-          onClick={() => downloadTranscript.mutate(studentId)}
+          onClick={handleDownloadTranscript}
           disabled={!hasAnyPublishedResults}
           isLoading={downloadTranscript.isPending}
           icon={<Download className="h-4 w-4" aria-hidden="true" />}

@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../lib/apiClient";
+import { blobFromEnvelope, downloadBlob, exportReport } from "../../lib/exportClient";
 
 export type ResultStatus = "submitted" | "published" | "rejected";
 export type ApprovalDecision = "approve" | "reject";
@@ -73,12 +74,22 @@ export interface GradeDistributionEntry {
   count: number;
 }
 
+export interface ResultDetailEntry {
+  student_id: string;
+  student_name: string;
+  course_name: string;
+  exam_title: string | null;
+  grade_letter: string;
+  grade_point: number;
+}
+
 export interface ResultsReportResponse {
   scope: { department_id: string | null; semester_id: string | null; student_id: string | null };
   grade_distribution: GradeDistributionEntry[];
   pass_count: number;
   fail_count: number;
   average_gpa: number;
+  details: ResultDetailEntry[];
 }
 
 export function useMyResults(params?: { semesterId?: string; studentId?: string }) {
@@ -184,18 +195,47 @@ export function useExamResultsForTeacher(examId?: string) {
   });
 }
 
+// Reports-module consistency enhancement: Results now supports the same
+// Print/PDF/Excel export actions Attendance already had — reuses
+// lib/exportClient.ts's exportReport() exactly like
+// useExportAttendanceReportPdf/Excel (features/attendance/index.ts).
+export function useExportResultsReportPdf() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/results/reports/pdf",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "results-report.pdf",
+      ),
+  });
+}
+
+export function useExportResultsReportExcel() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/results/reports/excel",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "results-report.xlsx",
+      ),
+  });
+}
+
 export function useDownloadTranscript() {
   return useMutation({
     mutationFn: async (studentId: string) => {
-      const response = await apiClient.get(`/results/${studentId}/transcript`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "transcript.pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      // Base64 JSON envelope, not a raw blob response — see
+      // lib/exportClient.ts's docstring.
+      const response = await apiClient.get(`/results/${studentId}/transcript`);
+      downloadBlob(blobFromEnvelope(response.data), response.data.filename ?? "transcript.pdf");
     },
   });
 }

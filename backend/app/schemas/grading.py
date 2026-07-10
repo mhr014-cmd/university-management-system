@@ -23,6 +23,10 @@ class SubmissionQuestionDetail(BaseModel):
     answer_id: uuid.UUID | None
     answer_text: str | None
     selected_option_id: uuid.UUID | None
+    # Resolved display label for selected_option_id (Milestone 11 final-
+    # polish fix — Teacher grading view previously rendered the raw MCQ
+    # option UUID instead of what the student actually chose).
+    selected_option_text: str | None
     awarded_marks: float | None
     feedback: str | None
 

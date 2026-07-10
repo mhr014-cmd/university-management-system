@@ -23,6 +23,18 @@ const mutateAsyncUpdateExam = vi.fn();
 // `draft` from `detail`) sees a "changed" dependency every render, calls
 // setDraft again, re-renders, and never stabilizes (an infinite loop that
 // exhausted the test worker's memory the first time this was written).
+// Same reason `examData`/`examResultsData` are mutated in place by each
+// test (via `Object.assign`/array splicing) rather than reassigned, and
+// why the FR-034 describe block below does the same instead of using
+// `vi.doMock` — the top-level `vi.mock` factory below is hoisted and
+// resolved once for the whole file, so a per-test `vi.doMock` never
+// actually overrides it once `GradingInterfacePage` has been imported.
+const examData: { id: string; title: string; status: string } = {
+  id: "exam-1",
+  title: "Midterm",
+  status: "open",
+};
+
 const examResultsData = {
   exam_id: "exam-1",
   submissions: [
@@ -58,11 +70,16 @@ const submissionDetailData = {
 };
 
 vi.mock("../../src/features/exams", () => ({
-  useExam: () => ({ data: { id: "exam-1", title: "Midterm" } }),
+  useExam: () => ({ data: examData }),
   useExamResults: () => ({ data: examResultsData }),
   useSubmissionDetail: () => ({ data: submissionDetailData, isLoading: false }),
   useGradeExam: () => ({ mutateAsync: mutateAsyncGrade, isPending: false }),
   useUpdateExam: () => ({ mutateAsync: mutateAsyncUpdateExam, isPending: false }),
+}));
+
+const mutateAsyncSubmitResults = vi.fn();
+vi.mock("../../src/features/results", () => ({
+  useSubmitResults: () => ({ mutateAsync: mutateAsyncSubmitResults, isPending: false }),
 }));
 
 function renderGradingInterface() {
@@ -114,5 +131,46 @@ describe("GradingInterfacePage grading form", () => {
     await user.click(screen.getByRole("button", { name: /save grades/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/exceeds a question's maximum marks/i);
+  });
+});
+
+// FR-034: a Teacher submits a published, fully-graded exam's results for
+// admin approval via POST /results/{examId}/submit (features/results'
+// useSubmitResults) — previously built and tested at the API layer but
+// never reachable from any page. Covers the gap found via live runtime
+// debugging (see Grading Interface's own module docstring).
+describe("GradingInterfacePage — Submit Results for Approval (FR-034)", () => {
+  it("is hidden until the exam is published, even when fully graded", async () => {
+    examData.status = "open";
+    examResultsData.submissions[0].status = "graded";
+
+    renderGradingInterface();
+
+    await screen.findByPlaceholderText("Marks");
+    expect(screen.queryByText("Submit Results for Admin Approval")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /publish exam/i })).toBeInTheDocument();
+  });
+
+  it("submits grade_letter/grade_point per student once published and fully graded", async () => {
+    examData.status = "published";
+    examResultsData.submissions[0].status = "graded";
+    examResultsData.submissions[0].total_awarded_marks = 4;
+    const user = userEvent.setup();
+    mutateAsyncSubmitResults.mockResolvedValue({ exam_id: "exam-1", status: "submitted", submitted_at: "now" });
+
+    renderGradingInterface();
+
+    expect(screen.queryByRole("button", { name: /publish exam/i })).not.toBeInTheDocument();
+    await screen.findByText("Submit Results for Admin Approval");
+
+    await user.type(screen.getByPlaceholderText("Grade letter (e.g. A)"), "A");
+    await user.type(screen.getByPlaceholderText("Grade point"), "4");
+    await user.click(screen.getByRole("button", { name: /submit results for approval/i }));
+
+    expect(mutateAsyncSubmitResults).toHaveBeenCalledWith({
+      examId: "exam-1",
+      results: [{ student_id: "student-1", grade_letter: "A", grade_point: 4 }],
+    });
+    expect(await screen.findByText("Results submitted for admin approval.")).toBeInTheDocument();
   });
 });

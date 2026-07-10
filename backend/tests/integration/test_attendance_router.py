@@ -8,7 +8,7 @@ Full request -> DB -> response cycle against a disposable test database
 
 import uuid
 
-from tests.conftest import requires_test_database
+from tests.conftest import decode_file_envelope, requires_test_database
 
 pytestmark = requires_test_database
 
@@ -463,11 +463,11 @@ class TestAttendanceReportsExport:
         response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(admin_token))
 
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/pdf"
-        assert response.content.startswith(b"%PDF")
-        content_disposition = response.headers["content-disposition"]
-        assert content_disposition.startswith('attachment; filename="attendance-report-')
-        assert content_disposition.endswith('.pdf"')
+        content, content_type, filename = decode_file_envelope(response)
+        assert content_type == "application/pdf"
+        assert content.startswith(b"%PDF")
+        assert filename.startswith("attendance-report-")
+        assert filename.endswith(".pdf")
 
     def test_excel_download_has_correct_content_type_and_filename(
         self,
@@ -498,25 +498,27 @@ class TestAttendanceReportsExport:
         response = client.get("/api/v1/attendance/reports/excel", headers=_headers(admin_token))
 
         assert response.status_code == 200
-        assert response.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        assert response.content.startswith(b"PK")
-        content_disposition = response.headers["content-disposition"]
-        assert content_disposition.startswith('attachment; filename="attendance-report-')
-        assert content_disposition.endswith('.xlsx"')
+        content, content_type, filename = decode_file_envelope(response)
+        assert content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        assert content.startswith(b"PK")
+        assert filename.startswith("attendance-report-")
+        assert filename.endswith(".xlsx")
 
     def test_pdf_export_with_no_records_still_succeeds(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")
         admin_token = _login(client, "admin@example.com", "correct-password")
         response = client.get("/api/v1/attendance/reports/pdf", headers=_headers(admin_token))
         assert response.status_code == 200
-        assert response.content.startswith(b"%PDF")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"%PDF")
 
     def test_excel_export_with_no_records_still_succeeds(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")
         admin_token = _login(client, "admin@example.com", "correct-password")
         response = client.get("/api/v1/attendance/reports/excel", headers=_headers(admin_token))
         assert response.status_code == 200
-        assert response.content.startswith(b"PK")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"PK")
 
     def test_invalid_student_id_returns_422_for_pdf(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")
@@ -585,7 +587,8 @@ class TestAttendanceReportsExportParentAccess:
             f"/api/v1/attendance/reports/pdf?student_id={student.id}", headers=_headers(parent_token)
         )
         assert response.status_code == 200
-        assert response.content.startswith(b"%PDF")
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert content.startswith(b"%PDF")
 
     def test_linked_parent_downloads_csv(
         self,
@@ -609,18 +612,19 @@ class TestAttendanceReportsExportParentAccess:
             f"/api/v1/attendance/reports/csv?student_id={student.id}", headers=_headers(parent_token)
         )
         assert response.status_code == 200
-        assert response.headers["content-type"] == "text/csv; charset=utf-8"
-        content_disposition = response.headers["content-disposition"]
-        assert content_disposition.startswith('attachment; filename="attendance-report-')
-        assert content_disposition.endswith('.csv"')
-        assert b"Student,Attendance %" in response.content
+        content, content_type, filename = decode_file_envelope(response)
+        assert content_type == "text/csv"
+        assert filename.startswith("attendance-report-")
+        assert filename.endswith(".csv")
+        assert b"Student,Attendance %" in content
 
     def test_admin_still_gets_school_wide_csv(self, client, make_admin_user):
         make_admin_user("admin@example.com", "correct-password")
         admin_token = _login(client, "admin@example.com", "correct-password")
         response = client.get("/api/v1/attendance/reports/csv", headers=_headers(admin_token))
         assert response.status_code == 200
-        assert b"Student,Attendance %" in response.content
+        content, _content_type, _filename = decode_file_envelope(response)
+        assert b"Student,Attendance %" in content
 
 
 class TestClassSessionRoster:

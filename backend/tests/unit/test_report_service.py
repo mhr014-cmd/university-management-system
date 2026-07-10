@@ -84,11 +84,24 @@ def stub_repos(monkeypatch):
     department_repo = MagicMock()
     semester_repo = MagicMock()
     user_repo = MagicMock()
+    # Detail-section gap closure: get_results_report/get_fees_report now
+    # also batch-resolve student names and per-result course/exam names
+    # (see report_service.py). Defaulted here so every pre-existing test
+    # below — none of which assert on `.details` — doesn't need to know
+    # about this; only tests that care about the detail rows configure
+    # these further.
+    user_repo.list_students_by_ids.return_value = []
+    course_repo = MagicMock()
+    course_repo.get.return_value = make_course()
+    exam_repo = MagicMock()
+    exam_repo.get_exam.return_value = None
     monkeypatch.setattr(report_service_module, "result_repo", result_repo)
     monkeypatch.setattr(report_service_module, "fee_repo", fee_repo)
     monkeypatch.setattr(report_service_module, "department_repo", department_repo)
     monkeypatch.setattr(report_service_module, "semester_repo", semester_repo)
     monkeypatch.setattr(report_service_module, "user_repo", user_repo)
+    monkeypatch.setattr(report_service_module, "course_repo", course_repo)
+    monkeypatch.setattr(report_service_module, "exam_repo", exam_repo)
     return result_repo, fee_repo, department_repo, semester_repo, user_repo
 
 
@@ -172,6 +185,38 @@ class TestGetResultsReport:
             session, department_id=department_id, semester_id=semester_id, student_id=student_id
         )
 
+    def test_details_include_student_course_exam_and_grade(self, service, stub_repos, session, monkeypatch):
+        result_repo, _fee_repo, _department_repo, _semester_repo, user_repo = stub_repos
+        from app.models.student import Student
+        from app.models.user import User
+
+        student_id = uuid.uuid4()
+        result = make_result(student_id=student_id, grade_letter="A", grade_point=4.0)
+        result_repo.list_published_for_report.return_value = [result]
+        student = Student(id=student_id, user_id=uuid.uuid4(), department_id=uuid.uuid4(), first_name="Rafiq", last_name="Chowdhury")
+        user_repo.list_students_by_ids.return_value = [student]
+
+        course = make_course(name="Data Structures")
+        monkeypatch.setattr(report_service_module, "course_repo", MagicMock(get=lambda *_a, **_k: course))
+        monkeypatch.setattr(result_service_module, "course_repo", MagicMock(get=lambda *_a, **_k: course))
+
+        from app.models.exam import Exam
+
+        exam = Exam(
+            id=result.exam_id, class_session_id=uuid.uuid4(), created_by_teacher_id=uuid.uuid4(), title="Midterm",
+            exam_type="mcq", time_limit_minutes=30, status="published",
+        )
+        monkeypatch.setattr(report_service_module, "exam_repo", MagicMock(get_exam=lambda *_a, **_k: exam))
+
+        response = service.get_results_report(session, department_id=None, semester_id=None, student_id=None)
+        assert len(response.details) == 1
+        detail = response.details[0]
+        assert detail.student_name == "Rafiq Chowdhury"
+        assert detail.course_name == "Data Structures"
+        assert detail.exam_title == "Midterm"
+        assert detail.grade_letter == "A"
+        assert detail.grade_point == 4.0
+
 
 class TestGetFeesReport:
     def test_invalid_department_rejected(self, service, stub_repos, session):
@@ -219,3 +264,25 @@ class TestGetFeesReport:
         response = service.get_fees_report(session, department_id=None, semester_id=None, student_id=None)
         assert response.total_outstanding == 0.0
         assert response.total_overdue == 0.0
+
+    def test_details_include_student_fee_name_and_amounts(self, service, stub_repos, session):
+        _result_repo, fee_repo, _department_repo, _semester_repo, user_repo = stub_repos
+        from app.models.student import Student
+
+        student_id = uuid.uuid4()
+        fee_structure = make_fee_structure(name="Tuition", amount=10000, due_date=date(2020, 1, 1))
+        invoice = make_invoice(student_id=student_id, fee_structure_id=fee_structure.id, status="unpaid")
+        fee_repo.list_invoices_for_report.return_value = [(invoice, fee_structure)]
+        fee_repo.sum_payments.return_value = 4000.0
+        student = Student(id=student_id, user_id=uuid.uuid4(), department_id=uuid.uuid4(), first_name="Rafiq", last_name="Chowdhury")
+        user_repo.list_students_by_ids.return_value = [student]
+
+        response = service.get_fees_report(session, department_id=None, semester_id=None, student_id=None)
+        assert len(response.details) == 1
+        detail = response.details[0]
+        assert detail.student_name == "Rafiq Chowdhury"
+        assert detail.fee_name == "Tuition"
+        assert detail.amount == 10000.0
+        assert detail.paid == 4000.0
+        assert detail.outstanding == 6000.0
+        assert detail.status == "overdue"

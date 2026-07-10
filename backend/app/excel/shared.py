@@ -56,8 +56,32 @@ def write_header_row(sheet: Worksheet, columns: list[str], *, row: int = _HEADER
         cell.alignment = Alignment(horizontal="center")
 
 
+def _write_data_sheet(sheet: Worksheet, *, title_row_value: str, columns: list[str], rows: list[list]) -> None:
+    """Shared body for both the primary sheet (via build_report_workbook)
+    and any extra_sheets (below) — a title/header row then data rows,
+    auto-sized. Extracted so a detail sheet doesn't duplicate this loop."""
+    _write_merged_meta_row(sheet, _TITLE_ROW, title_row_value, len(columns), _TITLE_FONT)
+    write_header_row(sheet, columns, row=_TITLE_ROW + 1)
+
+    for row_offset, row_values in enumerate(rows, start=1):
+        for col_index, value in enumerate(row_values, start=1):
+            sheet.cell(row=_TITLE_ROW + 1 + row_offset, column=col_index, value=value)
+
+    autosize_columns(sheet, len(columns))
+
+
 def build_report_workbook(
-    *, report_title: str, subtitle: str, columns: list[str], rows: list[list]
+    *,
+    report_title: str,
+    subtitle: str,
+    columns: list[str],
+    rows: list[list],
+    # Optional additional worksheets — e.g. a "Details" sheet backing a
+    # report's summary (Reports-module detail enhancement). Each tuple is
+    # (sheet_title, columns, rows), reusing the same header/autosize
+    # styling as the primary sheet. Every pre-existing caller (Attendance)
+    # omits this, so its output is byte-for-byte unchanged.
+    extra_sheets: list[tuple[str, list[str], list[list]]] | None = None,
 ) -> bytes:
     """Assembles a full .xlsx report: a title row, a subtitle row, a
     generated-on timestamp row, then a styled header row and the data
@@ -83,6 +107,10 @@ def build_report_workbook(
             sheet.cell(row=_HEADER_ROW + row_offset, column=col_index, value=value)
 
     autosize_columns(sheet, len(columns))
+
+    for sheet_title, extra_columns, extra_rows in extra_sheets or []:
+        extra_sheet = workbook.create_sheet(title=sheet_title)
+        _write_data_sheet(extra_sheet, title_row_value=sheet_title, columns=extra_columns, rows=extra_rows)
 
     buffer = BytesIO()
     workbook.save(buffer)

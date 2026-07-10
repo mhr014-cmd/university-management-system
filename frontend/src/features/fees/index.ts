@@ -3,7 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../lib/apiClient";
-import { downloadBlob, filenameFromContentDisposition } from "../../lib/exportClient";
+import { blobFromEnvelope, downloadBlob, exportReport } from "../../lib/exportClient";
 
 export type InvoiceStatus = "unpaid" | "partially_paid" | "paid" | "overdue";
 
@@ -79,11 +79,23 @@ export interface OverdueResponse {
   overdue_accounts: OverdueAccountEntry[];
 }
 
+export interface FeeDetailEntry {
+  student_id: string;
+  student_name: string;
+  fee_name: string;
+  amount: number;
+  paid: number;
+  outstanding: number;
+  due_date: string;
+  status: string;
+}
+
 export interface FeesReportResponse {
   scope: { department_id: string | null; semester_id: string | null; student_id: string | null };
   total_collected: number;
   total_outstanding: number;
   total_overdue: number;
+  details: FeeDetailEntry[];
 }
 
 export type OverdueNotifyScope = "selected" | "all_overdue";
@@ -204,16 +216,50 @@ export function useNotifyOverdueAccounts() {
   });
 }
 
+// Reports-module consistency enhancement: Fees now supports the same
+// Print/PDF/Excel export actions Attendance already had — reuses
+// lib/exportClient.ts's exportReport() exactly like
+// useExportAttendanceReportPdf/Excel (features/attendance/index.ts).
+export function useExportFeesReportPdf() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/fees/reports/pdf",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "fees-report.pdf",
+      ),
+  });
+}
+
+export function useExportFeesReportExcel() {
+  return useMutation({
+    mutationFn: async (params?: { departmentId?: string; semesterId?: string; studentId?: string }) =>
+      exportReport(
+        "/fees/reports/excel",
+        {
+          department_id: params?.departmentId,
+          semester_id: params?.semesterId,
+          student_id: params?.studentId,
+        },
+        "fees-report.xlsx",
+      ),
+  });
+}
+
 export function useDownloadInvoice() {
   return useMutation({
     mutationFn: async (invoiceId: string) => {
-      const response = await apiClient.get(`/fees/invoices/${invoiceId}`, { responseType: "blob" });
-      // Server labels a paid invoice's PDF (and its Content-Disposition
-      // filename) as a Receipt instead of an Invoice — see
+      // Base64 JSON envelope, not a raw blob response — see
+      // lib/exportClient.ts's docstring. Server labels a paid invoice's
+      // PDF (and its filename) as a Receipt instead of an Invoice — see
       // invoice_generator.py's docstring — so the downloaded filename
       // reflects whichever the backend actually generated.
-      const filename = filenameFromContentDisposition(response.headers["content-disposition"]) ?? "invoice.pdf";
-      downloadBlob(response.data, filename);
+      const response = await apiClient.get(`/fees/invoices/${invoiceId}`);
+      downloadBlob(blobFromEnvelope(response.data), response.data.filename ?? "invoice.pdf");
     },
   });
 }

@@ -58,11 +58,11 @@ export default function ResultApprovalPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Result Approval</h1>
+        <h1 className="shrink-0 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Result Approval</h1>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ResultStatus)}
-          className={`w-auto ${inputClass}`}
+          className={`!w-40 shrink-0 ${inputClass}`}
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option} value={option}>

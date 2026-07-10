@@ -250,7 +250,7 @@ export default function ExamBuilderPage() {
             value={classSessionId}
             onChange={(e) => setClassSessionId(e.target.value)}
             disabled={isEditMode}
-            className={`w-auto ${inputClass}`}
+            className={`!w-56 shrink-0 ${inputClass}`}
           >
             <option value="">Select Class</option>
             {uniqueClassSessions.map(([id, name]) => (
@@ -259,7 +259,7 @@ export default function ExamBuilderPage() {
               </option>
             ))}
           </select>
-          <select value={examType} onChange={(e) => setExamType(e.target.value as ExamType)} className={`w-auto ${inputClass}`}>
+          <select value={examType} onChange={(e) => setExamType(e.target.value as ExamType)} className={`!w-40 shrink-0 ${inputClass}`}>
             {EXAM_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -271,7 +271,7 @@ export default function ExamBuilderPage() {
             min={1}
             value={timeLimitMinutes}
             onChange={(e) => setTimeLimitMinutes(Number(e.target.value))}
-            className={`w-28 ${inputClass}`}
+            className={`!w-28 shrink-0 ${inputClass}`}
             placeholder="Minutes"
           />
         </div>
@@ -297,7 +297,7 @@ export default function ExamBuilderPage() {
                 <select
                   value={question.question_type}
                   onChange={(e) => updateQuestion(qIndex, { question_type: e.target.value as QuestionType })}
-                  className={`w-auto ${inputClass}`}
+                  className={`!w-40 shrink-0 ${inputClass}`}
                 >
                   {QUESTION_TYPE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -311,7 +311,7 @@ export default function ExamBuilderPage() {
                   step={0.01}
                   value={question.marks}
                   onChange={(e) => updateQuestion(qIndex, { marks: Number(e.target.value) })}
-                  className={`w-24 ${inputClass}`}
+                  className={`!w-24 shrink-0 ${inputClass}`}
                   placeholder="Marks"
                 />
                 <input
@@ -319,7 +319,7 @@ export default function ExamBuilderPage() {
                   value={question.hint ?? ""}
                   onChange={(e) => updateQuestion(qIndex, { hint: e.target.value })}
                   placeholder="Hint (optional)"
-                  className={`flex-1 ${inputClass}`}
+                  className={`min-w-0 flex-1 ${inputClass}`}
                 />
               </div>
 

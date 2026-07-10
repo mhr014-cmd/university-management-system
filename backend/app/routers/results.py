@@ -4,10 +4,11 @@ API router: results (see docs/API_Contract.md Section 5).
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from app.core.file_response import file_json_response
 from app.db.session import get_db
 from app.middleware.auth import get_current_user
 from app.middleware.rbac import require_roles
@@ -92,4 +93,7 @@ async def get_transcript(
 ):
     student_name, semesters = result_service.get_transcript_data(db, current_user, student_id)
     pdf_bytes = await run_in_threadpool(generate_transcript_pdf, student_name, semesters)
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    # Base64 JSON envelope, not a raw application/pdf response — see
+    # app/core/file_response.py's docstring (third-party download-manager
+    # interception, confirmed via live runtime debugging).
+    return file_json_response(pdf_bytes, "application/pdf", "transcript.pdf")
